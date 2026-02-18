@@ -3,31 +3,31 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>איך הייתם מצביעים?</title>
+<title>מצביע ומשפיע</title>
 <style>
   @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
 
   :root {
     --blue: #0038b8;
-    --blue-dark: #002a8a;
+    --blue-dark: #001d6e;
     --blue-light: #4a7fe0;
-    --blue-pale: #e8eef8;
-    --blue-glow: rgba(0, 56, 184, 0.12);
+    --blue-pale: #e4ecf7;
+    --blue-glow: rgba(0, 56, 184, 0.15);
     --white: #fafaf8;
-    --off-white: #f5f4f0;
+    --off-white: #eef0f4;
     --card-bg: #ffffff;
-    --border: #dde1e8;
+    --border: #d0d5df;
     --text: #1a1a2e;
     --text-mid: #3a3a52;
     --text-light: #6a6a82;
     --green: #1a9e52;
-    --green-bg: #e8f8ef;
+    --green-bg: #e2f5eb;
     --red: #c0392b;
-    --red-bg: #fde8e8;
+    --red-bg: #fce4e4;
     --orange: #d4850a;
     --orange-bg: #fff3e0;
-    --shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
-    --shadow-hover: 0 8px 32px rgba(0, 56, 184, 0.12);
+    --shadow: 0 2px 8px rgba(0,0,0,0.04), 0 8px 32px rgba(0, 20, 80, 0.08);
+    --shadow-hover: 0 12px 40px rgba(0, 56, 184, 0.16);
   }
 
   * { margin: 0; padding: 0; box-sizing: border-box; }
@@ -40,31 +40,133 @@
     min-height: 100vh;
   }
 
-  .stripe { height: 5px; background: linear-gradient(90deg, var(--blue), var(--blue-light)); }
+  .stripe { height: 6px; background: linear-gradient(90deg, var(--blue-dark), var(--blue), var(--blue-light)); }
 
   header {
-    background: linear-gradient(135deg, var(--blue-dark), var(--blue));
+    background: linear-gradient(135deg, var(--blue-dark) 0%, var(--blue) 60%, #1a5bc4 100%);
     color: white;
-    padding: 2rem 2rem 1.8rem;
+    padding: 2.5rem 2rem 2.2rem;
     text-align: center;
   }
 
   header h1 {
-    font-size: 2.2rem;
+    font-size: 2.6rem;
     font-weight: 800;
-    margin-bottom: 0.3rem;
+    margin-bottom: 0.4rem;
+    letter-spacing: -0.01em;
+    cursor: pointer;
   }
 
   header p {
-    font-size: 1.05rem;
-    opacity: 0.8;
+    font-size: 1.1rem;
+    opacity: 0.85;
     font-weight: 300;
   }
 
   .container {
-    max-width: 680px;
+    max-width: 820px;
     margin: 0 auto;
-    padding: 2rem 1.5rem;
+    padding: 2.5rem 2rem;
+  }
+
+  /* Intro page */
+  .intro-section {
+    animation: fadeIn 0.5s ease;
+  }
+
+  .intro-card {
+    background: var(--card-bg);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 2.2rem 2.5rem;
+    margin-bottom: 1.5rem;
+    border: 1px solid rgba(0,0,0,0.03);
+  }
+
+  .intro-card h2 {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--blue);
+    margin-bottom: 1rem;
+  }
+
+  .intro-card p {
+    color: var(--text-mid);
+    margin-bottom: 0.8rem;
+    font-size: 1.05rem;
+    line-height: 1.8;
+  }
+
+  .intro-card ul {
+    list-style: none;
+    padding: 0;
+    margin: 0.8rem 0;
+  }
+
+  .intro-card ul li {
+    padding: 0.5rem 0;
+    padding-right: 2rem;
+    position: relative;
+    color: var(--text-mid);
+    font-size: 1.02rem;
+    line-height: 1.7;
+  }
+
+  .intro-card ul li::before {
+    content: "\25B8";
+    position: absolute;
+    right: 0.3rem;
+    color: var(--blue);
+    font-size: 0.9rem;
+  }
+
+  .start-btn {
+    display: block;
+    width: 100%;
+    padding: 1.2rem;
+    border: none;
+    border-radius: 14px;
+    background: linear-gradient(135deg, var(--blue), #2260d4);
+    color: white;
+    font-family: 'Heebo', sans-serif;
+    font-size: 1.25rem;
+    font-weight: 700;
+    cursor: pointer;
+    transition: all 0.25s;
+    letter-spacing: 0.02em;
+    box-shadow: 0 4px 16px rgba(0, 56, 184, 0.3);
+  }
+
+  .start-btn:hover {
+    transform: translateY(-3px);
+    box-shadow: 0 8px 28px rgba(0, 56, 184, 0.4);
+  }
+
+  .intro-stats {
+    display: flex;
+    gap: 1rem;
+    margin-top: 1rem;
+  }
+
+  .intro-stat {
+    flex: 1;
+    text-align: center;
+    padding: 1rem 0.8rem;
+    background: linear-gradient(135deg, var(--blue-pale), #dde6f5);
+    border-radius: 12px;
+    border: 1px solid rgba(0, 56, 184, 0.08);
+  }
+
+  .intro-stat .num {
+    font-size: 1.6rem;
+    font-weight: 800;
+    color: var(--blue);
+  }
+
+  .intro-stat .label {
+    font-size: 0.82rem;
+    color: var(--text-light);
+    margin-top: 0.1rem;
   }
 
   /* Progress bar */
@@ -97,10 +199,11 @@
   /* Quiz card */
   .quiz-card {
     background: var(--card-bg);
-    border-radius: 16px;
+    border-radius: 18px;
     box-shadow: var(--shadow);
-    padding: 2rem 2rem 1.5rem;
+    padding: 2.5rem 2.5rem 2rem;
     animation: fadeIn 0.4s ease;
+    border: 1px solid rgba(0,0,0,0.03);
   }
 
   @keyframes fadeIn {
@@ -116,20 +219,56 @@
     margin-bottom: 0.8rem;
   }
 
-  .bill-summary {
-    font-size: 1.2rem;
-    font-weight: 500;
-    color: var(--text);
-    line-height: 1.8;
-    margin-bottom: 1.5rem;
+  .bill-topics {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    margin-bottom: 1rem;
   }
 
-  .bill-original-name {
+  .topic-tag {
+    font-size: 0.75rem;
+    font-weight: 500;
+    padding: 0.2rem 0.7rem;
+    border-radius: 100px;
+    background: var(--blue-pale);
+    color: var(--blue);
+  }
+
+  .bill-synopsis {
+    font-size: 1.2rem;
+    font-weight: 400;
+    color: var(--text);
+    line-height: 2;
+    margin-bottom: 1.8rem;
+  }
+
+  .bill-footer {
     font-size: 0.82rem;
     color: var(--text-light);
     margin-bottom: 2rem;
     padding-top: 0.8rem;
     border-top: 1px solid var(--border);
+    display: flex;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 1rem;
+  }
+
+  .bill-footer .bill-name {
+    flex: 1;
+  }
+
+  .bill-link {
+    color: var(--blue-light);
+    text-decoration: none;
+    font-weight: 500;
+    white-space: nowrap;
+    font-size: 0.82rem;
+  }
+
+  .bill-link:hover {
+    text-decoration: underline;
   }
 
   .vote-buttons {
@@ -139,20 +278,20 @@
 
   .vote-btn {
     flex: 1;
-    padding: 1rem;
-    border: 2px solid var(--border);
-    border-radius: 12px;
+    padding: 1.1rem;
+    border: 2.5px solid var(--border);
+    border-radius: 14px;
     background: var(--card-bg);
     cursor: pointer;
     font-family: 'Heebo', sans-serif;
-    font-size: 1rem;
+    font-size: 1.05rem;
     font-weight: 600;
     transition: all 0.2s;
     text-align: center;
   }
 
   .vote-btn:hover {
-    transform: translateY(-2px);
+    transform: translateY(-3px);
     box-shadow: var(--shadow-hover);
   }
 
@@ -262,15 +401,38 @@
   .result-card-header {
     padding: 1.2rem 1.5rem;
     display: flex;
-    justify-content: space-between;
     align-items: center;
+    gap: 1rem;
+  }
+
+  /* MK avatar */
+  .mk-avatar {
+    width: 48px;
+    height: 48px;
+    border-radius: 50%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-weight: 700;
+    font-size: 1rem;
+    color: white;
+    flex-shrink: 0;
+    overflow: hidden;
+  }
+
+  .mk-avatar img {
+    width: 100%;
+    height: 100%;
+    border-radius: 50%;
+    object-fit: cover;
   }
 
   .result-rank {
-    font-size: 1.5rem;
+    font-size: 1.3rem;
     font-weight: 800;
     color: var(--blue);
-    min-width: 2.5rem;
+    min-width: 2rem;
+    text-align: center;
   }
 
   .result-info { flex: 1; }
@@ -283,6 +445,12 @@
   .result-faction {
     font-size: 0.85rem;
     color: var(--text-light);
+  }
+
+  .result-detail {
+    font-size: 0.8rem;
+    color: var(--text-light);
+    margin-top: 0.15rem;
   }
 
   .result-score {
@@ -400,13 +568,454 @@
     font-size: 1.05rem;
   }
 
+  /* MK Directory */
+  .mk-dir-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(150px, 1fr));
+    gap: 0.8rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .mk-dir-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 1rem;
+    text-align: center;
+    transition: transform 0.15s;
+  }
+
+  .mk-dir-card:hover {
+    transform: translateY(-2px);
+    cursor: pointer;
+  }
+
+  .mk-dir-card .mk-avatar {
+    width: 56px;
+    height: 56px;
+    margin: 0 auto 0.5rem;
+    font-size: 1.1rem;
+  }
+
+  .mk-dir-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.15rem;
+  }
+
+  .mk-dir-faction {
+    font-size: 0.75rem;
+    color: var(--text-light);
+  }
+
+  .mk-dir-votes {
+    font-size: 0.7rem;
+    color: var(--blue-light);
+    margin-top: 0.3rem;
+  }
+
+  .back-btn {
+    display: inline-block;
+    margin-bottom: 1.5rem;
+    padding: 0.5rem 1rem;
+    border: 1px solid var(--border);
+    border-radius: 8px;
+    background: var(--card-bg);
+    color: var(--text-mid);
+    font-family: 'Heebo', sans-serif;
+    font-size: 0.9rem;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+
+  .back-btn:hover {
+    background: var(--blue-pale);
+    color: var(--blue);
+  }
+
+  .faction-section-title {
+    font-size: 1rem;
+    font-weight: 600;
+    color: var(--text-mid);
+    margin: 1.5rem 0 0.8rem;
+    padding-bottom: 0.4rem;
+    border-bottom: 1px solid var(--border);
+  }
+
+  /* MK Detail View */
+  .mk-detail-header {
+    background: var(--card-bg);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 2rem;
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .mk-detail-header .mk-avatar {
+    width: 88px;
+    height: 88px;
+    margin: 0 auto 1rem;
+    font-size: 1.8rem;
+  }
+
+  .mk-detail-name {
+    font-size: 1.5rem;
+    font-weight: 700;
+    margin-bottom: 0.2rem;
+  }
+
+  .mk-detail-faction {
+    font-size: 1rem;
+    color: var(--text-light);
+    margin-bottom: 0.3rem;
+  }
+
+  .mk-detail-stats {
+    font-size: 0.85rem;
+    color: var(--blue-light);
+  }
+
+  .vote-stream {
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    margin-bottom: 1.5rem;
+    overflow: hidden;
+  }
+
+  .vote-stream-title {
+    padding: 1rem 1.5rem 0.5rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--blue);
+  }
+
+  .vote-stream-summary {
+    padding: 0 1.5rem 1rem;
+    font-size: 0.9rem;
+    color: var(--text-mid);
+    font-weight: 500;
+  }
+
+  .vote-stream-row {
+    display: flex;
+    align-items: center;
+    gap: 0.6rem;
+    padding: 0.7rem 1.5rem;
+    border-top: 1px solid #f0f0f0;
+    font-size: 0.85rem;
+  }
+
+  .vote-stream-row.vote-stream-header {
+    border-top: none;
+    padding-bottom: 0.3rem;
+    font-size: 0.78rem;
+  }
+
+  .vote-stream-bill {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-mid);
+  }
+
+  .vote-chip {
+    display: inline-block;
+    padding: 0.15rem 0.5rem;
+    border-radius: 6px;
+    font-size: 0.75rem;
+    font-weight: 600;
+    white-space: nowrap;
+  }
+
+  .vote-chip.for { background: var(--green-bg); color: var(--green); }
+  .vote-chip.against { background: var(--red-bg); color: var(--red); }
+  .vote-chip.abstain { background: var(--orange-bg); color: var(--orange); }
+
+  .match-icon {
+    font-size: 1rem;
+    font-weight: 700;
+    min-width: 1.2rem;
+    text-align: center;
+  }
+
+  .match-icon.agree { color: var(--green); }
+  .match-icon.half { color: var(--orange); }
+  .match-icon.disagree { color: var(--red); }
+
+  .mk-vote-list {
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .mk-vote-list-title {
+    padding: 1rem 1.5rem 0.5rem;
+    font-size: 1rem;
+    font-weight: 700;
+    color: var(--text);
+  }
+
+  .mk-vote-row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.6rem 1.5rem;
+    border-top: 1px solid #f0f0f0;
+    font-size: 0.85rem;
+  }
+
+  .mk-vote-row-name {
+    flex: 1;
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    color: var(--text-mid);
+  }
+
+  .mk-vote-row-date {
+    font-size: 0.75rem;
+    color: var(--text-light);
+    white-space: nowrap;
+  }
+
+  /* Plenum visualization */
+  .plenum-wrap {
+    text-align: center;
+    margin-bottom: 1.5rem;
+  }
+
+  .plenum-svg {
+    width: 100%;
+    max-width: 500px;
+    height: auto;
+  }
+
+  .plenum-seat {
+    transition: fill 0.5s ease;
+    cursor: pointer;
+  }
+
+  .plenum-seat:hover {
+    stroke: var(--text);
+    stroke-width: 1.5;
+  }
+
+  .plenum-tooltip {
+    display: none;
+    position: absolute;
+    z-index: 100;
+    background: var(--card-bg);
+    border-radius: 12px;
+    box-shadow: 0 4px 20px rgba(0,0,0,0.15);
+    padding: 0.8rem 1rem;
+    pointer-events: none;
+    min-width: 160px;
+    text-align: center;
+    border: 1px solid var(--border);
+  }
+
+  .plenum-tooltip.visible { display: block; }
+
+  .plenum-tooltip .mk-avatar {
+    width: 48px;
+    height: 48px;
+    margin: 0 auto 0.4rem;
+    font-size: 1rem;
+  }
+
+  .plenum-tooltip-name {
+    font-size: 0.9rem;
+    font-weight: 600;
+    color: var(--text);
+  }
+
+  .plenum-tooltip-faction {
+    font-size: 0.78rem;
+    color: var(--text-light);
+    margin-bottom: 0.3rem;
+  }
+
+  .plenum-tooltip-match {
+    font-size: 0.82rem;
+    font-weight: 600;
+    color: var(--blue);
+  }
+
+  /* Bill Directory & Detail */
+  .bill-dir-card {
+    background: var(--card-bg);
+    border-radius: 12px;
+    box-shadow: var(--shadow);
+    padding: 1rem 1.3rem;
+    margin-bottom: 0.8rem;
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  .bill-dir-card:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .bill-dir-name {
+    font-size: 0.95rem;
+    font-weight: 600;
+    color: var(--text);
+    margin-bottom: 0.3rem;
+    line-height: 1.5;
+  }
+
+  .bill-dir-meta {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    font-size: 0.78rem;
+    color: var(--text-light);
+    flex-wrap: wrap;
+  }
+
+  .bill-dir-result {
+    font-weight: 600;
+  }
+
+  .bill-dir-result.accepted { color: var(--green); }
+  .bill-dir-result.rejected { color: var(--red); }
+
+  .bill-detail-header {
+    background: var(--card-bg);
+    border-radius: 18px;
+    box-shadow: var(--shadow);
+    padding: 2rem;
+    margin-bottom: 1.5rem;
+  }
+
+  .bill-detail-name {
+    font-size: 1.2rem;
+    font-weight: 700;
+    color: var(--text);
+    margin-bottom: 0.8rem;
+    line-height: 1.6;
+  }
+
+  .bill-detail-synopsis {
+    font-size: 1rem;
+    color: var(--text-mid);
+    line-height: 1.8;
+    margin-bottom: 1rem;
+  }
+
+  .bill-detail-tally {
+    display: flex;
+    gap: 1.2rem;
+    font-size: 0.9rem;
+    font-weight: 600;
+    margin-bottom: 0.8rem;
+  }
+
+  .bill-detail-tally .for-count { color: var(--green); }
+  .bill-detail-tally .against-count { color: var(--red); }
+  .bill-detail-tally .abstain-count { color: var(--orange); }
+
+  .bill-detail-links {
+    font-size: 0.85rem;
+    margin-top: 0.5rem;
+  }
+
+  .bill-mk-list {
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    overflow: hidden;
+  }
+
+  .bill-mk-section-title {
+    padding: 0.8rem 1.5rem 0.4rem;
+    font-size: 0.9rem;
+    font-weight: 700;
+  }
+
+  .bill-mk-section-title.for { color: var(--green); }
+  .bill-mk-section-title.against { color: var(--red); }
+  .bill-mk-section-title.abstain { color: var(--orange); }
+
+  .bill-mk-row {
+    display: flex;
+    align-items: center;
+    gap: 0.8rem;
+    padding: 0.5rem 1.5rem;
+    border-top: 1px solid #f0f0f0;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.1s;
+  }
+
+  .bill-mk-row:hover {
+    background: var(--blue-pale);
+  }
+
+  .bill-mk-row .mk-avatar {
+    width: 32px;
+    height: 32px;
+    font-size: 0.7rem;
+  }
+
+  .bill-mk-name {
+    flex: 1;
+    font-weight: 500;
+  }
+
+  .bill-mk-faction {
+    font-size: 0.75rem;
+    color: var(--text-light);
+  }
+
+  .result-card.clickable {
+    cursor: pointer;
+    transition: transform 0.15s, box-shadow 0.15s;
+  }
+
+  .result-card.clickable:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+
+  /* Footer */
+  .site-footer {
+    text-align: center;
+    padding: 2rem 1.5rem;
+    border-top: 1px solid var(--border);
+    color: var(--text-light);
+    font-size: 0.85rem;
+  }
+
+  .site-footer a {
+    color: var(--blue-light);
+    text-decoration: none;
+  }
+
+  .site-footer a:hover {
+    text-decoration: underline;
+  }
+
   /* Responsive */
   @media (max-width: 500px) {
     header h1 { font-size: 1.6rem; }
     .quiz-card { padding: 1.5rem; }
-    .bill-summary { font-size: 1.05rem; }
+    .bill-synopsis { font-size: 1.05rem; }
     .vote-btn { padding: 0.8rem 0.5rem; font-size: 0.9rem; }
     .vote-btn .btn-icon { font-size: 1.2rem; }
+    .mk-avatar { width: 40px; height: 40px; font-size: 0.85rem; }
+    .intro-stats { flex-direction: column; gap: 0.5rem; }
+    .intro-card { padding: 1.5rem; }
+    .mk-detail-header .mk-avatar { width: 64px; height: 64px; font-size: 1.4rem; }
+    .vote-stream-row, .mk-vote-row { padding: 0.6rem 1rem; gap: 0.4rem; }
+    .vote-stream-row { font-size: 0.8rem; }
   }
 </style>
 </head>
@@ -414,11 +1023,12 @@
 
 <div class="stripe"></div>
 <header>
-  <h1>איך הייתם מצביעים?</h1>
+  <h1 onclick="renderIntro()">מצביע ומשפיע</h1>
   <p>גלו אילו חברי כנסת הכי קרובים לעמדות שלכם</p>
 </header>
 <div class="stripe"></div>
 
+<div class="plenum-tooltip" id="plenum-tooltip"></div>
 <div class="container" id="app">
   <div class="loading">
     <div class="spinner"></div>
@@ -426,27 +1036,509 @@
   </div>
 </div>
 
+<footer class="site-footer">
+  <p>
+    &copy; הראל קין |
+    <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> |
+    <a href="https://github.com/harelc/biapia" target="_blank">קוד מקור</a> |
+    מבוסס על נתוני <a href="https://main.knesset.gov.il/Activity/Info/Pages/Databases.aspx" target="_blank">הכנסת הפתוחה</a>
+  </p>
+</footer>
+
 <script>
 const TOTAL_QUESTIONS = 10;
 let allBills = [];
 let quizBills = [];
-let userVotes = []; // {billIndex, vote: 1=for, 2=against, 3=abstain}
+let userVotes = [];
 let currentQ = 0;
 let voted = false;
+let mkPhotos = {};
+let previousView = 'intro';
+let plenumSeats = []; // [{mkName, faction, x, y}]
+let runningScores = {}; // mkName → {agree, total}
+
+const FACTION_COLORS = {
+  'הליכוד': '#1d4ed8',
+  'יש עתיד': '#f97316',
+  'המחנה הממלכתי': '#0ea5e9',
+  'הציונות הדתית': '#16a34a',
+  'ש"ס': '#7c3aed',
+  'יהדות התורה': '#1e3a5f',
+  'ישראל ביתנו': '#dc2626',
+  'עוצמה יהודית': '#b91c1c',
+  'העבודה': '#ef4444',
+  'הרשימה המשותפת': '#059669',
+  'רע"ם': '#15803d',
+  'מרצ': '#22c55e',
+  'נעם': '#854d0e',
+  'חד"ש-תע"ל': '#dc2626',
+  'בל"ד': '#047857',
+};
+
+function factionColor(factionFull) {
+  const short = shortenFaction(factionFull);
+  return FACTION_COLORS[short] || '#64748b';
+}
+
+const DISPLAY_NAME_MAP = {
+  "פרקש הכהן אורית": "אורית פרקש הכהן",
+  "בן ארי מירב": "מירב בן ארי",
+  "בן ברק רם": "רם בן ברק",
+  "בן גביר איתמר": "איתמר בן גביר",
+  "בן סעיד סמיר": "סמיר בן סעיד",
+  "בן צור יואב": "יואב בן צור",
+  "דיסטל אטבריאן  גלית": "גלית דיסטל אטבריאן",
+  "ח'טיב יאסין אימאן": "אימאן ח'טיב יאסין",
+  "טור פז משה": "משה טור פז",
+  "להב הרצנו יוראי": "יוראי להב הרצנו",
+  "סון הר מלך לימור": "לימור סון הר מלך",
+  "צרפתי הרכבי מטי": "מטי צרפתי הרכבי",
+  "רון בן משה יעל": "יעל רון בן משה",
+  "רייטן מרום אפרת": "אפרת רייטן מרום",
+  "שיר סגמן מיכל": "מיכל שיר סגמן",
+  "תומא סלימאן עאידה": "עאידה תומא סלימאן",
+};
+function displayName(name) {
+  const clean = name.replace(/\s+/g, ' ').trim();
+  if (DISPLAY_NAME_MAP[clean]) return DISPLAY_NAME_MAP[clean];
+  // Default: flip "LastName FirstName" → "FirstName LastName"
+  const parts = clean.split(' ');
+  if (parts.length === 2) return `${parts[1]} ${parts[0]}`;
+  if (parts.length >= 3) return `${parts.slice(1).join(' ')} ${parts[0]}`;
+  return name;
+}
+
+function mkInitials(name) {
+  const parts = name.split(/\s+/);
+  if (parts.length >= 2) return parts[1][0] + parts[0][0]; // First Last initials
+  return name[0] || '?';
+}
+
+function mkAvatarHTML(name, faction) {
+  const photoData = mkPhotos[name];
+  if (photoData && photoData.photo_url) {
+    return `<div class="mk-avatar"><img src="${photoData.photo_url}" alt="${name}" onerror="this.parentElement.innerHTML='${mkInitials(name)}';this.parentElement.style.background='${factionColor(faction)}'"></div>`;
+  }
+  const color = factionColor(faction);
+  const initials = mkInitials(name);
+  return `<div class="mk-avatar" style="background:${color}">${initials}</div>`;
+}
+
+function isContested(b) {
+  const total = (b.total_for || 0) + (b.total_against || 0);
+  if (total < 10) return false;
+  return Math.max(b.total_for || 0, b.total_against || 0) / total <= 0.75;
+}
+
+function selectUniformByTopic(pool, count) {
+  // Group bills by their topics
+  const byTopic = {};
+  const noTopic = [];
+  for (const b of pool) {
+    if (b.topics && b.topics.length > 0) {
+      for (const t of b.topics) {
+        if (!byTopic[t]) byTopic[t] = [];
+        byTopic[t].push(b);
+      }
+    } else {
+      noTopic.push(b);
+    }
+  }
+
+  const topics = Object.keys(byTopic);
+  if (topics.length === 0) return shuffle(pool).slice(0, count);
+
+  // Shuffle within each topic
+  for (const t of topics) byTopic[t] = shuffle(byTopic[t]);
+
+  // Round-robin pick from each topic
+  const selected = [];
+  const usedIds = new Set();
+  let topicIdx = 0;
+  const shuffledTopics = shuffle(topics);
+
+  while (selected.length < count && (shuffledTopics.length > 0 || noTopic.length > 0)) {
+    if (shuffledTopics.length > 0) {
+      const topic = shuffledTopics[topicIdx % shuffledTopics.length];
+      const candidates = byTopic[topic];
+      // Find an unused bill from this topic
+      const bill = candidates.find(b => !usedIds.has(b.id));
+      if (bill) {
+        selected.push(bill);
+        usedIds.add(bill.id);
+      }
+      topicIdx++;
+      // If we've gone around all topics, remove empty ones
+      if (topicIdx % shuffledTopics.length === 0) {
+        for (let i = shuffledTopics.length - 1; i >= 0; i--) {
+          if (!byTopic[shuffledTopics[i]].some(b => !usedIds.has(b.id))) {
+            shuffledTopics.splice(i, 1);
+          }
+        }
+        if (shuffledTopics.length === 0) break;
+      }
+    } else {
+      // Fill remaining from noTopic
+      const bill = noTopic.find(b => !usedIds.has(b.id));
+      if (bill) {
+        selected.push(bill);
+        usedIds.add(bill.id);
+      } else break;
+    }
+  }
+
+  return selected;
+}
+
+function billKnessetUrl(bill) {
+  if (bill.bill_id) {
+    return `https://main.knesset.gov.il/Activity/Legislation/Laws/Pages/LawBill.aspx?t=lawsuggestionssearch&lawitemid=${bill.bill_id}`;
+  }
+  return null;
+}
+
+function votePageUrl(bill) {
+  if (bill.vote_id) {
+    return `https://knesset.gov.il/vote/heb/Vote_Res_Map.asp?vote_id_t=${bill.vote_id}`;
+  }
+  return null;
+}
 
 async function loadData() {
   const resp = await fetch("data/bills.json");
   allBills = await resp.json();
-  // Pick bills that have MK votes and are interesting (high participation)
-  const eligible = allBills.filter(b =>
-    (b.mk_votes || []).length >= 20 &&
-    b.name && b.name.length > 10
-  );
-  // Shuffle and pick TOTAL_QUESTIONS
-  quizBills = shuffle(eligible).slice(0, TOTAL_QUESTIONS);
-  if (quizBills.length < TOTAL_QUESTIONS) {
-    quizBills = shuffle(allBills.filter(b => (b.mk_votes || []).length > 0)).slice(0, TOTAL_QUESTIONS);
+
+  try {
+    const pResp = await fetch("data/mk_photos.json");
+    if (pResp.ok) mkPhotos = await pResp.json();
+  } catch(e) {}
+
+  renderIntro();
+}
+
+function renderMkDirectory() {
+  previousView = 'directory';
+  const app = document.getElementById("app");
+
+  // Collect all MKs with their factions and vote counts
+  const mkData = {};
+  for (const b of allBills) {
+    for (const mv of (b.mk_votes || [])) {
+      if (!mkData[mv.mk_name]) {
+        mkData[mv.mk_name] = { faction: mv.faction || '', voteCount: 0 };
+      }
+      // Prefer non-empty faction (some votes may lack faction data)
+      if (!mkData[mv.mk_name].faction && mv.faction) {
+        mkData[mv.mk_name].faction = mv.faction;
+      }
+      mkData[mv.mk_name].voteCount++;
+    }
   }
+
+  // Group by faction (shortened)
+  const byFaction = {};
+  for (const [name, data] of Object.entries(mkData)) {
+    const short = shortenFaction(data.faction);
+    if (!byFaction[short]) byFaction[short] = [];
+    byFaction[short].push({ name, ...data });
+  }
+
+  // Sort factions by size, MKs by name within each
+  const sortedFactions = Object.entries(byFaction)
+    .sort((a, b) => b[1].length - a[1].length);
+  for (const [, mks] of sortedFactions) {
+    mks.sort((a, b) => a.name.localeCompare(b.name, 'he'));
+  }
+
+  const sectionsHTML = sortedFactions.map(([faction, mks]) => `
+    <div class="faction-section-title">${faction} (${mks.length})</div>
+    <div class="mk-dir-grid">
+      ${mks.map(mk => `
+        <div class="mk-dir-card" onclick="renderMkDetail('${mk.name.replace(/'/g, "\\'")}', false)">
+          ${mkAvatarHTML(mk.name, mk.faction)}
+          <div class="mk-dir-name">${displayName(mk.name)}</div>
+          <div class="mk-dir-faction">${faction}</div>
+          <div class="mk-dir-votes">${mk.voteCount} הצבעות</div>
+        </div>
+      `).join("")}
+    </div>
+  `).join("");
+
+  app.innerHTML = `
+    <div class="results-section">
+      <button class="back-btn" onclick="renderIntro()">&rsaquo; חזרה</button>
+      <div class="results-intro">
+        <h2>חברי הכנסת ה-25</h2>
+        <p>${Object.keys(mkData).length} ח"כים, ${sortedFactions.length} סיעות</p>
+      </div>
+      ${sectionsHTML}
+      <button class="back-btn" onclick="renderIntro()">&rsaquo; חזרה לחידון</button>
+    </div>
+  `;
+}
+
+function renderIntro() {
+  const app = document.getElementById("app");
+  const eligible = allBills.filter(b =>
+    (b.mk_votes || []).length >= 20 && isContested(b)
+  );
+  const withSyn = eligible.filter(b => b.synopsis && b.synopsis.length > 20);
+  const mkNames = new Set();
+  for (const b of eligible) {
+    for (const mv of (b.mk_votes || [])) mkNames.add(mv.mk_name);
+  }
+
+  app.innerHTML = `
+    <div class="intro-section">
+      <div class="intro-card">
+        <h2>מה זה?</h2>
+        <p>
+          בכנסת ה-25 הצביעו על מאות הצעות חוק &mdash; מביטחון דרך כלכלה ועד זכויות אזרח.
+          אבל כמה מאיתנו באמת יודעים איך חברי הכנסת שלנו הצביעו?
+        </p>
+        <p>
+          <strong>מצביע ומשפיע</strong> מציג 10 הצעות חוק אמיתיות מנושאים מגוונים.
+          קיראו את התקציר, הצביעו בעד או נגד, וגלו מי הח"כים שהכי קרובים לדעות שלכם.
+        </p>
+      </div>
+
+      <div class="intro-card">
+        <h2>איך זה עובד?</h2>
+        <ul>
+          <li>קיראו תקציר קצר של הצעת חוק אמיתית</li>
+          <li>הצביעו &mdash; בעד, נגד, או נמנע/ת</li>
+          <li>אחרי 10 הצבעות נשווה אתכם מול כל חברי הכנסת</li>
+          <li>גלו איזו סיעה ואילו ח"כים הכי מתאימים לכם</li>
+        </ul>
+        <div class="intro-stats">
+          <div class="intro-stat" style="cursor:pointer" onclick="renderBillDirectory()">
+            <div class="num">${withSyn.length}</div>
+            <div class="label">הצעות חוק &rsaquo;</div>
+          </div>
+          <div class="intro-stat" style="cursor:pointer" onclick="renderMkDirectory()">
+            <div class="num">${mkNames.size}</div>
+            <div class="label">חברי כנסת &rsaquo;</div>
+          </div>
+          <div class="intro-stat">
+            <div class="num">${TOTAL_QUESTIONS}</div>
+            <div class="label">שאלות בחידון</div>
+          </div>
+        </div>
+      </div>
+
+      <button class="start-btn" onclick="startQuiz()">יאללה, מתחילים</button>
+    </div>
+  `;
+}
+
+function buildPlenumSeats() {
+  // Collect all MKs with factions
+  const mkData = {};
+  for (const b of allBills) {
+    for (const mv of (b.mk_votes || [])) {
+      if (!mkData[mv.mk_name]) {
+        mkData[mv.mk_name] = { faction: mv.faction || '' };
+      }
+      if (!mkData[mv.mk_name].faction && mv.faction) {
+        mkData[mv.mk_name].faction = mv.faction;
+      }
+    }
+  }
+
+  // Group by faction, sort factions by size descending
+  const byFaction = {};
+  for (const [name, data] of Object.entries(mkData)) {
+    const short = shortenFaction(data.faction);
+    if (!byFaction[short]) byFaction[short] = [];
+    byFaction[short].push({ mkName: name, faction: data.faction, factionShort: short });
+  }
+
+  // Order factions right-to-left as in the Knesset plenum
+  const FACTION_ORDER = [
+    'הליכוד', 'הציונות הדתית', 'עוצמה יהודית', 'ש"ס', 'יהדות התורה', 'נעם',
+    'רע"ם', 'הרשימה המשותפת', 'חד"ש-תע"ל', 'בל"ד',
+    'ישראל ביתנו', 'המחנה הממלכתי', 'יש עתיד', 'העבודה', 'מרצ',
+  ];
+  const factionNames = Object.keys(byFaction);
+  const sortedFactions = factionNames
+    .sort((a, b) => {
+      const ia = FACTION_ORDER.indexOf(a);
+      const ib = FACTION_ORDER.indexOf(b);
+      // Known factions in order, unknown ones at the end sorted by size
+      if (ia !== -1 && ib !== -1) return ia - ib;
+      if (ia !== -1) return -1;
+      if (ib !== -1) return 1;
+      return (byFaction[b] || []).length - (byFaction[a] || []).length;
+    })
+    .map(name => [name, byFaction[name]]);
+  const allMks = [];
+  for (const [, mks] of sortedFactions) allMks.push(...mks);
+
+  const totalMks = allMks.length;
+  const numRows = 5;
+  const seatRadius = 1.5;
+  const seatSpacing = 3.8;
+  const cx = 50, cy = 52;
+  const minRadius = 15;
+  const maxRadius = 47;
+  const radiusStep = (maxRadius - minRadius) / (numRows - 1);
+
+  // Calculate seats per row based on arc circumference
+  const seatsPerRow = [];
+  let remaining = totalMks;
+  for (let r = 0; r < numRows; r++) {
+    const radius = minRadius + r * radiusStep;
+    const circumference = Math.PI * radius;
+    const maxSeats = Math.floor(circumference / seatSpacing);
+    const rowSeats = Math.min(maxSeats, remaining);
+    seatsPerRow.push(rowSeats);
+    remaining -= rowSeats;
+  }
+
+  // Create all seat positions
+  const allPositions = [];
+  for (let r = 0; r < numRows; r++) {
+    const radius = minRadius + r * radiusStep;
+    const n = seatsPerRow[r];
+    const angleStep = Math.PI / (n + 1);
+    for (let s = 0; s < n; s++) {
+      const angle = Math.PI - angleStep * (s + 1);
+      const x = cx + radius * Math.cos(angle);
+      const y = cy - radius * Math.sin(angle);
+      allPositions.push({ x, y, angle });
+    }
+  }
+
+  // Sort positions by angle (column-based: right to left visually)
+  allPositions.sort((a, b) => b.angle - a.angle);
+
+  // Assign MKs (in faction order) to positions in column order
+  plenumSeats = [];
+  const count = Math.min(allPositions.length, totalMks);
+  for (let i = 0; i < count; i++) {
+    const pos = allPositions[i];
+    plenumSeats.push({ ...allMks[i], x: pos.x, y: pos.y, seatRadius });
+  }
+}
+
+function plenumSeatColor(mkName) {
+  const s = runningScores[mkName];
+  if (!s || s.total === 0) return '#d0d5df'; // neutral gray
+  const ratio = s.agree / s.total; // 0 to 1
+  // Interpolate: 0=red, 0.5=orange, 1=green
+  // Also increase saturation/intensity with more votes
+  const confidence = Math.min(s.total / 5, 1); // fully colored after 5 votes
+  if (ratio >= 0.5) {
+    // green side: interpolate from orange to green
+    const t = (ratio - 0.5) * 2; // 0 to 1
+    const r = Math.round(210 - t * 184); // 210→26
+    const g = Math.round(133 + t * 25);  // 133→158
+    const b = Math.round(10 + t * 72);   // 10→82
+    return blendWithGray(r, g, b, confidence);
+  } else {
+    // red side: interpolate from orange to red
+    const t = (0.5 - ratio) * 2; // 0 to 1
+    const r = Math.round(210 - t * 18);  // 210→192
+    const g = Math.round(133 - t * 76);  // 133→57
+    const b = Math.round(10 + t * 33);   // 10→43
+    return blendWithGray(r, g, b, confidence);
+  }
+}
+
+function blendWithGray(r, g, b, t) {
+  // Blend color with neutral gray (208,213,223) based on t (0=gray, 1=full color)
+  const gr = 208, gg = 213, gb = 223;
+  const fr = Math.round(gr + (r - gr) * t);
+  const fg = Math.round(gg + (g - gg) * t);
+  const fb = Math.round(gb + (b - gb) * t);
+  return `rgb(${fr},${fg},${fb})`;
+}
+
+function renderPlenumSVG() {
+  if (plenumSeats.length === 0) return '';
+  const seats = plenumSeats.map((s, i) => {
+    const color = plenumSeatColor(s.mkName);
+    const escaped = s.mkName.replace(/'/g, "\\'");
+    return `<circle class="plenum-seat" cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${s.seatRadius}" fill="${color}" stroke="#b0b5c0" stroke-width="0.3" data-mk="${s.mkName}" data-faction="${s.faction}" onclick="renderMkDetail('${escaped}', ${userVotes.length > 0})" onmouseenter="showPlenumTooltip(event, '${escaped}')" onmouseleave="hidePlenumTooltip()"/>`;
+  }).join('\n');
+  return `
+    <div class="plenum-wrap">
+      <svg class="plenum-svg" viewBox="0 0 100 56" xmlns="http://www.w3.org/2000/svg">
+        ${seats}
+      </svg>
+    </div>
+  `;
+}
+
+function showPlenumTooltip(event, mkName) {
+  const tip = document.getElementById('plenum-tooltip');
+  const faction = plenumSeats.find(s => s.mkName === mkName)?.faction || '';
+  const sc = runningScores[mkName];
+  const matchHTML = sc && sc.total > 0
+    ? `<div class="plenum-tooltip-match">${Math.round(sc.agree / sc.total * 100)}% התאמה</div>`
+    : '';
+  tip.innerHTML = `
+    ${mkAvatarHTML(mkName, faction)}
+    <div class="plenum-tooltip-name">${displayName(mkName)}</div>
+    <div class="plenum-tooltip-faction">${shortenFaction(faction)}</div>
+    ${matchHTML}
+  `;
+  tip.classList.add('visible');
+  const rect = event.target.getBoundingClientRect();
+  const tipW = tip.offsetWidth;
+  let left = rect.left + rect.width / 2 - tipW / 2;
+  left = Math.max(8, Math.min(left, window.innerWidth - tipW - 8));
+  tip.style.left = left + 'px';
+  tip.style.top = (rect.top - tip.offsetHeight - 8 + window.scrollY) + 'px';
+}
+
+function hidePlenumTooltip() {
+  document.getElementById('plenum-tooltip').classList.remove('visible');
+}
+
+function updatePlenumColors() {
+  const seats = document.querySelectorAll('.plenum-seat');
+  seats.forEach(el => {
+    const mkName = el.getAttribute('data-mk');
+    el.setAttribute('fill', plenumSeatColor(mkName));
+  });
+}
+
+function updateRunningScores(vote) {
+  const bill = quizBills[currentQ];
+  for (const mk of (bill.mk_votes || [])) {
+    if (!runningScores[mk.mk_name]) {
+      runningScores[mk.mk_name] = { agree: 0, total: 0 };
+    }
+    runningScores[mk.mk_name].total++;
+    runningScores[mk.mk_name].agree += voteMatchScore(mk.result, vote);
+  }
+}
+
+function startQuiz() {
+  userVotes = [];
+  currentQ = 0;
+  runningScores = {};
+  buildPlenumSeats();
+
+  const pool = allBills.filter(b =>
+    b.synopsis && b.synopsis.length > 20 &&
+    (b.mk_votes || []).length >= 20 &&
+    isContested(b)
+  );
+
+  quizBills = selectUniformByTopic(pool, TOTAL_QUESTIONS);
+
+  if (quizBills.length < TOTAL_QUESTIONS) {
+    // Fill from non-synopsis bills if needed
+    const extra = allBills.filter(b =>
+      (b.mk_votes || []).length >= 20 &&
+      isContested(b) &&
+      !quizBills.find(q => q.id === b.id)
+    );
+    quizBills = [...quizBills, ...shuffle(extra)].slice(0, TOTAL_QUESTIONS);
+  }
+
   renderQuiz();
 }
 
@@ -459,29 +1551,19 @@ function shuffle(arr) {
   return a;
 }
 
-function makeSummary(bill) {
-  // Create a catchy Hebrew summary from the bill name and description
+function getDisplayText(bill) {
+  if (bill.synopsis && bill.synopsis.length > 20) return bill.synopsis;
   let name = bill.name || "";
-  // Clean up the legal name
   name = name.replace(/\(תיקון[^)]*\)/g, "").replace(/\(הוראת שעה[^)]*\)/g, "").trim();
   name = name.replace(/,\s*הת?שפ"?[א-ת].*$/g, "").trim();
   name = name.replace(/,\s*התש[א-ת]"[א-ת].*$/g, "").trim();
-
-  let summary = bill.summary || "";
+  const summary = bill.summary || "";
   if (summary && summary.length > 20) {
-    // Use the official summary if available
-    // Trim to ~2 sentences
-    const sentences = summary.split(/(?<=[.!?])\s+/);
-    return sentences.slice(0, 3).join(" ");
+    return summary.split(/(?<=[.!?])\s+/).slice(0, 3).join(" ");
   }
-
-  // Fallback: describe the vote context
   const desc = bill.vote_description || "";
-  let text = name;
-  if (desc && desc !== name) {
-    text += " — " + desc;
-  }
-  return text;
+  if (desc && desc !== name) return name + " — " + desc;
+  return name;
 }
 
 function renderQuiz() {
@@ -493,7 +1575,20 @@ function renderQuiz() {
   }
 
   const bill = quizBills[currentQ];
-  const summary = makeSummary(bill);
+  const displayText = getDisplayText(bill);
+  const topics = bill.topics || [];
+  const knessetUrl = billKnessetUrl(bill);
+  const voteUrl = votePageUrl(bill);
+
+  const topicsHTML = topics.length > 0
+    ? `<div class="bill-topics">${topics.map(t => `<span class="topic-tag">${t}</span>`).join("")}</div>`
+    : "";
+
+  const links = [];
+  if (bill.doc_url) links.push(`<a class="bill-link" href="${bill.doc_url}" target="_blank" rel="noopener">נוסח ההצעה</a>`);
+  if (knessetUrl) links.push(`<a class="bill-link" href="${knessetUrl}" target="_blank" rel="noopener">דף ההצעה</a>`);
+  if (voteUrl) links.push(`<a class="bill-link" href="${voteUrl}" target="_blank" rel="noopener">דף ההצבעה</a>`);
+  const linkHTML = links.join(' | ');
 
   app.innerHTML = `
     <div class="progress-wrap">
@@ -506,10 +1601,16 @@ function renderQuiz() {
       </div>
     </div>
 
+    ${renderPlenumSVG()}
+
     <div class="quiz-card" id="quiz-card">
       <div class="bill-number">הצעת חוק #${currentQ + 1}</div>
-      <div class="bill-summary">${summary}</div>
-      <div class="bill-original-name">${bill.name}</div>
+      ${topicsHTML}
+      <div class="bill-synopsis">${displayText}</div>
+      <div class="bill-footer">
+        <span class="bill-name">${bill.name}</span>
+        ${linkHTML}
+      </div>
 
       <div class="vote-buttons" id="vote-buttons">
         <button class="vote-btn for" onclick="castVote(1)">
@@ -538,8 +1639,9 @@ function castVote(vote) {
 
   const bill = quizBills[currentQ];
   userVotes.push({ billIndex: currentQ, vote });
+  updateRunningScores(vote);
+  updatePlenumColors();
 
-  // Highlight selected button
   const buttons = document.querySelectorAll(".vote-btn");
   const cls = vote === 1 ? "for" : vote === 2 ? "against" : "abstain";
   buttons.forEach(btn => {
@@ -547,7 +1649,6 @@ function castVote(vote) {
     else btn.style.opacity = "0.4";
   });
 
-  // Show feedback
   const accepted = bill.is_accepted === 1;
   const feedbackEl = document.getElementById("feedback");
   const resultText = accepted ? "ההצעה התקבלה בכנסת" : "ההצעה נדחתה בכנסת";
@@ -567,31 +1668,33 @@ function nextQuestion() {
   renderQuiz();
 }
 
+function voteMatchScore(mkVote, userVote) {
+  // Exact match = 1, one side abstained = 0.5, disagree = 0
+  if (mkVote === userVote) return 1;
+  if (mkVote === 3 || userVote === 3) return 0.5;
+  return 0;
+}
+
 function computeResults() {
-  // For each MK, compute agreement score with user
-  const mkScores = {}; // mkName -> {agree, total, faction}
+  const mkScores = {};
 
   for (const uv of userVotes) {
     const bill = quizBills[uv.billIndex];
-    const mkVotes = bill.mk_votes || [];
-
-    for (const mk of mkVotes) {
+    for (const mk of (bill.mk_votes || [])) {
       const key = mk.mk_name;
       if (!mkScores[key]) {
-        mkScores[key] = { agree: 0, total: 0, faction: mk.faction, votes: [] };
+        mkScores[key] = { agree: 0, total: 0, faction: mk.faction || '' };
+      }
+      if (!mkScores[key].faction && mk.faction) {
+        mkScores[key].faction = mk.faction;
       }
       mkScores[key].total++;
-      // Agreement: same vote (for=1, against=2, abstain=3)
-      if (mk.result === uv.vote) {
-        mkScores[key].agree++;
-      }
-      mkScores[key].votes.push({ userVote: uv.vote, mkVote: mk.result });
+      mkScores[key].agree += voteMatchScore(mk.result, uv.vote);
     }
   }
 
-  // Convert to array and sort by agreement percentage
   const mkResults = Object.entries(mkScores)
-    .filter(([_, s]) => s.total >= 3) // Only MKs who voted on enough bills
+    .filter(([_, s]) => s.total >= 3)
     .map(([name, s]) => ({
       name,
       faction: s.faction,
@@ -601,7 +1704,6 @@ function computeResults() {
     }))
     .sort((a, b) => b.pct - a.pct || b.total - a.total);
 
-  // Party-level aggregation
   const partyScores = {};
   for (const mk of mkResults) {
     const f = mk.faction || "אחר";
@@ -622,7 +1724,6 @@ function computeResults() {
 }
 
 function shortenFaction(name) {
-  // Shorten ridiculously long faction names
   const map = {
     'הליכוד בהנהגת בנימין נתניהו לראשות הממשלה': 'הליכוד',
     'התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ"ל': 'ש"ס',
@@ -636,11 +1737,38 @@ function shortenFaction(name) {
   for (const [long, short] of Object.entries(map)) {
     if (name.includes(long) || name.startsWith(long.slice(0, 15))) return short;
   }
-  // Generic: take first 20 chars
   return name.length > 25 ? name.slice(0, 22) + "..." : name;
 }
 
+function renderMkCard(mk, rank, isBottom) {
+  const color = isBottom ? 'var(--red)' : 'var(--blue)';
+  const barBg = isBottom ? 'background: var(--red);' : '';
+  const avatar = mkAvatarHTML(mk.name, mk.faction);
+
+  return `
+    <div class="result-card clickable" onclick="renderMkDetail('${mk.name.replace(/'/g, "\\'")}', true)">
+      <div class="result-card-header">
+        <span class="result-rank" style="color:${color}">${rank}</span>
+        ${avatar}
+        <div class="result-info">
+          <div class="result-name">${displayName(mk.name)}</div>
+          <div class="result-faction">${shortenFaction(mk.faction)}</div>
+          <div class="result-detail">התאמה ב-${mk.agree % 1 ? mk.agree.toFixed(1) : mk.agree} מתוך ${mk.total} הצבעות</div>
+        </div>
+        <div class="result-score">
+          <div class="result-pct" style="color:${color}">${mk.pct}%</div>
+          <div class="result-label">התאמה</div>
+        </div>
+      </div>
+      <div class="match-bar">
+        <div class="match-bar-fill" style="width: ${mk.pct}%; ${barBg}"></div>
+      </div>
+    </div>
+  `;
+}
+
 function renderResults() {
+  previousView = 'results';
   const app = document.getElementById("app");
   const { mkResults, partyResults } = computeResults();
 
@@ -670,58 +1798,287 @@ function renderResults() {
       </div>
 
       <div class="section-title">ח"כים שהכי מתאימים לכם</div>
-      ${top10.map((mk, i) => `
-        <div class="result-card">
-          <div class="result-card-header">
-            <span class="result-rank">${i + 1}</span>
-            <div class="result-info">
-              <div class="result-name">${mk.name}</div>
-              <div class="result-faction">${shortenFaction(mk.faction)}</div>
-            </div>
-            <div class="result-score">
-              <div class="result-pct">${mk.pct}%</div>
-              <div class="result-label">התאמה</div>
-            </div>
-          </div>
-          <div class="match-bar">
-            <div class="match-bar-fill" style="width: ${mk.pct}%"></div>
-          </div>
-        </div>
-      `).join("")}
+      ${top10.map((mk, i) => renderMkCard(mk, i + 1, false)).join("")}
 
       ${bottom5.length ? `
         <div class="section-title">ח"כים הכי רחוקים מכם</div>
-        ${bottom5.map((mk, i) => `
-          <div class="result-card">
-            <div class="result-card-header">
-              <span class="result-rank" style="color: var(--red);">${mkResults.length - bottom5.length + i + 1}</span>
-              <div class="result-info">
-                <div class="result-name">${mk.name}</div>
-                <div class="result-faction">${shortenFaction(mk.faction)}</div>
-              </div>
-              <div class="result-score">
-                <div class="result-pct" style="color: var(--red);">${mk.pct}%</div>
-                <div class="result-label">התאמה</div>
-              </div>
-            </div>
-            <div class="match-bar">
-              <div class="match-bar-fill" style="width: ${mk.pct}%; background: var(--red);"></div>
-            </div>
-          </div>
-        `).join("")}
+        ${bottom5.map((mk, i) => renderMkCard(mk, i + 1, true)).join("")}
       ` : ""}
 
-      <button class="restart-btn" onclick="restart()">נסו שוב עם הצעות חוק אחרות</button>
+      <button class="restart-btn" onclick="startQuiz()">נסו שוב עם הצעות חוק אחרות</button>
     </div>
   `;
 }
 
-function restart() {
-  userVotes = [];
-  currentQ = 0;
-  const eligible = allBills.filter(b => (b.mk_votes || []).length >= 20);
-  quizBills = shuffle(eligible).slice(0, TOTAL_QUESTIONS);
-  renderQuiz();
+function renderBillDirectory() {
+  previousView = 'billDirectory';
+  const app = document.getElementById("app");
+
+  const bills = allBills
+    .filter(b => (b.mk_votes || []).length >= 20 && isContested(b))
+    .sort((a, b) => (b.date || b.vote_date || '').localeCompare(a.date || a.vote_date || ''));
+
+  const billCards = bills.map((b, i) => {
+    const billIdx = allBills.indexOf(b);
+    const name = b.name || 'הצעת חוק';
+    const date = (b.date || b.vote_date || '');
+    const dateStr = date ? new Date(date).toLocaleDateString('he-IL') : '';
+    const accepted = b.is_accepted === 1;
+    const resultText = accepted ? 'התקבלה' : 'נדחתה';
+    const resultCls = accepted ? 'accepted' : 'rejected';
+    const totalVoters = (b.total_for || 0) + (b.total_against || 0) + (b.total_abstain || 0);
+    const topics = (b.topics || []).slice(0, 3);
+    const topicsHTML = topics.length > 0
+      ? topics.map(t => `<span class="topic-tag">${t}</span>`).join(' ')
+      : '';
+
+    return `
+      <div class="bill-dir-card" onclick="renderBillDetail(${billIdx})">
+        <div class="bill-dir-name">${name}</div>
+        <div class="bill-dir-meta">
+          <span class="bill-dir-result ${resultCls}">${resultText}</span>
+          <span>${b.total_for || 0} בעד / ${b.total_against || 0} נגד</span>
+          ${dateStr ? `<span>${dateStr}</span>` : ''}
+          ${topicsHTML}
+        </div>
+      </div>
+    `;
+  }).join('');
+
+  app.innerHTML = `
+    <div class="results-section">
+      <button class="back-btn" onclick="renderIntro()">&rsaquo; חזרה</button>
+      <div class="results-intro">
+        <h2>הצעות חוק נבחרות</h2>
+        <p>${bills.length} הצעות חוק מהכנסת ה-25 שעברו סינון: לפחות 20 ח"כים הצביעו, וההצבעה הייתה שנויה במחלוקת (לא יותר מ-75% לצד אחד).</p>
+      </div>
+      ${billCards}
+    </div>
+  `;
+}
+
+function renderBillDetail(billIdx) {
+  const app = document.getElementById("app");
+  const bill = allBills[billIdx];
+  if (!bill) return;
+
+  const displayText = getDisplayText(bill);
+  const topics = bill.topics || [];
+  const knessetUrl = billKnessetUrl(bill);
+  const voteUrl = votePageUrl(bill);
+  const date = bill.date || bill.vote_date || '';
+  const dateStr = date ? new Date(date).toLocaleDateString('he-IL') : '';
+  const accepted = bill.is_accepted === 1;
+
+  const topicsHTML = topics.length > 0
+    ? `<div class="bill-topics">${topics.map(t => `<span class="topic-tag">${t}</span>`).join('')}</div>`
+    : '';
+
+  const links = [];
+  if (bill.doc_url) links.push(`<a class="bill-link" href="${bill.doc_url}" target="_blank" rel="noopener">נוסח ההצעה</a>`);
+  if (knessetUrl) links.push(`<a class="bill-link" href="${knessetUrl}" target="_blank" rel="noopener">דף ההצעה</a>`);
+  if (voteUrl) links.push(`<a class="bill-link" href="${voteUrl}" target="_blank" rel="noopener">דף ההצבעה</a>`);
+
+  // Group MK votes by result
+  const mkVotes = bill.mk_votes || [];
+  const forVotes = mkVotes.filter(v => v.result === 1);
+  const againstVotes = mkVotes.filter(v => v.result === 2);
+  const abstainVotes = mkVotes.filter(v => v.result === 3);
+
+  function mkVoteRowsHTML(votes) {
+    return votes.map(v => {
+      const escaped = v.mk_name.replace(/'/g, "\\'");
+      const fromResults = previousView === 'results';
+      return `
+        <div class="bill-mk-row" onclick="renderMkDetail('${escaped}', ${fromResults})">
+          ${mkAvatarHTML(v.mk_name, v.faction || '')}
+          <span class="bill-mk-name">${displayName(v.mk_name)}</span>
+          <span class="bill-mk-faction">${shortenFaction(v.faction || '')}</span>
+        </div>
+      `;
+    }).join('');
+  }
+
+  const backFn = previousView === 'billDirectory' ? 'renderBillDirectory'
+    : previousView === 'results' ? 'renderResults'
+    : 'renderIntro';
+
+  // Keep previousView pointing to the page before bill detail
+  // so MK detail can come back here correctly
+
+  app.innerHTML = `
+    <div class="results-section">
+      <button class="back-btn" onclick="${backFn}()">&rsaquo; חזרה</button>
+
+      <div class="bill-detail-header">
+        ${topicsHTML}
+        <div class="bill-detail-name">${bill.name || 'הצעת חוק'}</div>
+        ${displayText !== bill.name ? `<div class="bill-detail-synopsis">${displayText}</div>` : ''}
+        <div class="bill-detail-tally">
+          <span class="for-count">${bill.total_for || 0} בעד</span>
+          <span class="against-count">${bill.total_against || 0} נגד</span>
+          <span class="abstain-count">${bill.total_abstain || 0} נמנעים</span>
+        </div>
+        <div class="bill-dir-meta">
+          <span class="bill-dir-result ${accepted ? 'accepted' : 'rejected'}">${accepted ? 'התקבלה' : 'נדחתה'}</span>
+          ${dateStr ? `<span>${dateStr}</span>` : ''}
+        </div>
+        ${links.length ? `<div class="bill-detail-links">${links.join(' | ')}</div>` : ''}
+      </div>
+
+      <div class="bill-mk-list">
+        ${forVotes.length ? `
+          <div class="bill-mk-section-title for">בעד (${forVotes.length})</div>
+          ${mkVoteRowsHTML(forVotes)}
+        ` : ''}
+        ${againstVotes.length ? `
+          <div class="bill-mk-section-title against">נגד (${againstVotes.length})</div>
+          ${mkVoteRowsHTML(againstVotes)}
+        ` : ''}
+        ${abstainVotes.length ? `
+          <div class="bill-mk-section-title abstain">נמנעים (${abstainVotes.length})</div>
+          ${mkVoteRowsHTML(abstainVotes)}
+        ` : ''}
+      </div>
+    </div>
+  `;
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
+}
+
+function voteLabel(v) {
+  if (v === 1) return 'בעד';
+  if (v === 2) return 'נגד';
+  return 'נמנע';
+}
+
+function voteClass(v) {
+  if (v === 1) return 'for';
+  if (v === 2) return 'against';
+  return 'abstain';
+}
+
+function renderMkDetail(mkName, showAgreement) {
+  const app = document.getElementById("app");
+
+  // Find MK's faction from any bill
+  let mkFaction = '';
+  for (const b of allBills) {
+    const mv = (b.mk_votes || []).find(v => v.mk_name === mkName);
+    if (mv && mv.faction) { mkFaction = mv.faction; break; }
+  }
+
+  // Collect all votes by this MK across all bills
+  const allMkVotes = [];
+  for (const b of allBills) {
+    const mv = (b.mk_votes || []).find(v => v.mk_name === mkName);
+    if (mv) {
+      allMkVotes.push({
+        bill: b,
+        result: mv.result,
+        date: b.date || b.vote_date || '',
+      });
+    }
+  }
+
+  // Sort by date descending
+  allMkVotes.sort((a, b) => (b.date || '').localeCompare(a.date || ''));
+
+  const avatar = mkAvatarHTML(mkName, mkFaction);
+
+  // Agreement stream (post-quiz only)
+  let agreementHTML = '';
+  if (showAgreement && userVotes.length > 0) {
+    const rows = [];
+    let matchSum = 0;
+    let matchCount = 0;
+
+    for (const uv of userVotes) {
+      const bill = quizBills[uv.billIndex];
+      const mv = (bill.mk_votes || []).find(v => v.mk_name === mkName);
+      if (!mv) continue;
+
+      const score = voteMatchScore(mv.result, uv.vote);
+      matchSum += score;
+      matchCount++;
+
+      const matchCls = score === 1 ? 'agree' : score === 0.5 ? 'half' : 'disagree';
+      const matchSymbol = score === 1 ? '✓' : score === 0.5 ? '½' : '✗';
+
+      const billName = (bill.name || '').length > 50
+        ? bill.name.slice(0, 47) + '...'
+        : (bill.name || 'הצעת חוק');
+
+      rows.push(`
+        <div class="vote-stream-row">
+          <span class="vote-stream-bill">${billName}</span>
+          <span class="vote-chip ${voteClass(mv.result)}">${voteLabel(mv.result)}</span>
+          <span class="vote-chip ${voteClass(uv.vote)}">${voteLabel(uv.vote)}</span>
+          <span class="match-icon ${matchCls}">${matchSymbol}</span>
+        </div>
+      `);
+    }
+
+    if (rows.length > 0) {
+      const matchRounded = Math.round(matchSum * 10) / 10;
+      agreementHTML = `
+        <div class="vote-stream">
+          <div class="vote-stream-title">השוואה להצבעות שלכם</div>
+          <div class="vote-stream-summary">התאמה ב-${matchRounded} מתוך ${matchCount} הצבעות</div>
+          <div class="vote-stream-row vote-stream-header">
+            <span class="vote-stream-bill" style="font-weight:600;color:var(--text)">הצעת חוק</span>
+            <span class="vote-chip" style="background:none;color:var(--text-light)">ח"כ</span>
+            <span class="vote-chip" style="background:none;color:var(--text-light)">אתם</span>
+            <span class="match-icon" style="color:var(--text-light)"></span>
+          </div>
+          ${rows.join('')}
+        </div>
+      `;
+    }
+  }
+
+  // Full voting record
+  const voteRowsHTML = allMkVotes.map(v => {
+    const billIdx = allBills.indexOf(v.bill);
+    const billName = (v.bill.name || '').length > 60
+      ? v.bill.name.slice(0, 57) + '...'
+      : (v.bill.name || 'הצעת חוק');
+    const dateStr = v.date ? new Date(v.date).toLocaleDateString('he-IL') : '';
+    return `
+      <div class="mk-vote-row" style="cursor:pointer" onclick="renderBillDetail(${billIdx})">
+        <span class="mk-vote-row-name">${billName}</span>
+        <span class="vote-chip ${voteClass(v.result)}">${voteLabel(v.result)}</span>
+        <span class="mk-vote-row-date">${dateStr}</span>
+      </div>
+    `;
+  }).join('');
+
+  // Back button logic
+  const backFn = previousView === 'results' ? 'renderResults'
+    : previousView === 'directory' ? 'renderMkDirectory'
+    : 'renderIntro';
+
+  app.innerHTML = `
+    <div class="results-section">
+      <button class="back-btn" onclick="${backFn}()">&rsaquo; חזרה</button>
+
+      <div class="mk-detail-header">
+        ${avatar}
+        <div class="mk-detail-name">${displayName(mkName)}</div>
+        <div class="mk-detail-faction">${shortenFaction(mkFaction)}</div>
+        <div class="mk-detail-stats">${allMkVotes.length} הצבעות רשומות</div>
+      </div>
+
+      ${agreementHTML}
+
+      <div class="mk-vote-list">
+        <div class="mk-vote-list-title">כל ההצבעות (${allMkVotes.length})</div>
+        ${voteRowsHTML}
+      </div>
+    </div>
+  `;
+
+  window.scrollTo({ top: 0, behavior: 'smooth' });
 }
 
 loadData();

@@ -1,264 +1,105 @@
-# Knesset Vote Tracker (biapia)
+# מצביע ומשפיע
 
-A web-based viewer for Israeli Knesset bill votes, showing per-MK vote breakdowns with party affiliations.
+A Hebrew quiz app that matches users to Knesset members based on their votes on real bills from the 25th Knesset.
 
-## Data Sources & ETL Documentation
+**Live demo**: serve locally with `python -m http.server 8080`
 
-### The Challenge
+## How it works
 
-Getting structured Knesset vote data with individual MK breakdowns is surprisingly difficult. There is no single API that provides everything. Here is a detailed map of every data source we investigated, what it contains, and its limitations.
+1. User sees 10 bill synopses (AI-generated, in plain Hebrew) from diverse topics
+2. User votes for/against/abstain on each
+3. App compares to actual MK votes and shows closest/furthest MKs and factions
 
----
+## Project structure
 
-### 1. Official Knesset OData APIs
-
-The Knesset exposes two OData v3 services:
-
-#### ParliamentInfo Service
-- **URL**: `https://knesset.gov.il/Odata/ParliamentInfo.svc/`
-- **Status**: Active, has Knesset 25 data
-- **Bot protection**: Radware (blocks browser-based scraping but allows direct API calls)
-- **48 entity sets** including:
-
-| Entity | Description | Key Fields |
-|--------|-------------|------------|
-| `KNS_Bill` | Bill metadata | BillID, Name, KnessetNum, SummaryLaw, StatusID |
-| `KNS_DocumentBill` | Bill document files (PDFs/DOCs) | BillID, FilePath (URLs to `fs.knesset.gov.il`), GroupTypeDesc |
-| `KNS_BillInitiator` | Who proposed the bill | BillID, PersonID |
-| `KNS_PlmSessionItem` | Plenary session agenda items | ItemID, PlenumSessionID, Name |
-| `KNS_PlenumSession` | Plenary sessions | PlenumSessionID, dates |
-| `KNS_Person` | People (MKs, officials) | PersonID, names |
-| `KNS_PersonToPosition` | Position history | PersonID, KnessetNum, FactionID |
-| `KNS_Faction` | Parties/factions | FactionID, Name |
-| `KNS_Status` | Status codes | StatusID, Desc |
-
-**Usage example**:
 ```
-GET https://knesset.gov.il/Odata/ParliamentInfo.svc/KNS_Bill?$format=json&$filter=KnessetNum eq 24&$top=5
+index.html              — Single-page quiz app (vanilla JS/CSS)
+data/
+  bills.json            — All bills with votes, synopses, topics
+  synopses.json         — Cache of AI-generated bill synopses
+  topics.json           — Cache of topic classifications
+  mk_photos.json        — MK name → photo path mapping
+  docs/                 — Downloaded bill documents (DOCX/PDF, gitignored)
+  photos/               — Downloaded MK photos (gitignored)
 ```
 
-**Pagination**: Use `$top` and `$skip`. Default page size varies. Max is around 1000.
+## Data pipeline
 
-**Important**: The `$metadata` endpoint at `https://knesset.gov.il/Odata/ParliamentInfo.svc/$metadata` gives the full XML schema with all entity types, properties, and relationships.
+### Quick start
 
-#### Votes Service
-- **URL**: `https://knesset.gov.il/Odata/Votes.svc/`
-- **Status**: Active but DATA ONLY GOES UP TO KNESSET 24 (July 2021)
-- **4 entity sets**:
+```bash
+# Set up
+uv venv && uv pip install pdfplumber anthropic
 
-| Entity | Description | Key Fields |
-|--------|-------------|------------|
-| `View_vote_rslts_hdr_Approved` | Vote headers (aggregated) | vote_id, sess_item_id, sess_item_dscr, vote_date, is_accepted, total_for/against/abstain, knesset_num |
-| `vote_rslts_kmmbr_shadow` | Individual MK votes | vote_id, kmmbr_id, kmmbr_name, vote_result (1=for, 2=against, 3=abstain), faction_name |
-| `View_Vote_MK_Individual` | MK identity lookup | vip_id, mk_individual_id, name (Hebrew + English) |
-| `vote_result_type` | Result code descriptions | result_type_id, result_type_name |
+# Full build (fetch + enrich) — takes ~15 minutes, needs Claude API
+.venv/bin/python build_data.py
 
-**CRITICAL LIMITATION**: Despite being actively served, this API contains **NO Knesset 25 data**. The most recent vote is from July 13, 2021 (Knesset 24, vote_id 34525). This appears to be a data pipeline failure on the Knesset's side — the API works but was never updated with Knesset 25 votes.
+# Or enrich only (skip vote crawling, just regenerate synopses/topics)
+.venv/bin/python build_data.py --enrich
 
-#### Undocumented REST API (THE KEY DISCOVERY)
-- **URL**: `https://knesset.gov.il/WebSiteApi/knessetapi/Votes/GetVoteDetails/{voteId}`
-- **Status**: Active, HAS KNESSET 25 DATA through Feb 2026
-- **Auth**: None required
-- **CORS**: `access-control-allow-origin: *` (works from browsers too)
-- **No bot protection** (unlike the main website)
+# Serve
+python -m http.server 8080
+```
 
-**Response structure** (JSON):
+### Scripts (run order matters)
+
+| Script | What it does | Output | API calls |
+|--------|-------------|--------|-----------|
+| `fetch_data.py` | Crawls K25 votes from undocumented Knesset REST API, matches bills to OData for doc URLs | `data/bills.json` | Knesset REST + OData |
+| `generate_synopses.py` | Downloads bill docs (DOCX/PDF), extracts text, generates catchy Hebrew synopses | `data/synopses.json` → merges into `bills.json` | Claude Haiku |
+| `generate_topics.py` | Classifies each bill into 3-5 topics from a taxonomy of 15 | `data/topics.json` → merges into `bills.json` | Claude Haiku |
+| `fetch_photos.py` | Searches Hebrew Wikipedia for MK photos, downloads thumbnails | `data/mk_photos.json` + `data/photos/` | Wikipedia API |
+| `build_data.py` | Orchestrates all scripts in order, does final merge | Everything | All of the above |
+
+### Claude API access
+
+Scripts look for API key in this order:
+1. `ANTHROPIC_API_KEY` environment variable
+2. macOS Keychain ("Claude Code" service) — auto-populated by `claude /login`
+
+### Data sources
+
+| Source | What | Bot protection |
+|--------|------|---------------|
+| `knesset.gov.il/WebSiteApi/knessetapi/Votes/GetVoteDetails/{id}` | Per-MK vote breakdowns (K25) | None |
+| `knesset.gov.il/Odata/ParliamentInfo.svc/` | Bill metadata, doc URLs, MK data | None |
+| `fs.knesset.gov.il` | Bill document files (PDF/DOCX) | None |
+| `he.wikipedia.org/w/api.php` | MK photos (pageimages) | None |
+| `main.knesset.gov.il` | Bill/vote pages (linked from quiz) | Radware (works in browser) |
+
+### bills.json schema
+
 ```json
 {
-  "VoteHeader": [{
-    "VoteId": 45200,
-    "VoteDateStr": "5.2.2026",
-    "VoteTimeStr": "13:45",
-    "ItemTitle": "הצעת חוק ...",
-    "FK_ItemID": 2226985,
-    "FK_Knesset": 25,
-    "IsForAccepted": true,
-    "Decision": "...",
-    "AcceptedText": "ההצעה התקבלה"
-  }],
-  "VoteCounters": [
-    {"Title": "בעד", "countOfResult": 63},
-    {"Title": "נגד", "countOfResult": 57}
-  ],
-  "VoteDetails": [
-    {"MkName": "שם חבר כנסת", "FactionName": "שם סיעה", "VoteResultId": 7, "Title": "בעד"}
-  ],
-  "NextAndPrevVotes": [{"NextVote": 45201, "PrevVote": 45199}]
+  "id": "2226483",
+  "name": "הצעת חוק ...",
+  "vote_date": "2026-02-18",
+  "vote_id": 45239,
+  "bill_id": 2240064,
+  "is_accepted": 0,
+  "total_for": 37,
+  "total_against": 53,
+  "total_abstain": 0,
+  "synopsis": "AI-generated catchy Hebrew summary",
+  "topics": ["ביטחון ומלחמה", "זכויות אזרח"],
+  "doc_url": "https://fs.knesset.gov.il/25/law/...",
+  "mk_votes": [
+    {"mk_name": "שם חבר כנסת", "result": 1, "faction": "שם סיעה"}
+  ]
 }
 ```
 
-**Vote ID ranges for Knesset 25**: ~34526 to ~45250 (as of Feb 2026). IDs are not purely sequential — some gaps exist and some IDs from older Knessets are interspersed. Use `NextAndPrevVotes` for reliable sequential traversal.
+### Topic taxonomy (15 topics)
 
-**No list/search endpoint exists** — you must enumerate by vote ID or crawl using the Next/Prev links.
+ביטחון ומלחמה · כלכלה ותקציב · חינוך · בריאות · משפט ועונשין · דת ומדינה · זכויות אזרח · רווחה וביטוח לאומי · תחבורה ותשתיות · סביבה ואקלים · עבודה ותעסוקה · ממשל ודמוקרטיה · חברה ומיעוטים · דיור ונדל"ן · טכנולוגיה ומידע
 
----
+## Tech stack
 
-### 2. Open Knesset Project (hasadna)
+- **Frontend**: Single HTML file, vanilla JS/CSS, Heebo font
+- **Data generation**: Python 3.11+, pdfplumber, anthropic SDK
+- **Package management**: uv + pyproject.toml
+- **Design**: Israeli flag palette (blue `#0038b8`, off-white `#fafaf8`)
 
-The Public Knowledge Workshop (hasadna) maintains the Open Knesset project, which scrapes and reprocesses Knesset data.
+## License
 
-#### Production CSV Files
-- **Base URL**: `https://production.oknesset.org/pipelines/data/`
-- **Status**: Files are refreshed daily (last seen: Feb 18, 2026)
-- **Architecture**: Generated by `knesset-data-pipelines` (migrating from DataFlows to Airflow)
-
-| Path | Description | Size | Coverage |
-|------|-------------|------|----------|
-| `votes/view_vote_rslts_hdr_approved_extra/view_vote_rslts_hdr_approved.csv` | Vote headers with embedded MK ID lists | ~12 MB | K16-K24 |
-| `votes/vote_rslts_kmmbr_shadow_extra/vote_rslts_kmmbr_shadow.csv` | Per-MK vote records | ~99 MB | K16-K24 |
-| `votes/vote_rslts_kmmbr_shadow_extra/mk_individual_positions.csv` | MK position/faction history | ~4.6 MB | All |
-| `members/mk_individual/` | MK profiles | varies | All |
-| `bills/` | Bill data | varies | K16+ (last updated Feb 2023) |
-| `committees/` | Committee sessions & protocols | varies | Active, updated daily |
-
-**Vote headers CSV columns**:
-`id, knesset_num, session_id, sess_item_nbr, sess_item_id, sess_item_dscr, vote_item_id, vote_item_dscr, vote_date, vote_time, is_elctrnc_vote, vote_type, is_accepted, total_for, total_against, total_abstain, vote_stat, session_num, vote_nbr_in_sess, reason, modifier, remark, mk_ids_pro, mk_ids_against, mk_ids_abstain, knesset, plenum, assembly, pagra`
-
-**MK votes CSV columns**:
-`vote_id, kmmbr_id, kmmbr_name, vote_result, knesset_num, faction_id, faction_name, reason, modifier, remark, result_type_name, mk_individual_id`
-
-**SAME LIMITATION**: The vote data pipelines also stop at Knesset 24. The airflow migration has added pipelines for committees and members but NOT yet for votes.
-
-#### Redash SQL Interface
-- **URL**: `https://redash.hasadna.org.il/`
-- **Auth**: Gmail login required
-- **Data source**: Select "next-oknesset"
-- Could be used for custom queries but has the same underlying data
-
-#### GitHub Repositories
-| Repo | Purpose |
-|------|---------|
-| [hasadna/knesset-data-pipelines](https://github.com/hasadna/knesset-data-pipelines) | Main ETL pipelines (DataFlows + Airflow) |
-| [hasadna/knesset-data](https://github.com/hasadna/knesset-data) | API documentation and data access guides |
-| [hasadna/knesset-data-python](https://github.com/hasadna/knesset-data-python) | Python client library (includes Reblaze bot-protection bypass) |
-| [hasadna/Open-Knesset](https://github.com/hasadna/Open-Knesset) | Legacy Django web app (deprecated) |
-
----
-
-### 3. data.gov.il (Israel Open Data Portal)
-
-- **URL**: `https://data.gov.il/`
-- **Bot protection**: Radware (blocks most automated access)
-- **Dataset**: "תוצאות בחירות" (election results) — **NOT parliamentary votes**
-  - Resource ID: `b392b8ee-ba45-4ea0-bfed-f03a1a36e99c` (K25 by members)
-  - This is ballot/election data (which party each settlement voted for), not legislative voting records
-- **Dataset**: "הצבעות חברי הכנסת במליאה" (MK votes in plenum) — listed but has **0 resources** (empty dataset)
-- **CKAN API**: `https://data.gov.il/api/3/action/` — works but the useful dataset is empty
-
----
-
-### 4. Knesset Website (JavaScript-rendered pages)
-
-- **Vote pages**: `https://main.knesset.gov.il/activity/plenum/votes/pages/vote.aspx?voteid=XXXXX`
-- **Smart Protocol**: `https://main.knesset.gov.il/apps/smartprotocol/session/{PlenumSessionID}/{ItemID}`
-- **Bot protection**: Radware with JavaScript challenge (returns only `window.rbzns` init code)
-- **NOT scrapable** without a headless browser that executes JavaScript
-- Likely has Knesset 25 data but requires Selenium/Playwright to access
-
----
-
-### 5. Knesset Bill Document Files
-
-- **Base URL**: `https://fs.knesset.gov.il/{KnessetNum}/law/`
-- **Format**: Direct file downloads (PDF, DOC, DOCX)
-- **Naming**: `{KnessetNum}_ls_{type}_{id}.{ext}` or similar patterns
-- **No bot protection** on file server — direct downloads work
-- Linked from `KNS_DocumentBill.FilePath` in the OData API
-- **GroupTypeDesc** values found:
-  - `"הצעת חוק לדיון מוקדם"` (early discussion bill proposal)
-  - `"קטע מדברי הכנסת"` (Knesset proceedings excerpt)
-  - `"מסמכים לא משויכים"` (unassigned documents)
-
----
-
-## Data Model & Relationships
-
-```
-KNS_Bill (BillID)
-  ├── KNS_DocumentBill (FilePath → fs.knesset.gov.il PDFs)
-  ├── KNS_BillInitiator (PersonID)
-  └── name match → KNS_PlmSessionItem (ItemID, Name)
-                        │
-                        └── sess_item_id → View_vote_rslts_hdr_Approved
-                                              │
-                                              └── vote_id → vote_rslts_kmmbr_shadow
-                                                              (MK name, faction, for/against)
-```
-
-**Key insight**: There is NO direct foreign key between bills (`KNS_Bill.BillID`) and votes (`vote_id` / `sess_item_id`). The only link is through **text matching** between `KNS_Bill.Name` and the vote's `sess_item_dscr` field, or through `KNS_PlmSessionItem.ItemID` = `View_vote_rslts_hdr_Approved.sess_item_id`.
-
----
-
-## ETL Pipeline (fetch_data.py)
-
-Our pipeline combines two data sources:
-
-1. **Open Knesset CSVs** → vote headers + per-MK vote breakdowns (with faction names)
-2. **Knesset OData API** → bill documents (PDFs) and summaries (`SummaryLaw` field)
-
-### Steps:
-1. Download `view_vote_rslts_hdr_approved.csv` (~12 MB) — all vote headers
-2. Download `vote_rslts_kmmbr_shadow.csv` (~99 MB) — all per-MK votes
-3. Filter to target Knesset, group votes by `sess_item_id` (each unique `sess_item_id` = one bill)
-4. Build in-memory index: `vote_id → [mk_votes]`
-5. For each bill, pick the main vote and attach MK breakdown
-6. For each bill, query OData `KNS_Bill` by name substring match to find `BillID`
-7. For matched bills, query `KNS_DocumentBill` to get PDF/DOCX download URL
-8. Output to `data/bills.json`
-
-### Output schema (`data/bills.json`):
-```json
-[
-  {
-    "id": "sess_item_id",
-    "name": "הצעת חוק ...",
-    "vote_date": "2021-07-13",
-    "is_accepted": 1,
-    "total_for": 52,
-    "total_against": 3,
-    "total_abstain": 0,
-    "vote_description": "הצבעה סופית",
-    "summary": "SummaryLaw from KNS_Bill (if matched)",
-    "doc_url": "https://fs.knesset.gov.il/...",
-    "mk_votes": [
-      {"mk_name": "שם חבר כנסת", "result": 1, "faction": "שם סיעה"}
-    ]
-  }
-]
-```
-
----
-
-## Knesset 25 Data Gap
-
-As of February 2026, **no public API or data pipeline provides Knesset 25 (Nov 2022 – present) electronic vote data**. The gap exists because:
-
-1. The official OData Votes API stopped being updated after Knesset 24
-2. The Open Knesset project's vote pipelines haven't been migrated to Airflow yet
-3. The data.gov.il dataset for plenum votes is empty
-4. The Knesset website has the data but is protected by Radware JavaScript challenges
-
-**Possible workarounds** (not yet implemented):
-- Use Playwright/Selenium to scrape `main.knesset.gov.il` vote pages
-- Use the `knesset-data-python` library's Reblaze bypass utility
-- Access the Redash database if it has been updated separately
-- Contact the Knesset's IT team or hasadna volunteers about the data gap
-
----
-
-## Running
-
-```bash
-# Fetch data (downloads ~110 MB of CSVs, takes 2-3 minutes)
-python3 fetch_data.py
-
-# Serve the web page
-python3 -m http.server 8000
-
-# Open http://localhost:8000
-```
-
-## Tech Stack
-- **Backend**: Python 3 (stdlib only — no dependencies)
-- **Frontend**: Single HTML file with vanilla JS/CSS
-- **Design**: Israeli flag palette (off-white `#fafaf8`, blue `#0038b8`)
+CC BY-NC-SA 4.0 — © הראל קין

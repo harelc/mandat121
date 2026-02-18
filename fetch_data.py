@@ -25,9 +25,9 @@ VOTES_API = "https://knesset.gov.il/WebSiteApi/knessetapi/Votes/GetVoteDetails"
 PARLIAMENT_BASE = "https://knesset.gov.il/Odata/ParliamentInfo.svc"
 
 TARGET_KNESSET = 25
-MAX_BILLS = 250
-START_VOTE_ID = 45250
-MIN_VOTE_ID = 34526
+MAX_BILLS = 800
+START_VOTE_ID = 45800
+MIN_VOTE_ID = 39000
 
 # Patterns that indicate this is NOT a regular bill
 NON_BILL_PATTERNS = [
@@ -102,23 +102,17 @@ def crawl_votes():
     skipped_non_bills = 0
 
     batch_size = 20
-    current_id = START_VOTE_ID
-    empty_streak = 0
     total_fetched = 0
 
-    # We need more than MAX_BILLS raw items because we'll filter later
-    raw_target = MAX_BILLS * 3
+    # Scan the entire range — K25 votes are scattered with large gaps
+    all_vote_ids = list(range(START_VOTE_ID, MIN_VOTE_ID - 1, -1))
+    print(f"  Scanning {len(all_vote_ids)} vote IDs ({START_VOTE_ID} → {MIN_VOTE_ID})...")
 
-    while current_id >= MIN_VOTE_ID and len(bills) < raw_target:
-        batch_ids = list(range(current_id, max(current_id - batch_size, MIN_VOTE_ID - 1), -1))
-        batch_ids = [vid for vid in batch_ids if vid not in seen_vote_ids]
-
-        if not batch_ids:
-            current_id -= batch_size
-            continue
+    for batch_start in range(0, len(all_vote_ids), batch_size):
+        batch_ids = all_vote_ids[batch_start:batch_start + batch_size]
 
         results = {}
-        with ThreadPoolExecutor(max_workers=10) as executor:
+        with ThreadPoolExecutor(max_workers=8) as executor:
             futures = {executor.submit(fetch_vote, vid): vid for vid in batch_ids}
             for future in as_completed(futures):
                 vid = futures[future]
@@ -128,7 +122,6 @@ def crawl_votes():
                 except Exception:
                     results[vid] = None
 
-        found_in_batch = 0
         for vid in sorted(results.keys(), reverse=True):
             data = results[vid]
             if not data or not data.get("VoteHeader"):
@@ -195,22 +188,11 @@ def crawl_votes():
                     "vote_description": (header.get("Decision") or "").strip(),
                     "mk_votes": mk_votes,
                 }
-                found_in_batch += 1
 
             total_fetched += 1
 
-        if found_in_batch > 0:
-            empty_streak = 0
-        else:
-            empty_streak += 1
-
-        if empty_streak > 30:
-            print(f"  Stopping: {empty_streak} consecutive empty batches")
-            break
-
-        current_id -= batch_size
-        if total_fetched % 50 == 0 or found_in_batch > 0:
-            print(f"  Scanned to vote ID {current_id}, found {len(bills)} bills ({skipped_non_bills} non-bills skipped)")
+        if (batch_start + batch_size) % 200 == 0 or batch_start + batch_size >= len(all_vote_ids):
+            print(f"  Scanned {min(batch_start + batch_size, len(all_vote_ids))}/{len(all_vote_ids)} IDs, found {len(bills)} bills ({skipped_non_bills} non-bills skipped)", flush=True)
 
     print(f"  Total: {len(bills)} bills found, {skipped_non_bills} non-bills skipped")
     sorted_bills = sorted(bills.values(), key=lambda b: b["vote_date"], reverse=True)
@@ -284,16 +266,14 @@ def main():
     # Step 2: Fetch bill documents
     all_bills = fetch_bill_documents(all_bills)
 
-    # Step 3: Keep only bills WITH a doc_url, up to MAX_BILLS
+    # Step 3: Keep all bills up to MAX_BILLS (prioritize those with docs)
     bills_with_docs = [b for b in all_bills if b.get("doc_url")]
     bills_without = [b for b in all_bills if not b.get("doc_url")]
     print(f"\n  Bills with documents: {len(bills_with_docs)}")
     print(f"  Bills without documents: {len(bills_without)}")
 
-    # Prioritize bills with docs, then fill up with others if needed
-    final = bills_with_docs[:MAX_BILLS]
-    if len(final) < MAX_BILLS:
-        final += bills_without[:MAX_BILLS - len(final)]
+    final = bills_with_docs + bills_without
+    final = final[:MAX_BILLS]
 
     # Step 4: Save
     out_path = DATA_DIR / "bills.json"

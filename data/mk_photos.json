@@ -1,0 +1,486 @@
+{
+  "אבוטבול משה": {
+    "photo_url": "data/photos/אבוטבול_משה.jpg",
+    "faction": "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ\"ל"
+  },
+  "אדלשטיין יולי יואל": {
+    "photo_url": "data/photos/אדלשטיין_יולי_יואל.jpg",
+    "faction": "הליכוד"
+  },
+  "אוחנה אמיר": {
+    "photo_url": "data/photos/אוחנה_אמיר.jpg",
+    "faction": "הליכוד"
+  },
+  "אזולאי ינון": {
+    "photo_url": "data/photos/אזולאי_ינון.jpg",
+    "faction": "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ\"ל"
+  },
+  "אייכלר ישראל": {
+    "photo_url": "data/photos/אייכלר_ישראל.jpg",
+    "faction": "יהדות התורה"
+  },
+  "אילוז דן": {
+    "photo_url": "data/photos/אילוז_דן.jpg",
+    "faction": "הליכוד"
+  },
+  "אלהואשלה ואליד": {
+    "photo_url": "data/photos/אלהואשלה_ואליד.jpg",
+    "faction": "רע\"ם"
+  },
+  "אלהרר קארין": {
+    "photo_url": "data/photos/אלהרר_קארין.jpg",
+    "faction": "יש עתיד"
+  },
+  "אליהו עמיחי": {
+    "photo_url": "data/photos/אליהו_עמיחי.jpg",
+    "faction": "עוצמה יהודית בראשות איתמר בן גביר"
+  },
+  "אלקין זאב": {
+    "photo_url": "data/photos/אלקין_זאב.png",
+    "faction": "הימין הממלכתי"
+  },
+  "ארבל משה": {
+    "photo_url": "data/photos/ארבל_משה.jpg",
+    "faction": "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ\"ל"
+  },
+  "אשר יעקב": {
+    "photo_url": "data/photos/אשר_יעקב.jpg",
+    "faction": "יהדות התורה"
+  },
+  "בוארון אביחי אברהם": {
+    "photo_url": "data/photos/בוארון_אביחי_אברהם.jpg",
+    "faction": "הליכוד"
+  },
+  "בוסו אוריאל": {
+    "photo_url": "data/photos/בוסו_אוריאל.jpg",
+    "faction": "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ\"ל"
+  },
+  "בוסקילה מישל": {
+    "photo_url": "data/photos/בוסקילה_מישל.jpg",
+    "faction": "הימין הממלכתי"
+  },
+  "ביטון דבי": {
+    "photo_url": "data/photos/ביטון_דבי.jpg",
+    "faction": "יש עתיד"
+  },
+  "ביטון חיים": {
+    "photo_url": "data/photos/ביטון_חיים.jpg",
+    "faction": "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ\"ל"
+  },
+  "ביטון מיכאל מרדכי": {
+    "photo_url": "data/photos/ביטון_מיכאל_מרדכי.jpg",
+    "faction": "כחול לבן - המחנה הממלכתי"
+  },
+  "ביטן דוד": {
+    "photo_url": "data/photos/ביטן_דוד.jpg",
+    "faction": "הליכוד"
+  },
+  "ביסמוט בועז": {
+    "photo_url": "data/photos/ביסמוט_בועז.jpg",
+    "faction": "הליכוד"
+  },
+  "בליאק ולדימיר": {
+    "photo_url": "data/photos/בליאק_ולדימיר.jpg",
+    "faction": "יש עתיד"
+  },
+  "בן ארי מירב": {
+    "photo_url": "data/photos/בן_ארי_מירב.jpg",
+    "faction": "יש עתיד"
+  },
+  "בן ברק רם": {
+    "photo_url": "data/photos/בן_ברק_רם.jpg",
+    "faction": "יש עתיד"
+  },
+  "בן גביר איתמר": {
+    "photo_url": "data/photos/בן_גביר_איתמר.jpg",
+    "faction": "עוצמה יהודית בראשות איתמר בן גביר"
+  },
+  "בן סעיד סמיר": {
+    "photo_url": "data/photos/בן_סעיד_סמיר.jpg",
+    "faction": "חד\"ש-תע\"ל"
+  },
+  "בן צור יואב": {
+    "photo_url": "data/photos/בן_צור_יואב.jpg",
+    "faction": "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ\"ל"
+  },
+  "ברקת ניר": {
+    "photo_url": "data/photos/ברקת_ניר.jpg",
+    "faction": "הליכוד"
+  },
+  "גואטה  ששון ששי": {
+    "photo_url": "data/photos/גואטה__ששון_ששי.jpg",
+    "faction": "הליכוד"
+  },
+  "גוטליב טלי": {
+    "photo_url": "data/photos/גוטליב_טלי.jpg",
+    "faction": "הליכוד"
+  },
+  "גולדקנופ יצחק": {
+    "photo_url": "data/photos/גולדקנופ_יצחק.jpg",
+    "faction": "יהדות התורה"
+  },
+  "גולן מאי": {
+    "photo_url": "data/photos/גולן_מאי.jpg",
+    "faction": "הליכוד"
+  },
+  "גינזבורג איתן": {
+    "photo_url": "data/photos/גינזבורג_איתן.jpg",
+    "faction": "כחול לבן - המחנה הממלכתי"
+  },
+  "גמליאל גילה": {
+    "photo_url": "data/photos/גמליאל_גילה.jpg",
+    "faction": "הליכוד"
+  },
+  "גנץ בני": {
+    "photo_url": "data/photos/גנץ_בני.jpg",
+    "faction": "כחול לבן - המחנה הממלכתי"
+  },
+  "גפני משה": {
+    "photo_url": "data/photos/גפני_משה.jpg",
+    "faction": "יהדות התורה"
+  },
+  "דוידסון סימון": {
+    "photo_url": "data/photos/דוידסון_סימון.jpg",
+    "faction": "יש עתיד"
+  },
+  "דיכטר אבי": {
+    "photo_url": "data/photos/דיכטר_אבי.jpg",
+    "faction": "הליכוד"
+  },
+  "דיסטל אטבריאן  גלית": {
+    "photo_url": "data/photos/דיסטל_אטבריאן__גלית.jpg",
+    "faction": "הליכוד"
+  },
+  "דלל אלי": {
+    "photo_url": "data/photos/דלל_אלי.jpg",
+    "faction": "הליכוד"
+  },
+  "דנינו שלום": {
+    "photo_url": "data/photos/דנינו_שלום.jpg",
+    "faction": "הליכוד"
+  },
+  "דרעי אריה מכלוף": {
+    "photo_url": "data/photos/דרעי_אריה_מכלוף.jpg",
+    "faction": "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ\"ל"
+  },
+  "הלוי עמית": {
+    "photo_url": "data/photos/הלוי_עמית.jpg",
+    "faction": "הליכוד"
+  },
+  "השכל שרן מרים": {
+    "photo_url": "data/photos/השכל_שרן_מרים.jpg",
+    "faction": "הימין הממלכתי"
+  },
+  "ואטורי ניסים": {
+    "photo_url": "data/photos/ואטורי_ניסים.jpg",
+    "faction": "הליכוד"
+  },
+  "וולדיגר מיכל מרים": {
+    "photo_url": "data/photos/וולדיגר_מיכל_מרים.jpg",
+    "faction": "הציונות הדתית בראשות בצלאל סמוטריץ'"
+  },
+  "וסרלאוף יצחק שמעון": {
+    "photo_url": "data/photos/וסרלאוף_יצחק_שמעון.jpg",
+    "faction": "עוצמה יהודית בראשות איתמר בן גביר"
+  },
+  "ח'טיב יאסין אימאן": {
+    "photo_url": "data/photos/חטיב_יאסין_אימאן.jpg",
+    "faction": "רע\"ם"
+  },
+  "חוג'יראת יאסר": {
+    "photo_url": "data/photos/חוגיראת_יאסר.jpg",
+    "faction": "רע\"ם"
+  },
+  "חסון אכרם": {
+    "photo_url": "data/photos/חסון_אכרם.jpg",
+    "faction": "הימין הממלכתי"
+  },
+  "טאהא ווליד": {
+    "photo_url": "data/photos/טאהא_ווליד.jpg",
+    "faction": "רע\"ם"
+  },
+  "טופורובסקי בועז": {
+    "photo_url": "data/photos/טופורובסקי_בועז.jpg",
+    "faction": "יש עתיד"
+  },
+  "טור פז משה": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "טיבי אחמד": {
+    "photo_url": "data/photos/טיבי_אחמד.png",
+    "faction": "חד\"ש-תע\"ל"
+  },
+  "טייב יוסף": {
+    "photo_url": null,
+    "faction": "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ\"ל"
+  },
+  "טל אוהד": {
+    "photo_url": "data/photos/טל_אוהד.jpg",
+    "faction": "הציונות הדתית בראשות בצלאל סמוטריץ'"
+  },
+  "טסלר יעקב": {
+    "photo_url": "data/photos/טסלר_יעקב.jpg",
+    "faction": "יהדות התורה"
+  },
+  "טרופר חילי": {
+    "photo_url": null,
+    "faction": "כחול לבן - המחנה הממלכתי"
+  },
+  "כהן מאיר": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "כהן מירב": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "כסיף עופר": {
+    "photo_url": "data/photos/כסיף_עופר.png",
+    "faction": "חד\"ש-תע\"ל"
+  },
+  "כץ אופיר": {
+    "photo_url": null,
+    "faction": "הליכוד"
+  },
+  "כץ ישראל": {
+    "photo_url": null,
+    "faction": "הליכוד"
+  },
+  "כץ רון": {
+    "photo_url": "data/photos/כץ_רון.jpg",
+    "faction": "יש עתיד"
+  },
+  "להב הרצנו יוראי": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "לוי ירון": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "לוי מיקי": {
+    "photo_url": "data/photos/לוי_מיקי.jpg",
+    "faction": "יש עתיד"
+  },
+  "לוין יריב": {
+    "photo_url": "data/photos/לוין_יריב.jpg",
+    "faction": "הליכוד"
+  },
+  "לזימי נעמה": {
+    "photo_url": "data/photos/לזימי_נעמה.jpg",
+    "faction": "העבודה"
+  },
+  "ליברמן אביגדור": {
+    "photo_url": null,
+    "faction": "ישראל ביתנו"
+  },
+  "לפיד יאיר": {
+    "photo_url": "data/photos/לפיד_יאיר.jpg",
+    "faction": "יש עתיד"
+  },
+  "מזרסקי טטיאנה": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "מיכאלי מרב": {
+    "photo_url": "data/photos/מיכאלי_מרב.jpg",
+    "faction": "העבודה"
+  },
+  "מירון שלי טל": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "מישרקי יונתן": {
+    "photo_url": "data/photos/מישרקי_יונתן.jpg",
+    "faction": "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ\"ל"
+  },
+  "מלביצקי חנוך דב": {
+    "photo_url": null,
+    "faction": "הליכוד"
+  },
+  "מלינובסקי יוליה": {
+    "photo_url": null,
+    "faction": "ישראל ביתנו"
+  },
+  "מלכיאלי מיכאל": {
+    "photo_url": "data/photos/מלכיאלי_מיכאל.jpg",
+    "faction": "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ\"ל"
+  },
+  "מלקו צגה צגנש": {
+    "photo_url": null,
+    "faction": "הליכוד"
+  },
+  "מעוז אבי": {
+    "photo_url": null,
+    "faction": "נעם - בראשות אבי מעוז"
+  },
+  "מקלב אורי": {
+    "photo_url": null,
+    "faction": "יהדות התורה"
+  },
+  "מרגי יעקב": {
+    "photo_url": "data/photos/מרגי_יעקב.jpg",
+    "faction": "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ\"ל"
+  },
+  "ניר שרון": {
+    "photo_url": "data/photos/ניר_שרון.png",
+    "faction": "ישראל ביתנו"
+  },
+  "נתניהו בנימין": {
+    "photo_url": "data/photos/נתניהו_בנימין.jpg",
+    "faction": "הליכוד"
+  },
+  "סגלוביץ יואב": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "סובה יבגני": {
+    "photo_url": null,
+    "faction": "ישראל ביתנו"
+  },
+  "סוכות צבי ידידיה": {
+    "photo_url": "data/photos/סוכות_צבי_ידידיה.jpg",
+    "faction": "הציונות הדתית בראשות בצלאל סמוטריץ'"
+  },
+  "סולומון משה": {
+    "photo_url": null,
+    "faction": "הציונות הדתית בראשות בצלאל סמוטריץ'"
+  },
+  "סון הר מלך לימור": {
+    "photo_url": "data/photos/סון_הר_מלך_לימור.jpg",
+    "faction": "עוצמה יהודית בראשות איתמר בן גביר"
+  },
+  "סופר אופיר": {
+    "photo_url": "data/photos/סופר_אופיר.jpg",
+    "faction": "הציונות הדתית בראשות בצלאל סמוטריץ'"
+  },
+  "סטרוק אורית": {
+    "photo_url": "data/photos/סטרוק_אורית.jpg",
+    "faction": "הציונות הדתית בראשות בצלאל סמוטריץ'"
+  },
+  "סעדה משה": {
+    "photo_url": null,
+    "faction": "הליכוד"
+  },
+  "עבאס מנסור": {
+    "photo_url": null,
+    "faction": "רע\"ם"
+  },
+  "עבד עפיף": {
+    "photo_url": null,
+    "faction": "הליכוד"
+  },
+  "עודה איימן": {
+    "photo_url": null,
+    "faction": "חד\"ש-תע\"ל"
+  },
+  "עזוז עדי": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "עטייה חוה אתי": {
+    "photo_url": null,
+    "faction": "הליכוד"
+  },
+  "עמאר חמד": {
+    "photo_url": null,
+    "faction": "ישראל ביתנו"
+  },
+  "פוגל צביקה": {
+    "photo_url": null,
+    "faction": "עוצמה יהודית בראשות איתמר בן גביר"
+  },
+  "פורר עודד": {
+    "photo_url": null,
+    "faction": "ישראל ביתנו"
+  },
+  "פינדרוס יצחק זאב": {
+    "photo_url": "data/photos/פינדרוס_יצחק_זאב.jpg",
+    "faction": "יהדות התורה"
+  },
+  "פסל משה": {
+    "photo_url": null,
+    "faction": "הליכוד"
+  },
+  "פרוש מאיר": {
+    "photo_url": null,
+    "faction": "יהדות התורה"
+  },
+  "פרידמן יסמין": {
+    "photo_url": "data/photos/פרידמן_יסמין.jpg",
+    "faction": "יש עתיד"
+  },
+  "פרקש הכהן אורית": {
+    "photo_url": null,
+    "faction": "כחול לבן - המחנה הממלכתי"
+  },
+  "צרפתי הרכבי מטי": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "קלנר אריאל": {
+    "photo_url": null,
+    "faction": "הליכוד"
+  },
+  "קרויזר יצחק": {
+    "photo_url": null,
+    "faction": "עוצמה יהודית בראשות איתמר בן גביר"
+  },
+  "קריב גלעד": {
+    "photo_url": null,
+    "faction": "העבודה"
+  },
+  "קרעי שלמה": {
+    "photo_url": "data/photos/קרעי_שלמה.jpg",
+    "faction": "הליכוד"
+  },
+  "רביבו אליהו": {
+    "photo_url": null,
+    "faction": "הליכוד"
+  },
+  "רוטמן שמחה": {
+    "photo_url": null,
+    "faction": "הציונות הדתית בראשות בצלאל סמוטריץ'"
+  },
+  "רון בן משה יעל": {
+    "photo_url": null,
+    "faction": "כחול לבן - המחנה הממלכתי"
+  },
+  "רייטן מרום אפרת": {
+    "photo_url": null,
+    "faction": "העבודה"
+  },
+  "שוסטר אלון": {
+    "photo_url": null,
+    "faction": "כחול לבן - המחנה הממלכתי"
+  },
+  "שטרית קטי קטרין": {
+    "photo_url": null,
+    "faction": "הליכוד"
+  },
+  "שטרן אלעזר": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "שיר סגמן מיכל": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "שירי נאור": {
+    "photo_url": null,
+    "faction": "יש עתיד"
+  },
+  "שקלים אושר": {
+    "photo_url": null,
+    "faction": "הליכוד"
+  },
+  "תומא סלימאן עאידה": {
+    "photo_url": "data/photos/תומא_סלימאן_עאידה.png",
+    "faction": "חד\"ש-תע\"ל"
+  },
+  "תמנו פנינה": {
+    "photo_url": null,
+    "faction": "כחול לבן - המחנה הממלכתי"
+  }
+}
