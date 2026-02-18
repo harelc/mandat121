@@ -1,0 +1,33 @@
+{
+  "permissions": {
+    "allow": [
+      "WebFetch(domain:main.knesset.gov.il)",
+      "WebFetch(domain:knesset.gov.il)",
+      "WebSearch",
+      "Bash(gh api:*)",
+      "WebFetch(domain:github.com)",
+      "Bash(python3:*)",
+      "WebFetch(domain:data.gov.il)",
+      "WebFetch(domain:production.oknesset.org)",
+      "WebFetch(domain:storage.googleapis.com)",
+      "WebFetch(domain:oknesset.org)",
+      "Bash(curl:*)",
+      "Bash(gh search:*)",
+      "Bash(lsof:*)",
+      "Bash(xargs kill:*)",
+      "Bash(for endpoint in \"https://knesset.gov.il/WebSiteApi/knessetapi/MKs/GetCurrentMembers\" \"https://knesset.gov.il/WebSiteApi/knessetapi/MKs/GetAllMembers\" \"https://knesset.gov.il/WebSiteApi/knessetapi/Members/GetAllCurrentKnessetMembers\" \"https://knesset.gov.il/WebSiteApi/knessetapi/Members/GetCurrentMembers\")",
+      "Bash(do)",
+      "Bash(echo:*)",
+      "Bash(done)",
+      "Bash(# Follow oknesset redirect and try with mk_individual_id curl -sI \"\"https://oknesset.org/static/img/mk/214.png\"\")",
+      "Bash(xxd:*)",
+      "Bash(pip3 install:*)",
+      "Bash(gh auth status:*)",
+      "Bash(uv venv:*)",
+      "Bash(uv pip install:*)",
+      "Bash(git init:*)",
+      "Bash(git add:*)",
+      "Bash(git commit:*)"
+    ]
+  }
+}

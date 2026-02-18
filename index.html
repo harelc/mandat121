@@ -1,0 +1,731 @@
+<!DOCTYPE html>
+<html lang="he" dir="rtl">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>איך הייתם מצביעים?</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Heebo:wght@300;400;500;600;700;800&display=swap');
+
+  :root {
+    --blue: #0038b8;
+    --blue-dark: #002a8a;
+    --blue-light: #4a7fe0;
+    --blue-pale: #e8eef8;
+    --blue-glow: rgba(0, 56, 184, 0.12);
+    --white: #fafaf8;
+    --off-white: #f5f4f0;
+    --card-bg: #ffffff;
+    --border: #dde1e8;
+    --text: #1a1a2e;
+    --text-mid: #3a3a52;
+    --text-light: #6a6a82;
+    --green: #1a9e52;
+    --green-bg: #e8f8ef;
+    --red: #c0392b;
+    --red-bg: #fde8e8;
+    --orange: #d4850a;
+    --orange-bg: #fff3e0;
+    --shadow: 0 4px 24px rgba(0, 0, 0, 0.06);
+    --shadow-hover: 0 8px 32px rgba(0, 56, 184, 0.12);
+  }
+
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+
+  body {
+    font-family: 'Heebo', -apple-system, BlinkMacSystemFont, sans-serif;
+    background: var(--off-white);
+    color: var(--text);
+    line-height: 1.7;
+    min-height: 100vh;
+  }
+
+  .stripe { height: 5px; background: linear-gradient(90deg, var(--blue), var(--blue-light)); }
+
+  header {
+    background: linear-gradient(135deg, var(--blue-dark), var(--blue));
+    color: white;
+    padding: 2rem 2rem 1.8rem;
+    text-align: center;
+  }
+
+  header h1 {
+    font-size: 2.2rem;
+    font-weight: 800;
+    margin-bottom: 0.3rem;
+  }
+
+  header p {
+    font-size: 1.05rem;
+    opacity: 0.8;
+    font-weight: 300;
+  }
+
+  .container {
+    max-width: 680px;
+    margin: 0 auto;
+    padding: 2rem 1.5rem;
+  }
+
+  /* Progress bar */
+  .progress-wrap {
+    margin-bottom: 2rem;
+  }
+
+  .progress-label {
+    display: flex;
+    justify-content: space-between;
+    font-size: 0.85rem;
+    color: var(--text-light);
+    margin-bottom: 0.4rem;
+  }
+
+  .progress-bar {
+    height: 8px;
+    background: var(--border);
+    border-radius: 4px;
+    overflow: hidden;
+  }
+
+  .progress-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--blue), var(--blue-light));
+    border-radius: 4px;
+    transition: width 0.5s ease;
+  }
+
+  /* Quiz card */
+  .quiz-card {
+    background: var(--card-bg);
+    border-radius: 16px;
+    box-shadow: var(--shadow);
+    padding: 2rem 2rem 1.5rem;
+    animation: fadeIn 0.4s ease;
+  }
+
+  @keyframes fadeIn {
+    from { opacity: 0; transform: translateY(12px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+
+  .bill-number {
+    font-size: 0.8rem;
+    color: var(--blue-light);
+    font-weight: 600;
+    letter-spacing: 0.05em;
+    margin-bottom: 0.8rem;
+  }
+
+  .bill-summary {
+    font-size: 1.2rem;
+    font-weight: 500;
+    color: var(--text);
+    line-height: 1.8;
+    margin-bottom: 1.5rem;
+  }
+
+  .bill-original-name {
+    font-size: 0.82rem;
+    color: var(--text-light);
+    margin-bottom: 2rem;
+    padding-top: 0.8rem;
+    border-top: 1px solid var(--border);
+  }
+
+  .vote-buttons {
+    display: flex;
+    gap: 0.8rem;
+  }
+
+  .vote-btn {
+    flex: 1;
+    padding: 1rem;
+    border: 2px solid var(--border);
+    border-radius: 12px;
+    background: var(--card-bg);
+    cursor: pointer;
+    font-family: 'Heebo', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    transition: all 0.2s;
+    text-align: center;
+  }
+
+  .vote-btn:hover {
+    transform: translateY(-2px);
+    box-shadow: var(--shadow-hover);
+  }
+
+  .vote-btn.for {
+    border-color: var(--green);
+    color: var(--green);
+  }
+  .vote-btn.for:hover, .vote-btn.for.selected {
+    background: var(--green);
+    color: white;
+  }
+
+  .vote-btn.against {
+    border-color: var(--red);
+    color: var(--red);
+  }
+  .vote-btn.against:hover, .vote-btn.against.selected {
+    background: var(--red);
+    color: white;
+  }
+
+  .vote-btn.abstain {
+    border-color: var(--orange);
+    color: var(--orange);
+  }
+  .vote-btn.abstain:hover, .vote-btn.abstain.selected {
+    background: var(--orange);
+    color: white;
+  }
+
+  .vote-btn .btn-icon {
+    font-size: 1.5rem;
+    display: block;
+    margin-bottom: 0.3rem;
+  }
+
+  /* After vote feedback */
+  .feedback {
+    margin-top: 1.2rem;
+    padding: 1rem;
+    border-radius: 10px;
+    font-size: 0.9rem;
+    animation: fadeIn 0.3s ease;
+  }
+
+  .feedback.accepted { background: var(--green-bg); color: #145a33; }
+  .feedback.rejected { background: var(--red-bg); color: var(--red); }
+
+  .feedback .result-line {
+    font-weight: 600;
+    margin-bottom: 0.3rem;
+  }
+
+  .feedback .tally {
+    font-size: 0.85rem;
+    opacity: 0.85;
+  }
+
+  .next-btn {
+    display: block;
+    width: 100%;
+    margin-top: 1rem;
+    padding: 0.9rem;
+    border: none;
+    border-radius: 10px;
+    background: var(--blue);
+    color: white;
+    font-family: 'Heebo', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: background 0.2s;
+  }
+
+  .next-btn:hover { background: var(--blue-dark); }
+
+  /* Results page */
+  .results-section {
+    animation: fadeIn 0.5s ease;
+  }
+
+  .results-intro {
+    text-align: center;
+    margin-bottom: 2rem;
+  }
+
+  .results-intro h2 {
+    font-size: 1.6rem;
+    font-weight: 700;
+    color: var(--blue);
+    margin-bottom: 0.5rem;
+  }
+
+  .results-intro p {
+    color: var(--text-light);
+    font-size: 1rem;
+  }
+
+  .result-card {
+    background: var(--card-bg);
+    border-radius: 14px;
+    box-shadow: var(--shadow);
+    margin-bottom: 1.2rem;
+    overflow: hidden;
+  }
+
+  .result-card-header {
+    padding: 1.2rem 1.5rem;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .result-rank {
+    font-size: 1.5rem;
+    font-weight: 800;
+    color: var(--blue);
+    min-width: 2.5rem;
+  }
+
+  .result-info { flex: 1; }
+
+  .result-name {
+    font-size: 1.1rem;
+    font-weight: 600;
+  }
+
+  .result-faction {
+    font-size: 0.85rem;
+    color: var(--text-light);
+  }
+
+  .result-score {
+    text-align: left;
+  }
+
+  .result-pct {
+    font-size: 1.4rem;
+    font-weight: 700;
+    color: var(--blue);
+  }
+
+  .result-label {
+    font-size: 0.75rem;
+    color: var(--text-light);
+  }
+
+  .match-bar {
+    height: 4px;
+    background: var(--border);
+  }
+
+  .match-bar-fill {
+    height: 100%;
+    background: linear-gradient(90deg, var(--blue), var(--blue-light));
+    transition: width 0.8s ease;
+  }
+
+  .section-title {
+    font-size: 1.1rem;
+    font-weight: 700;
+    color: var(--text);
+    margin: 2rem 0 1rem;
+    padding-bottom: 0.5rem;
+    border-bottom: 2px solid var(--blue-pale);
+  }
+
+  .party-result {
+    display: flex;
+    align-items: center;
+    gap: 1rem;
+    padding: 0.8rem 0;
+    border-bottom: 1px solid #f0f0f0;
+  }
+
+  .party-result:last-child { border-bottom: none; }
+
+  .party-name {
+    flex: 1;
+    font-weight: 500;
+  }
+
+  .party-bar-wrap {
+    width: 120px;
+    height: 6px;
+    background: var(--border);
+    border-radius: 3px;
+  }
+
+  .party-bar {
+    height: 100%;
+    background: var(--blue);
+    border-radius: 3px;
+  }
+
+  .party-pct {
+    min-width: 45px;
+    text-align: left;
+    font-weight: 600;
+    color: var(--blue);
+    font-size: 0.9rem;
+  }
+
+  .restart-btn {
+    display: block;
+    width: 100%;
+    margin-top: 2rem;
+    padding: 1rem;
+    border: 2px solid var(--blue);
+    border-radius: 12px;
+    background: transparent;
+    color: var(--blue);
+    font-family: 'Heebo', sans-serif;
+    font-size: 1rem;
+    font-weight: 600;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .restart-btn:hover {
+    background: var(--blue);
+    color: white;
+  }
+
+  .loading {
+    text-align: center;
+    padding: 4rem 2rem;
+  }
+
+  .spinner {
+    display: inline-block;
+    width: 36px;
+    height: 36px;
+    border: 3px solid var(--blue-pale);
+    border-top-color: var(--blue);
+    border-radius: 50%;
+    animation: spin 0.8s linear infinite;
+    margin-bottom: 1rem;
+  }
+
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  .loading-text {
+    color: var(--text-light);
+    font-size: 1.05rem;
+  }
+
+  /* Responsive */
+  @media (max-width: 500px) {
+    header h1 { font-size: 1.6rem; }
+    .quiz-card { padding: 1.5rem; }
+    .bill-summary { font-size: 1.05rem; }
+    .vote-btn { padding: 0.8rem 0.5rem; font-size: 0.9rem; }
+    .vote-btn .btn-icon { font-size: 1.2rem; }
+  }
+</style>
+</head>
+<body>
+
+<div class="stripe"></div>
+<header>
+  <h1>איך הייתם מצביעים?</h1>
+  <p>גלו אילו חברי כנסת הכי קרובים לעמדות שלכם</p>
+</header>
+<div class="stripe"></div>
+
+<div class="container" id="app">
+  <div class="loading">
+    <div class="spinner"></div>
+    <div class="loading-text">טוען הצעות חוק...</div>
+  </div>
+</div>
+
+<script>
+const TOTAL_QUESTIONS = 10;
+let allBills = [];
+let quizBills = [];
+let userVotes = []; // {billIndex, vote: 1=for, 2=against, 3=abstain}
+let currentQ = 0;
+let voted = false;
+
+async function loadData() {
+  const resp = await fetch("data/bills.json");
+  allBills = await resp.json();
+  // Pick bills that have MK votes and are interesting (high participation)
+  const eligible = allBills.filter(b =>
+    (b.mk_votes || []).length >= 20 &&
+    b.name && b.name.length > 10
+  );
+  // Shuffle and pick TOTAL_QUESTIONS
+  quizBills = shuffle(eligible).slice(0, TOTAL_QUESTIONS);
+  if (quizBills.length < TOTAL_QUESTIONS) {
+    quizBills = shuffle(allBills.filter(b => (b.mk_votes || []).length > 0)).slice(0, TOTAL_QUESTIONS);
+  }
+  renderQuiz();
+}
+
+function shuffle(arr) {
+  const a = [...arr];
+  for (let i = a.length - 1; i > 0; i--) {
+    const j = Math.floor(Math.random() * (i + 1));
+    [a[i], a[j]] = [a[j], a[i]];
+  }
+  return a;
+}
+
+function makeSummary(bill) {
+  // Create a catchy Hebrew summary from the bill name and description
+  let name = bill.name || "";
+  // Clean up the legal name
+  name = name.replace(/\(תיקון[^)]*\)/g, "").replace(/\(הוראת שעה[^)]*\)/g, "").trim();
+  name = name.replace(/,\s*הת?שפ"?[א-ת].*$/g, "").trim();
+  name = name.replace(/,\s*התש[א-ת]"[א-ת].*$/g, "").trim();
+
+  let summary = bill.summary || "";
+  if (summary && summary.length > 20) {
+    // Use the official summary if available
+    // Trim to ~2 sentences
+    const sentences = summary.split(/(?<=[.!?])\s+/);
+    return sentences.slice(0, 3).join(" ");
+  }
+
+  // Fallback: describe the vote context
+  const desc = bill.vote_description || "";
+  let text = name;
+  if (desc && desc !== name) {
+    text += " — " + desc;
+  }
+  return text;
+}
+
+function renderQuiz() {
+  const app = document.getElementById("app");
+
+  if (currentQ >= quizBills.length) {
+    renderResults();
+    return;
+  }
+
+  const bill = quizBills[currentQ];
+  const summary = makeSummary(bill);
+
+  app.innerHTML = `
+    <div class="progress-wrap">
+      <div class="progress-label">
+        <span>שאלה ${currentQ + 1} מתוך ${quizBills.length}</span>
+        <span>${Math.round((currentQ / quizBills.length) * 100)}%</span>
+      </div>
+      <div class="progress-bar">
+        <div class="progress-fill" style="width: ${(currentQ / quizBills.length) * 100}%"></div>
+      </div>
+    </div>
+
+    <div class="quiz-card" id="quiz-card">
+      <div class="bill-number">הצעת חוק #${currentQ + 1}</div>
+      <div class="bill-summary">${summary}</div>
+      <div class="bill-original-name">${bill.name}</div>
+
+      <div class="vote-buttons" id="vote-buttons">
+        <button class="vote-btn for" onclick="castVote(1)">
+          <span class="btn-icon">&#10003;</span>
+          בעד
+        </button>
+        <button class="vote-btn against" onclick="castVote(2)">
+          <span class="btn-icon">&#10007;</span>
+          נגד
+        </button>
+        <button class="vote-btn abstain" onclick="castVote(3)">
+          <span class="btn-icon">&mdash;</span>
+          נמנע/ת
+        </button>
+      </div>
+
+      <div id="feedback"></div>
+    </div>
+  `;
+  voted = false;
+}
+
+function castVote(vote) {
+  if (voted) return;
+  voted = true;
+
+  const bill = quizBills[currentQ];
+  userVotes.push({ billIndex: currentQ, vote });
+
+  // Highlight selected button
+  const buttons = document.querySelectorAll(".vote-btn");
+  const cls = vote === 1 ? "for" : vote === 2 ? "against" : "abstain";
+  buttons.forEach(btn => {
+    if (btn.classList.contains(cls)) btn.classList.add("selected");
+    else btn.style.opacity = "0.4";
+  });
+
+  // Show feedback
+  const accepted = bill.is_accepted === 1;
+  const feedbackEl = document.getElementById("feedback");
+  const resultText = accepted ? "ההצעה התקבלה בכנסת" : "ההצעה נדחתה בכנסת";
+  feedbackEl.innerHTML = `
+    <div class="feedback ${accepted ? "accepted" : "rejected"}">
+      <div class="result-line">${resultText}</div>
+      <div class="tally">${bill.total_for || 0} בעד &bull; ${bill.total_against || 0} נגד &bull; ${bill.total_abstain || 0} נמנעים</div>
+    </div>
+    <button class="next-btn" onclick="nextQuestion()">
+      ${currentQ + 1 < quizBills.length ? "להצעה הבאה &larr;" : "לתוצאות &larr;"}
+    </button>
+  `;
+}
+
+function nextQuestion() {
+  currentQ++;
+  renderQuiz();
+}
+
+function computeResults() {
+  // For each MK, compute agreement score with user
+  const mkScores = {}; // mkName -> {agree, total, faction}
+
+  for (const uv of userVotes) {
+    const bill = quizBills[uv.billIndex];
+    const mkVotes = bill.mk_votes || [];
+
+    for (const mk of mkVotes) {
+      const key = mk.mk_name;
+      if (!mkScores[key]) {
+        mkScores[key] = { agree: 0, total: 0, faction: mk.faction, votes: [] };
+      }
+      mkScores[key].total++;
+      // Agreement: same vote (for=1, against=2, abstain=3)
+      if (mk.result === uv.vote) {
+        mkScores[key].agree++;
+      }
+      mkScores[key].votes.push({ userVote: uv.vote, mkVote: mk.result });
+    }
+  }
+
+  // Convert to array and sort by agreement percentage
+  const mkResults = Object.entries(mkScores)
+    .filter(([_, s]) => s.total >= 3) // Only MKs who voted on enough bills
+    .map(([name, s]) => ({
+      name,
+      faction: s.faction,
+      pct: Math.round((s.agree / s.total) * 100),
+      agree: s.agree,
+      total: s.total,
+    }))
+    .sort((a, b) => b.pct - a.pct || b.total - a.total);
+
+  // Party-level aggregation
+  const partyScores = {};
+  for (const mk of mkResults) {
+    const f = mk.faction || "אחר";
+    if (!partyScores[f]) partyScores[f] = { totalAgree: 0, totalVotes: 0 };
+    partyScores[f].totalAgree += mk.agree;
+    partyScores[f].totalVotes += mk.total;
+  }
+
+  const partyResults = Object.entries(partyScores)
+    .map(([name, s]) => ({
+      name: shortenFaction(name),
+      fullName: name,
+      pct: Math.round((s.totalAgree / s.totalVotes) * 100),
+    }))
+    .sort((a, b) => b.pct - a.pct);
+
+  return { mkResults, partyResults };
+}
+
+function shortenFaction(name) {
+  // Shorten ridiculously long faction names
+  const map = {
+    'הליכוד בהנהגת בנימין נתניהו לראשות הממשלה': 'הליכוד',
+    'התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ"ל': 'ש"ס',
+    'התאחדות הספרדים העולמית שומרי תורה - תנועתו של מרן הרב עובדיה': 'ש"ס',
+    'יהדות התורה המאוחדת': 'יהדות התורה',
+    'הרשימה המשותפת': 'הרשימה המשותפת',
+    'הציונות הדתית': 'הציונות הדתית',
+    'המחנה הממלכתי': 'המחנה הממלכתי',
+    'עוצמה יהודית': 'עוצמה יהודית',
+  };
+  for (const [long, short] of Object.entries(map)) {
+    if (name.includes(long) || name.startsWith(long.slice(0, 15))) return short;
+  }
+  // Generic: take first 20 chars
+  return name.length > 25 ? name.slice(0, 22) + "..." : name;
+}
+
+function renderResults() {
+  const app = document.getElementById("app");
+  const { mkResults, partyResults } = computeResults();
+
+  const top10 = mkResults.slice(0, 10);
+  const bottom5 = mkResults.slice(-5).reverse();
+
+  app.innerHTML = `
+    <div class="results-section">
+      <div class="results-intro">
+        <h2>התוצאות שלכם</h2>
+        <p>על סמך ${userVotes.length} הצבעות, אלה חברי הכנסת והסיעות הקרובים ביותר לעמדות שלכם</p>
+      </div>
+
+      <div class="section-title">סיעות קרובות אליכם</div>
+      <div class="result-card">
+        <div style="padding: 1rem 1.5rem;">
+          ${partyResults.map(p => `
+            <div class="party-result">
+              <span class="party-name">${p.name}</span>
+              <div class="party-bar-wrap">
+                <div class="party-bar" style="width: ${p.pct}%"></div>
+              </div>
+              <span class="party-pct">${p.pct}%</span>
+            </div>
+          `).join("")}
+        </div>
+      </div>
+
+      <div class="section-title">ח"כים שהכי מתאימים לכם</div>
+      ${top10.map((mk, i) => `
+        <div class="result-card">
+          <div class="result-card-header">
+            <span class="result-rank">${i + 1}</span>
+            <div class="result-info">
+              <div class="result-name">${mk.name}</div>
+              <div class="result-faction">${shortenFaction(mk.faction)}</div>
+            </div>
+            <div class="result-score">
+              <div class="result-pct">${mk.pct}%</div>
+              <div class="result-label">התאמה</div>
+            </div>
+          </div>
+          <div class="match-bar">
+            <div class="match-bar-fill" style="width: ${mk.pct}%"></div>
+          </div>
+        </div>
+      `).join("")}
+
+      ${bottom5.length ? `
+        <div class="section-title">ח"כים הכי רחוקים מכם</div>
+        ${bottom5.map((mk, i) => `
+          <div class="result-card">
+            <div class="result-card-header">
+              <span class="result-rank" style="color: var(--red);">${mkResults.length - bottom5.length + i + 1}</span>
+              <div class="result-info">
+                <div class="result-name">${mk.name}</div>
+                <div class="result-faction">${shortenFaction(mk.faction)}</div>
+              </div>
+              <div class="result-score">
+                <div class="result-pct" style="color: var(--red);">${mk.pct}%</div>
+                <div class="result-label">התאמה</div>
+              </div>
+            </div>
+            <div class="match-bar">
+              <div class="match-bar-fill" style="width: ${mk.pct}%; background: var(--red);"></div>
+            </div>
+          </div>
+        `).join("")}
+      ` : ""}
+
+      <button class="restart-btn" onclick="restart()">נסו שוב עם הצעות חוק אחרות</button>
+    </div>
+  `;
+}
+
+function restart() {
+  userVotes = [];
+  currentQ = 0;
+  const eligible = allBills.filter(b => (b.mk_votes || []).length >= 20);
+  quizBills = shuffle(eligible).slice(0, TOTAL_QUESTIONS);
+  renderQuiz();
+}
+
+loadData();
+</script>
+
+</body>
+</html>
