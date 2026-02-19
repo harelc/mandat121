@@ -36,7 +36,7 @@
     "faction": "עוצמה יהודית בראשות איתמר בן גביר"
   },
   "אלקין זאב": {
-    "photo_url": "data/photos/אלקין_זאב.png",
+    "photo_url": "data/photos/אלקין_זאב.jpg",
     "faction": "הימין הממלכתי"
   },
   "ארבל משה": {
@@ -209,7 +209,7 @@
     "source": "wikipedia"
   },
   "טיבי אחמד": {
-    "photo_url": "data/photos/טיבי_אחמד.png",
+    "photo_url": "data/photos/טיבי_אחמד.jpg",
     "faction": "חד\"ש-תע\"ל"
   },
   "טייב יוסף": {
@@ -241,7 +241,7 @@
     "source": "wikipedia"
   },
   "כסיף עופר": {
-    "photo_url": "data/photos/כסיף_עופר.png",
+    "photo_url": "data/photos/כסיף_עופר.jpg",
     "faction": "חד\"ש-תע\"ל"
   },
   "כץ אופיר": {
@@ -341,7 +341,7 @@
     "faction": "התאחדות הספרדים שומרי תורה תנועתו של מרן הרב עובדיה יוסף זצ\"ל"
   },
   "ניר שרון": {
-    "photo_url": "data/photos/ניר_שרון.png",
+    "photo_url": "data/photos/ניר_שרון.jpg",
     "faction": "ישראל ביתנו"
   },
   "נתניהו בנימין": {
@@ -522,7 +522,7 @@
     "source": "wikipedia"
   },
   "תומא סלימאן עאידה": {
-    "photo_url": "data/photos/תומא_סלימאן_עאידה.png",
+    "photo_url": "data/photos/תומא_סלימאן_עאידה.jpg",
     "faction": "חד\"ש-תע\"ל"
   },
   "תמנו פנינה": {
