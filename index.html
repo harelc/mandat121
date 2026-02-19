@@ -1482,6 +1482,12 @@ function pushView(view, args) {
   }
 }
 
+document.addEventListener('click', (e) => {
+  if (_plenumTooltipMk && !e.target.closest('.plenum-seat') && !e.target.closest('.plenum-tooltip')) {
+    hidePlenumTooltip();
+  }
+});
+
 window.addEventListener('popstate', (e) => {
   const state = e.state;
   if (!state) { _skipPush = true; renderIntro(); _skipPush = false; return; }
@@ -1803,7 +1809,7 @@ function renderPlenumSVG() {
   const seats = plenumSeats.map((s, i) => {
     const color = plenumSeatColor(s.mkName);
     const escaped = s.mkName.replace(/'/g, "\\'");
-    return `<circle class="plenum-seat" cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${s.seatRadius}" fill="${color}" stroke="#b0b5c0" stroke-width="0.3" data-mk="${s.mkName}" data-faction="${s.faction}" onclick="renderMkDetail('${escaped}', ${userVotes.length > 0})" onmouseenter="showPlenumTooltip(event, '${escaped}')" onmouseleave="hidePlenumTooltip()"/>`;
+    return `<circle class="plenum-seat" cx="${s.x.toFixed(1)}" cy="${s.y.toFixed(1)}" r="${s.seatRadius}" fill="${color}" stroke="#b0b5c0" stroke-width="0.3" data-mk="${s.mkName}" data-faction="${s.faction}" onclick="handlePlenumTap(event, '${escaped}')" onmouseenter="showPlenumTooltip(event, '${escaped}')" onmouseleave="hidePlenumTooltip()"/>`;
   }).join('\n');
   return `
     <div class="plenum-wrap">
@@ -1814,19 +1820,38 @@ function renderPlenumSVG() {
   `;
 }
 
+let _plenumTooltipMk = null;
+const _isTouchDevice = ('ontouchstart' in window || navigator.maxTouchPoints > 0);
+
+function handlePlenumTap(event, mkName) {
+  if (_isTouchDevice) {
+    if (_plenumTooltipMk === mkName) {
+      hidePlenumTooltip();
+      renderMkDetail(mkName, userVotes.length > 0);
+    } else {
+      showPlenumTooltip(event, mkName);
+    }
+  } else {
+    renderMkDetail(mkName, userVotes.length > 0);
+  }
+}
+
 function showPlenumTooltip(event, mkName) {
-  if (!showTooltips) return;
+  if (!showTooltips && !_isTouchDevice) return;
+  _plenumTooltipMk = mkName;
   const tip = document.getElementById('plenum-tooltip');
   const faction = plenumSeats.find(s => s.mkName === mkName)?.faction || '';
   const sc = runningScores[mkName];
   const matchHTML = sc && sc.total > 0
     ? `<div class="plenum-tooltip-match">${Math.round(sc.agree / sc.total * 100)}% התאמה</div>`
     : '';
+  const tapHint = _isTouchDevice ? `<div style="font-size:0.7rem;color:var(--text-light);margin-top:0.3rem">הקש/י שוב לפרטים</div>` : '';
   tip.innerHTML = `
     ${mkAvatarHTML(mkName, faction)}
     <div class="plenum-tooltip-name">${displayName(mkName)}</div>
     <div class="plenum-tooltip-faction">${shortenFaction(faction)}</div>
     ${matchHTML}
+    ${tapHint}
   `;
   tip.classList.add('visible');
   const rect = event.target.getBoundingClientRect();
@@ -1838,6 +1863,7 @@ function showPlenumTooltip(event, mkName) {
 }
 
 function hidePlenumTooltip() {
+  _plenumTooltipMk = null;
   document.getElementById('plenum-tooltip').classList.remove('visible');
 }
 
