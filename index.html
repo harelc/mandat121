@@ -1359,7 +1359,7 @@ const DISPLAY_NAME_MAP = {
   "בן גביר איתמר": "איתמר בן גביר",
   "בן סעיד סמיר": "סמיר בן סעיד",
   "בן צור יואב": "יואב בן צור",
-  "דיסטל אטבריאן  גלית": "גלית דיסטל אטבריאן",
+  "דיסטל אטבריאן  גלית": "גלית דיסטל-אטבריאן",
   "ח'טיב יאסין אימאן": "אימאן ח'טיב יאסין",
   "טור פז משה": "משה טור פז",
   "להב הרצנו יוראי": "יוראי להב הרצנו",
@@ -1372,6 +1372,7 @@ const DISPLAY_NAME_MAP = {
 };
 function displayName(name) {
   const clean = name.replace(/\s+/g, ' ').trim();
+  if (DISPLAY_NAME_MAP[name]) return DISPLAY_NAME_MAP[name];
   if (DISPLAY_NAME_MAP[clean]) return DISPLAY_NAME_MAP[clean];
   // Default: flip "LastName FirstName" → "FirstName LastName"
   const parts = clean.split(' ');
@@ -1557,7 +1558,7 @@ function renderMkDirectory() {
   const sortedFactions = Object.entries(byFaction)
     .sort((a, b) => b[1].length - a[1].length);
   for (const [, mks] of sortedFactions) {
-    mks.sort((a, b) => a.name.localeCompare(b.name, 'he'));
+    mks.sort((a, b) => displayName(a.name).localeCompare(displayName(b.name), 'he'));
   }
 
   const sectionsHTML = sortedFactions.map(([faction, mks]) => `
