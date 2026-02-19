@@ -73,7 +73,12 @@ def merge_all():
     with_top = sum(1 for b in bills if b.get("topics"))
     with_doc = sum(1 for b in bills if b.get("doc_url"))
     with_votes = sum(1 for b in bills if len(b.get("mk_votes", [])) >= 20)
+    by_type = {}
+    for b in bills:
+        t = b.get("bill_type", "לא ידוע")
+        by_type[t] = by_type.get(t, 0) + 1
     print(f"\n  Final bills.json: {total} bills")
+    print(f"    By type:       {by_type}")
     print(f"    With doc_url:  {with_doc}")
     print(f"    With synopsis: {with_syn}")
     print(f"    With topics:   {with_top}")
@@ -84,8 +89,8 @@ def main():
     enrich_only = "--enrich" in sys.argv
 
     if not enrich_only:
-        # Step 1: Fetch votes and bill metadata from Knesset APIs
-        run("fetch_data.py", "Step 1: Fetching votes & bill metadata from Knesset")
+        # Step 1: Fetch votes + bill catalog (government/private/committee)
+        run("fetch_all_bills.py", "Step 1: Fetching votes & bill catalog")
 
     # Step 2: Download bill docs and generate synopses
     run("generate_synopses.py", "Step 2: Downloading bill docs & generating synopses")

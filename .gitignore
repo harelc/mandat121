@@ -6,3 +6,5 @@ data/photos/
 .env
 *.egg-info/
 dist/
+.DS_Store
+*.bak.json

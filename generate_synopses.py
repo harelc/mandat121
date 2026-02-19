@@ -193,9 +193,9 @@ def main():
     else:
         synopses = {}
 
-    # Filter to bills with 20+ votes (doc_url optional — will generate from name if needed)
-    eligible = [b for b in bills if len(b.get("mk_votes", [])) >= 20]
-    print(f"Eligible bills (20+ votes): {len(eligible)}")
+    # Filter to bills with 10+ votes (doc_url optional — will generate from name if needed)
+    eligible = [b for b in bills if len(b.get("mk_votes", [])) >= 10]
+    print(f"Eligible bills (10+ votes): {len(eligible)}")
 
     # Set up Claude client
     api_key = get_api_key()
