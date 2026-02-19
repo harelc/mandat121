@@ -312,6 +312,19 @@
     word-break: break-word;
   }
 
+  .bill-links {
+    display: flex;
+    gap: 0.3rem;
+    align-items: center;
+    flex-wrap: wrap;
+    white-space: nowrap;
+  }
+
+  .bill-links .sep {
+    color: var(--text-light);
+    opacity: 0.4;
+  }
+
   .bill-link {
     color: var(--blue-light);
     text-decoration: none;
@@ -1254,8 +1267,9 @@
     .container { padding: 0.8rem; }
     .quiz-card { padding: 0.8rem 1rem; }
     .bill-synopsis { font-size: 0.9rem; line-height: 1.5; }
-    .bill-footer { flex-direction: column; gap: 0.3rem; font-size: 0.75rem; }
-    .bill-footer .bill-name { word-break: break-word; overflow-wrap: anywhere; }
+    .bill-footer { flex-wrap: wrap; gap: 0.3rem; font-size: 0.75rem; }
+    .bill-footer .bill-name { word-break: break-word; overflow-wrap: anywhere; flex-basis: 100%; }
+    .bill-links { font-size: 0.72rem; }
     .vote-buttons { gap: 0.5rem; }
     .vote-btn { padding: 0.5rem 0.3rem; font-size: 0.8rem; border-radius: 14px; }
     .vote-btn .btn-icon { font-size: 1rem; }
@@ -1963,7 +1977,7 @@ function renderQuiz() {
   if (bill.doc_url) links.push(`<a class="bill-link" href="${bill.doc_url}" target="_blank" rel="noopener">נוסח ההצעה</a>`);
   if (knessetUrl) links.push(`<a class="bill-link" href="${knessetUrl}" target="_blank" rel="noopener">דף ההצעה</a>`);
   if (voteUrl) links.push(`<a class="bill-link" href="${voteUrl}" target="_blank" rel="noopener">דף ההצבעה</a>`);
-  const linkHTML = links.join(' | ');
+  const linkHTML = links.length ? `<span class="bill-links">${links.join('<span class="sep">|</span>')}</span>` : '';
 
   app.innerHTML = `
     <div class="progress-wrap">
