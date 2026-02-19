@@ -308,6 +308,8 @@
 
   .bill-footer .bill-name {
     flex: 1;
+    overflow-wrap: anywhere;
+    word-break: break-word;
   }
 
   .bill-link {
@@ -1249,11 +1251,18 @@
   @media (max-width: 500px) {
     header h1 { font-size: 1.5rem; }
     header { padding: 0.8rem 1rem 0.6rem; }
-    .container { padding: 1rem; }
-    .quiz-card { padding: 1rem 1.2rem; }
-    .bill-synopsis { font-size: 0.95rem; }
-    .vote-btn { padding: 0.6rem 0.4rem; font-size: 0.85rem; }
-    .vote-btn .btn-icon { font-size: 1.1rem; }
+    .container { padding: 0.8rem; }
+    .quiz-card { padding: 0.8rem 1rem; }
+    .bill-synopsis { font-size: 0.9rem; line-height: 1.5; }
+    .bill-footer { flex-direction: column; gap: 0.3rem; font-size: 0.75rem; }
+    .bill-footer .bill-name { word-break: break-word; overflow-wrap: anywhere; }
+    .vote-buttons { gap: 0.5rem; }
+    .vote-btn { padding: 0.5rem 0.3rem; font-size: 0.8rem; border-radius: 14px; }
+    .vote-btn .btn-icon { font-size: 1rem; }
+    .vote-btn.abstain { font-size: 0.75rem; }
+    .bill-number { font-size: 0.7rem; }
+    .topic-tag { font-size: 0.65rem; padding: 0.15rem 0.5rem; }
+    .feedback { padding: 0.7rem; font-size: 0.82rem; }
     .mk-avatar { width: 40px; height: 40px; font-size: 0.85rem; }
     .intro-stats { flex-direction: column; gap: 0.4rem; }
     .intro-card { padding: 1rem 1.2rem; }
