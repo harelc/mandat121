@@ -1586,14 +1586,14 @@ function renderMkDirectory() {
   pushView('directory');
   const app = document.getElementById("app");
 
-  // Collect all MKs with their factions and vote counts
+  // Collect current K25 MKs with their factions and vote counts
   const mkData = {};
   for (const b of allBills) {
     for (const mv of (b.mk_votes || [])) {
+      if (!mkPhotos[mv.mk_name]) continue;  // only current K25 members
       if (!mkData[mv.mk_name]) {
         mkData[mv.mk_name] = { faction: mv.faction || '', voteCount: 0 };
       }
-      // Prefer non-empty faction (some votes may lack faction data)
       if (!mkData[mv.mk_name].faction && mv.faction) {
         mkData[mv.mk_name].faction = mv.faction;
       }
@@ -1652,7 +1652,9 @@ function renderIntro() {
   const withSyn = eligible.filter(b => b.synopsis && b.synopsis.length > 20);
   const mkNames = new Set();
   for (const b of eligible) {
-    for (const mv of (b.mk_votes || [])) mkNames.add(mv.mk_name);
+    for (const mv of (b.mk_votes || [])) {
+      if (mkPhotos[mv.mk_name]) mkNames.add(mv.mk_name);
+    }
   }
 
   app.innerHTML = `
@@ -2168,6 +2170,7 @@ function computeResults() {
   for (const uv of userVotes) {
     const bill = quizBills[uv.billIndex];
     for (const mk of (bill.mk_votes || [])) {
+      if (!mkPhotos[mk.mk_name]) continue;  // only current K25 members
       const key = mk.mk_name;
       if (!mkScores[key]) {
         mkScores[key] = { agree: 0, total: 0, faction: mk.faction || '' };

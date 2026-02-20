@@ -93,33 +93,48 @@ def knesset_num_from_date(date_str):
     return 25
 
 
-# ── Step 1: MK faction lookup ──
+# ── Step 1: MK faction lookup from mk_photos.json ──
 
-def fetch_faction_lookup():
-    """Build {(PersonID, KnessetNum): FactionName} from KNS_PersonToPosition."""
-    print("\n=== Step 1: Building MK faction lookup ===")
-    factions = {}
-    for knum in (23, 24, 25):
-        items = odata_fetch_all("KNS_PersonToPosition", {
-            "$filter": f"PositionID eq 54 and KnessetNum eq {knum}",
-            "$select": "PersonID,FactionName,KnessetNum,IsCurrent",
-        })
-        for item in items:
-            factions[(item["PersonID"], knum)] = item["FactionName"]
-        time.sleep(DELAY)
+MK_PHOTOS_PATH = DATA_DIR / "mk_photos.json"
 
-    # Also collect K25 current members
-    k25_members = set()
-    k25_items = odata_fetch_all("KNS_PersonToPosition", {
-        "$filter": "PositionID eq 54 and KnessetNum eq 25 and IsCurrent eq true",
-        "$select": "PersonID",
-    })
-    for item in k25_items:
-        k25_members.add(item["PersonID"])
 
-    print(f"  Faction entries: {len(factions)}")
-    print(f"  Current K25 members: {len(k25_members)}")
-    return factions, k25_members
+def normalize_mk_name(name):
+    """Normalize MK name for matching: strip geresh, extra spaces, etc."""
+    name = name.replace("'", "").replace("\u05F3", "")  # remove geresh
+    name = " ".join(name.split())  # collapse multiple spaces
+    return name
+
+
+# OData vote names → mk_photos.json canonical names
+# (for current K25 MKs whose names differ between OData and mk_photos)
+MK_NAME_ALIASES = {
+    "גנץ בנימין": "גנץ בני",
+    "מלקו צגה": "מלקו צגה צגנש",
+    "סטרוק אורית מלכה": "סטרוק אורית",
+    "פינדרוס יצחק": "פינדרוס יצחק זאב",
+}
+
+
+def load_faction_lookup():
+    """Build name→faction from mk_photos.json (current K25 MKs)."""
+    print("\n=== Step 1: Loading MK faction lookup from mk_photos.json ===")
+
+    if not MK_PHOTOS_PATH.exists():
+        print("  WARNING: mk_photos.json not found!")
+        return {}, {}
+
+    mk_photos = json.loads(MK_PHOTOS_PATH.read_text("utf-8"))
+
+    # Build normalized name → faction map
+    factions = {}  # normalized_name → faction
+    name_map = {}  # normalized_name → canonical name (from mk_photos)
+    for name, data in mk_photos.items():
+        norm = normalize_mk_name(name)
+        factions[norm] = data.get("faction", "")
+        name_map[norm] = name
+
+    print(f"  MKs loaded: {len(factions)}")
+    return factions, name_map
 
 
 # ── Step 2: Fetch 2nd+3rd reading votes ──
@@ -237,7 +252,7 @@ def fetch_documents(bill_ids):
 
 # ── Step 6: Assemble bills.json ──
 
-def assemble_bills(votes, vote_results, bill_meta, doc_urls, factions):
+def assemble_bills(votes, vote_results, bill_meta, doc_urls, factions, name_map):
     """Assemble the final bills list from all fetched data."""
     print("\n=== Step 6: Assembling bills.json ===")
 
@@ -273,19 +288,20 @@ def assemble_bills(votes, vote_results, bill_meta, doc_urls, factions):
             if not result:
                 continue
 
-            mk_id = r["MkId"]
             last = (r.get("LastName") or "").strip()
             first = (r.get("FirstName") or "").strip()
             mk_name = f"{last} {first}".strip()
 
-            # Look up faction
-            faction = factions.get((mk_id, knesset_num), "")
-            if not faction:
-                # Try adjacent knessets
-                for kn in (23, 24, 25):
-                    faction = factions.get((mk_id, kn), "")
-                    if faction:
-                        break
+            # Apply name aliases first (OData → mk_photos canonical)
+            mk_name = MK_NAME_ALIASES.get(mk_name, mk_name)
+            norm_name = normalize_mk_name(mk_name)
+
+            # Use canonical name from mk_photos if available
+            if norm_name in name_map:
+                mk_name = name_map[norm_name]
+
+            # Look up faction by normalized name
+            faction = factions.get(norm_name, "")
 
             mk_votes.append({
                 "mk_name": mk_name,
@@ -372,7 +388,7 @@ def main():
 
     try:
         # Step 1: Faction lookup
-        factions, k25_members = fetch_faction_lookup()
+        factions, name_map = load_faction_lookup()
 
         # Step 2: Fetch votes
         votes = fetch_votes()
@@ -392,7 +408,7 @@ def main():
         doc_urls = fetch_documents(item_ids)
 
         # Step 6: Assemble
-        bills = assemble_bills(votes, vote_results, bill_meta, doc_urls, factions)
+        bills = assemble_bills(votes, vote_results, bill_meta, doc_urls, factions, name_map)
 
         # Merge with existing (preserve synopsis/topics)
         bills = merge_existing(bills, BILLS_PATH)
