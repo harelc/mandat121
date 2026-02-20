@@ -1748,6 +1748,7 @@ function buildPlenumSeats() {
   const mkData = {};
   for (const b of allBills) {
     for (const mv of (b.mk_votes || [])) {
+      if (!mkPhotos[mv.mk_name]) continue;  // only current K25 members
       if (!mkData[mv.mk_name]) {
         mkData[mv.mk_name] = { faction: mv.faction || '' };
       }
