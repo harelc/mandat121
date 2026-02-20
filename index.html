@@ -1383,6 +1383,7 @@ let plenumSeats = []; // [{mkName, faction, x, y}]
 let runningScores = {}; // mkName → {agree, total}
 let plenumOrdered = true;  // true=by faction, false=random
 let showTooltips = true;
+let showBillMeta = false;  // show stage, type, date during quiz
 
 const FACTION_COLORS = {
   'הליכוד': '#1d4ed8',
@@ -1701,7 +1702,7 @@ function renderIntro() {
         <div class="setting-row">
           <span class="setting-label">מספר הצבעות</span>
           <div class="pill-group" id="pill-questions">
-            ${[5,7,10,12,15].map(n => `<button class="pill-option${n === TOTAL_QUESTIONS ? ' active' : ''}" onclick="setQuestionCount(${n})">${n}</button>`).join('')}
+            ${[5,7,10,15,20,30,50].map(n => `<button class="pill-option${n === TOTAL_QUESTIONS ? ' active' : ''}" onclick="setQuestionCount(${n})">${n}</button>`).join('')}
           </div>
         </div>
         <div class="setting-row">
@@ -1715,6 +1716,13 @@ function renderIntro() {
           <span class="setting-label">טולטיפים עם שמות הח״כים</span>
           <label class="toggle-switch">
             <input type="checkbox" ${showTooltips ? 'checked' : ''} onchange="showTooltips = this.checked">
+            <span class="toggle-slider"></span>
+          </label>
+        </div>
+        <div class="setting-row">
+          <span class="setting-label">הצגת שלב, סוג ותאריך</span>
+          <label class="toggle-switch">
+            <input type="checkbox" ${showBillMeta ? 'checked' : ''} onchange="showBillMeta = this.checked">
             <span class="toggle-slider"></span>
           </label>
         </div>
@@ -2011,15 +2019,6 @@ function startQuiz() {
 
   quizBills = selectUniformByTopic(pool, TOTAL_QUESTIONS);
 
-  if (quizBills.length < TOTAL_QUESTIONS) {
-    // Fill from non-synopsis bills if needed
-    const extra = allBills.filter(b =>
-      (b.mk_votes || []).length >= 10 &&
-      !quizBills.find(q => q.id === b.id)
-    );
-    quizBills = [...quizBills, ...shuffle(extra)].slice(0, TOTAL_QUESTIONS);
-  }
-
   renderQuiz();
 }
 
@@ -2086,12 +2085,12 @@ function renderQuiz() {
 
     <div class="quiz-card" id="quiz-card">
       <div class="bill-number">הצעת חוק #${currentQ + 1}</div>
-      <div class="bill-meta">
+      ${showBillMeta ? `<div class="bill-meta">
         ${bill.bill_type ? `<span class="bill-type-tag ${bill.bill_type === 'ממשלתית' ? 'gov' : bill.bill_type === 'ועדה' ? 'committee' : 'private'}">${bill.bill_type}</span>` : ''}
         ${bill.vote_reading !== undefined ? `<span class="bill-type-tag reading">${bill.vote_reading === 0 ? 'דיון מוקדם' : bill.vote_reading === 3 ? 'קריאה שלישית' : 'קריאה שנייה'}</span>` : ''}
         ${bill.knesset_num ? `<span class="bill-type-tag knesset">כנסת ${bill.knesset_num}</span>` : ''}
         ${bill.vote_date ? `<span class="bill-type-tag" style="background:#f1f5f9;color:#475569">${bill.vote_date}</span>` : ''}
-      </div>
+      </div>` : ''}
       ${topicsHTML}
       <div class="bill-synopsis">${displayText}</div>
       <div class="bill-footer">
@@ -2331,6 +2330,7 @@ function renderBillDirectory() {
         <div class="bill-dir-meta">
           <span class="bill-dir-result ${resultCls}">${resultText}</span>
           ${b.bill_type ? `<span class="bill-type-tag ${b.bill_type === 'ממשלתית' ? 'gov' : b.bill_type === 'ועדה' ? 'committee' : 'private'}">${b.bill_type}</span>` : ''}
+          ${b.vote_reading !== undefined ? `<span class="bill-type-tag reading">${b.vote_reading === 0 ? 'דיון מוקדם' : b.vote_reading === 3 ? 'קריאה שלישית' : 'קריאה שנייה'}</span>` : ''}
           <span>${b.total_for || 0} בעד / ${b.total_against || 0} נגד</span>
           ${dateStr ? `<span>${dateStr}</span>` : ''}
           ${topicsHTML}
@@ -2417,6 +2417,7 @@ function renderBillDetail(billIdx) {
         <div class="bill-dir-meta">
           <span class="bill-dir-result ${accepted ? 'accepted' : 'rejected'}">${accepted ? 'התקבלה' : 'נדחתה'}</span>
           ${bill.bill_type ? `<span class="bill-type-tag ${bill.bill_type === 'ממשלתית' ? 'gov' : bill.bill_type === 'ועדה' ? 'committee' : 'private'}">${bill.bill_type}</span>` : ''}
+          ${bill.vote_reading !== undefined ? `<span class="bill-type-tag reading">${bill.vote_reading === 0 ? 'דיון מוקדם' : bill.vote_reading === 3 ? 'קריאה שלישית' : 'קריאה שנייה'}</span>` : ''}
           ${dateStr ? `<span>${dateStr}</span>` : ''}
         </div>
         ${links.length ? `<div class="bill-detail-links">${links.join(' | ')}</div>` : ''}
@@ -2439,7 +2440,7 @@ function renderBillDetail(billIdx) {
     </div>
   `;
 
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo(0, 0);
 }
 
 function voteLabel(v) {
@@ -2580,7 +2581,7 @@ function renderMkDetail(mkName, showAgreement) {
   // Fetch Wikipedia summary
   fetchWikiBrief(mkName);
 
-  window.scrollTo({ top: 0, behavior: 'smooth' });
+  window.scrollTo(0, 0);
 }
 
 const wikiCache = {};

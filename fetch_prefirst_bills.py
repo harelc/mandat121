@@ -43,7 +43,7 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
 }
 
-DELAY = 0.15
+DELAY = 0.55
 MAX_NEW_BILLS = 600  # Only fetch this many newest bills
 
 
@@ -76,19 +76,26 @@ def odata_query(entity, params=None):
     return data.get("value", []), data.get("@odata.nextLink")
 
 
-def odata_fetch_all(entity, params=None, progress=False):
+def odata_fetch_all(entity, params=None, progress=False, page_size=100):
+    """Fetch all pages using explicit $skip/$top (nextLink can hang)."""
     all_items = []
-    items, next_link = odata_query(entity, params)
-    all_items.extend(items)
-    page = 1
-    while next_link:
-        time.sleep(DELAY)
-        data = odata_get(next_link)
-        all_items.extend(data.get("value", []))
-        next_link = data.get("@odata.nextLink")
+    base_params = dict(params or {})
+    base_params["$top"] = str(page_size)
+    skip = 0
+    page = 0
+    while True:
+        base_params["$skip"] = str(skip)
+        items, _ = odata_query(entity, base_params)
+        all_items.extend(items)
         page += 1
-        if progress and page % 10 == 0:
+        if progress:
             print(f"    page {page}, {len(all_items)} items...", flush=True)
+        if len(items) < page_size:
+            break
+        skip += page_size
+        time.sleep(DELAY)
+    if progress:
+        print(f"    done: {page} pages, {len(all_items)} items", flush=True)
     return all_items
 
 
@@ -147,6 +154,7 @@ def main():
         print(f"MK factions loaded: {len(factions)}")
 
         # Step 1: Fetch pre-first-reading votes (server-side filter)
+        # Must set $top to trigger pagination (API returns no nextLink without it)
         print("\n=== Step 1: Fetching pre-first-reading votes ===")
         prefirst = odata_fetch_all("KNS_PlenumVote", {
             "$filter": (
@@ -154,6 +162,7 @@ def main():
                 " and contains(ForOptionDesc,'\u05dc\u05e7\u05e8\u05d9\u05d0\u05d4 \u05e8\u05d0\u05e9\u05d5\u05e0\u05d4')"
             ),
             "$select": "Id,VoteDateTime,ItemID,VoteTitle,ForOptionDesc",
+            "$top": "2000",
         }, progress=True)
         print(f"  Pre-first-reading votes: {len(prefirst)}")
 
@@ -368,8 +377,12 @@ def main():
         print("\nInterrupted by user")
         sys.exit(1)
     except Exception as e:
-        print(f"\nERROR: {e}")
-        raise
+        import traceback
+        print(f"\nERROR: {e}", flush=True)
+        traceback.print_exc()
+        sys.stdout.flush()
+        sys.stderr.flush()
+        sys.exit(1)
 
 
 if __name__ == "__main__":

@@ -30,8 +30,9 @@ BILLS_PATH = DATA_DIR / "bills.json"
 # Claude API config
 MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 300
-BATCH_SIZE = 10  # merge into bills.json every N synopses
+BATCH_SIZE = 50  # merge into bills.json every N synopses
 DOWNLOAD_WORKERS = 10  # parallel doc downloads
+SYNOPSIS_WORKERS = 10  # parallel Claude API calls
 
 
 def get_api_key():
@@ -240,52 +241,72 @@ def main():
     else:
         print("\nNo API key found, using extractive fallback")
 
-    # Step 3: Generate synopses, merging into bills.json in batches
-    print(f"\n=== Generating synopses (batch size {BATCH_SIZE}) ===")
-    generated = 0
-    batch_count = 0
-
-    for i, bill in enumerate(need_synopsis):
+    # Step 3: Prepare text for each bill
+    print(f"\n=== Extracting document text ===")
+    bill_texts = {}
+    for bill in need_synopsis:
         bill_id = str(bill["id"])
-
-        # Extract text from downloaded doc
         text = ""
         if bill_id in doc_tasks:
             url, doc_path = doc_tasks[bill_id]
             if doc_path.exists():
                 text = extract_text(url, doc_path)
+        bill_texts[bill_id] = text
 
-        # Generate synopsis
+    has_text = sum(1 for t in bill_texts.values() if t and len(t) > 50)
+    print(f"  {has_text}/{len(need_synopsis)} bills have extractable doc text")
+
+    # Step 4: Generate synopses in parallel
+    workers = SYNOPSIS_WORKERS if client else 1
+    print(f"\n=== Generating synopses ({workers} workers, batch save every {BATCH_SIZE}) ===")
+
+    def generate_one(bill):
+        bill_id = str(bill["id"])
+        text = bill_texts.get(bill_id, "")
+
         synopsis = ""
+        label = "NAME"
         if client:
             synopsis = generate_synopsis_claude(client, bill["name"], text)
             label = "AI" if text and len(text) > 50 else "AI-NAME"
-            if synopsis:
-                print(f"  [{i+1}/{len(need_synopsis)}] {label}: {bill['name'][:40]}... → {synopsis[:60]}...")
 
         if not synopsis and text:
             synopsis = extractive_synopsis(text, bill["name"])
-            if synopsis:
-                print(f"  [{i+1}/{len(need_synopsis)}] EXT: {bill['name'][:40]}... → {synopsis[:60]}...")
+            label = "EXT"
 
         if not synopsis:
             name = bill["name"]
             name = re.sub(r"\(תיקון[^)]*\)", "", name).strip()
             name = re.sub(r",\s*הת?שפ\"?[א-ת].*$", "", name).strip()
             synopsis = name
-            print(f"  [{i+1}/{len(need_synopsis)}] NAME: {synopsis[:60]}")
+            label = "NAME"
 
-        # Update in bills list
-        bill["synopsis"] = synopsis
-        if bill_id in bills_by_id:
-            bills_by_id[bill_id]["synopsis"] = synopsis
-        generated += 1
+        return bill_id, synopsis, label
 
-        # Batch save to bills.json
-        if generated % BATCH_SIZE == 0:
-            batch_count += 1
-            save_bills(bills)
-            print(f"  --- batch {batch_count}: saved {generated} synopses to bills.json ---")
+    generated = 0
+    batch_count = 0
+
+    with ThreadPoolExecutor(max_workers=workers) as executor:
+        futures = {
+            executor.submit(generate_one, bill): bill
+            for bill in need_synopsis
+        }
+        for future in as_completed(futures):
+            bill_id, synopsis, label = future.result()
+            generated += 1
+
+            # Update in bills list
+            if bill_id in bills_by_id:
+                bills_by_id[bill_id]["synopsis"] = synopsis
+
+            if generated % 10 == 0 or generated == len(need_synopsis):
+                print(f"  {generated}/{len(need_synopsis)} done ({label}: {synopsis[:50]}...)", flush=True)
+
+            # Batch save
+            if generated % BATCH_SIZE == 0:
+                batch_count += 1
+                save_bills(bills)
+                print(f"  --- batch {batch_count}: saved {generated} synopses ---", flush=True)
 
     # Final save
     if generated % BATCH_SIZE != 0:

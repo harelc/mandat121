@@ -16,11 +16,15 @@ A Hebrew quiz app that matches you to Knesset members based on your votes on rea
 
 | Knesset | Period | Source | Bills |
 |---------|--------|--------|-------|
-| K25 | Nov 2022 – Feb 2026 | Knesset undocumented REST API | ~225 |
-| K24 | Apr – Jul 2021 | Hasadna public CSV dumps | ~4 |
-| K23 | Mar 2020 – Mar 2021 | Hasadna public CSV dumps | ~110 |
+| K25 | Nov 2022 – Feb 2026 | Knesset OData v4 API | ~1,086 |
+| K24 | Jun 2021 – Jun 2022 | Knesset OData v4 API | ~103 |
+| K23 | Mar 2020 – Jun 2021 | Knesset OData v4 API | ~107 |
 
-**Note**: K24 data is sparse because the Hasadna pipeline stopped updating after July 2021. There is a gap in coverage from mid-2021 to late 2022 (K24's remaining term). K23 and K24 bills only include votes from MKs who also serve in K25.
+Bills include two types of plenum votes:
+- **3rd reading** (`vote_reading=3`): ~696 bills — final passage votes, mostly accepted
+- **Pre-first-reading** (`vote_reading=0`, דיון מוקדם): ~600 bills — early-stage votes, mostly rejected opposition bills. The Knesset API has **1,633** such votes total; the fetch script is capped at 600 newest (`MAX_NEW_BILLS`), so more can be added by increasing this limit.
+
+This mix gives the quiz both passed laws and rejected proposals, making the voting experience more balanced.
 
 All 120 current K25 MKs are included with photos (sourced from Wikipedia and the Knesset website) and linked to their Hebrew Wikipedia articles.
 
@@ -28,23 +32,19 @@ All 120 current K25 MKs are included with photos (sourced from Wikipedia and the
 
 ```
 index.html                 Single-page app (vanilla JS/CSS, ~70KB)
-build_data.py              Master build script — runs all steps in order
-fetch_all_bills.py         Fetches K25 votes + bill catalog + doc URLs
-fetch_past_bills.py        Fetches K23/K24 bills from Hasadna CSV dumps
+fetch_all_bills.py         Fetches 2nd/3rd reading bills from Knesset OData v4 API (K23-25)
+fetch_prefirst_bills.py    Fetches pre-first-reading (דיון מוקדם) bills from OData v4
+fetch_past_bills.py        Fetches K23/K24 bills from Hasadna CSV dumps (legacy)
 fetch_photos.py            Downloads MK photos from Wikipedia
-generate_synopses.py       Generates Hebrew bill synopses using Claude API
-generate_topics.py         Classifies bills into topic taxonomy using Claude API
+generate_synopses.py       Generates Hebrew bill synopses using Claude API (parallel)
+build_data.py              Master build script — runs all steps in order
 KNESSET_APIS.md            Field guide to all Knesset data APIs
 data/
-  bills.json               All bills with votes, synopses, topics (~340 bills)
-  bills_past.json          Past-knesset bills before merge (droppable)
-  bill_catalog.json        Full KNS_Bill catalog from Hasadna (~7K K25 entries)
-  synopses.json            Cache of AI-generated bill synopses
-  topics.json              Cache of topic classifications
-  mk_photos.json           MK name -> photo URL/path mapping (120 MKs)
+  bills.json               All bills with votes, synopses (~1,296 bills)
+  mk_photos.json           MK name -> {photo_url, source, faction, display_name} (120 MKs)
   mk_wiki.json             MK name -> Wikipedia article title mapping (120 MKs)
   docs/                    Downloaded bill documents (DOCX/PDF, gitignored)
-  photos/                  Downloaded MK photos (gitignored)
+  photos/                  Downloaded MK photos (74 local JPEGs)
 ```
 
 ## Data pipeline
@@ -74,10 +74,10 @@ python -m http.server 8080
 
 | Script | What it does | Output |
 |--------|-------------|--------|
-| `fetch_all_bills.py` | Crawls K25 votes from Knesset REST API, matches to bill catalog for type/docs | `data/bills.json` |
-| `fetch_past_bills.py` | Downloads K23/K24 votes from Hasadna CSVs, filters to K25 MKs only | `data/bills_past.json` |
-| `generate_synopses.py` | Downloads bill docs, extracts text, generates Hebrew synopses via Claude | `data/synopses.json` |
-| `generate_topics.py` | Classifies each bill into topics from a 15-topic taxonomy via Claude | `data/topics.json` |
+| `fetch_all_bills.py` | Fetches 2nd/3rd reading bills from Knesset OData v4 (K23-25) | `data/bills.json` |
+| `fetch_prefirst_bills.py` | Fetches pre-first-reading votes from OData v4 (capped at 600, 1,633 available) | merges into `data/bills.json` |
+| `fetch_past_bills.py` | Downloads K23/K24 votes from Hasadna CSVs (legacy, superseded by OData v4) | `data/bills_past.json` |
+| `generate_synopses.py` | Downloads bill docs, extracts text, generates Hebrew synopses via Claude (10 parallel workers) | updates `data/bills.json` |
 | `fetch_photos.py` | Finds MK photos on Hebrew Wikipedia, downloads thumbnails | `data/mk_photos.json` + `data/photos/` |
 | `build_data.py` | Orchestrates all scripts in order, does final merge | Everything |
 
@@ -93,20 +93,17 @@ Synopsis and topic generation require a Claude API key:
 
 | Source | What | Coverage | Bot protection |
 |--------|------|----------|---------------|
-| Knesset REST API (`WebSiteApi/knessetapi/Votes/`) | Per-MK vote breakdowns | K25 (current) | None |
-| Knesset OData (`Odata/ParliamentInfo.svc/`) | Bill metadata, doc URLs | K16–K25 | None |
+| Knesset OData v4 (`knesset.gov.il/OdataV4/ParliamentInfo/`) | Plenum votes, per-MK results, bill metadata, doc URLs | K16–K25 | None |
 | Knesset file server (`fs.knesset.gov.il`) | Bill documents (PDF/DOCX) | All | None |
-| Hasadna GCS (`storage.googleapis.com/knesset-data-pipelines/`) | Vote CSVs, bill catalog | K16–K24 | None |
 | Hebrew Wikipedia | MK photos and bios | Current | None |
 | Knesset website (`main.knesset.gov.il`) | Bill/vote web pages | All | **Radware** (474 errors from scripts) |
 
 ### Known issues
 
-- **Radware bot protection** on `main.knesset.gov.il` returns HTTP 474 when accessed from scripts. The OData and REST APIs are unaffected. Bill document downloads from `fs.knesset.gov.il` sometimes also get blocked.
-- **Knesset OData Votes service** (`Odata/Votes.svc/`) is frozen at K24 (last record: July 2021). The undocumented REST API is the only source for K25 vote data.
-- **K24 data gap**: Hasadna's vote pipeline stopped updating after July 2021, so K24 coverage is only ~3 months. The actual K24 lasted until June 2022.
-- **No direct bill-vote foreign key**: Bills and votes must be matched by name similarity (`SequenceMatcher`), which can miss or mismatch bills with similar names.
-- **MK name format varies**: K25 REST API uses "last first", Hasadna CSVs use "first last". Matching uses `frozenset` of name parts.
+- **Radware bot protection** on `main.knesset.gov.il` returns HTTP 474 when accessed from scripts. The OData and file server APIs are unaffected.
+- **OData v4 quirks**: `KNS_PlenumVote` has no `ForCount`/`AgainstCount` fields — vote totals must be computed from `KNS_PlenumVoteResult`. Pagination requires explicit `$skip`/`$top` — `nextLink` can hang on filtered queries. The `contains()` filter works with Hebrew text for server-side filtering.
+- **MK name normalization**: Some MKs have variant spellings (e.g. "גנץ בנימין" vs "גנץ בני"). Aliases are maintained in the fetch scripts.
+- **Pre-first-reading cap**: 1,633 pre-first-reading votes exist in the API (K23-25), but `fetch_prefirst_bills.py` caps at 600 newest to keep the dataset balanced. Increase `MAX_NEW_BILLS` to fetch more.
 
 ### bills.json schema
 
@@ -125,7 +122,8 @@ Synopsis and topic generation require a Claude API key:
   "synopsis": "AI-generated catchy Hebrew summary",
   "topics": ["ביטחון ומלחמה", "זכויות אזרח"],
   "doc_url": "https://fs.knesset.gov.il/25/law/...",
-  "knesset": 25,
+  "knesset_num": 25,
+  "vote_reading": 0,
   "mk_votes": [
     {"mk_name": "שם חבר כנסת", "result": 1, "faction": "שם סיעה"}
   ]
@@ -135,6 +133,8 @@ Synopsis and topic generation require a Claude API key:
 `result`: 1 = for (בעד), 2 = against (נגד), 3 = abstain (נמנע)
 
 `bill_type`: ממשלתית (government), פרטית (private), ועדה (committee)
+
+`vote_reading`: 0 = pre-first-reading (דיון מוקדם), 2 = second reading, 3 = third reading
 
 ### Topic taxonomy (15 topics)
 
