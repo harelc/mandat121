@@ -88,6 +88,17 @@
     position: relative;
   }
 
+  .header-emoji {
+    position: absolute;
+    top: 50%;
+    transform: translateY(-50%);
+    font-size: 4.5rem;
+    line-height: 1;
+    z-index: 1;
+  }
+  .header-emoji.left { right: calc(50% + 130px); }
+  .header-emoji.right { left: calc(50% + 130px); }
+
   .container {
     max-width: 820px;
     margin: 0 auto;
@@ -1140,6 +1151,16 @@
   .bill-type-tag.gov { background: #dbeafe; color: #1d4ed8; }
   .bill-type-tag.private { background: #f3e8ff; color: #7c3aed; }
   .bill-type-tag.committee { background: #d1fae5; color: #059669; }
+  .bill-type-tag.reading { background: #fef3c7; color: #92400e; }
+  .bill-type-tag.knesset { background: #e0e7ff; color: #3730a3; }
+
+  .bill-meta {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 0.4rem;
+    align-items: center;
+    margin-bottom: 0.3rem;
+  }
 
   .bill-detail-header {
     background: var(--card-bg);
@@ -1260,6 +1281,35 @@
     text-decoration: underline;
   }
 
+  .footer-kolot {
+    display: inline-flex;
+    align-items: center;
+    gap: 5px;
+    background: linear-gradient(135deg, #6366f1, #8b5cf6);
+    color: #fff !important;
+    padding: 4px 12px;
+    border-radius: 8px;
+    font-weight: 600;
+    font-size: 0.82rem;
+    text-decoration: none !important;
+    transition: transform 0.15s, box-shadow 0.15s;
+    box-shadow: 0 2px 8px rgba(99, 102, 241, 0.3);
+  }
+  .footer-kolot:hover {
+    transform: scale(1.05);
+    box-shadow: 0 4px 14px rgba(99, 102, 241, 0.5);
+    color: #fff !important;
+  }
+
+  .visitor-counter {
+    display: inline-flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 0.78rem;
+    color: var(--text-light);
+    opacity: 0.8;
+  }
+
   /* Responsive */
   @media (max-width: 500px) {
     header h1 { font-size: 1.5rem; }
@@ -1290,8 +1340,10 @@
 
 <div class="stripe"></div>
 <header>
+  <span class="header-emoji left">🥱</span>
   <h1 onclick="renderIntro()">ביע פיע</h1>
   <p>חוקים, חיבוקים ופיהוקים</p>
+  <span class="header-emoji right">🤗</span>
 </header>
 <div class="stripe"></div>
 
@@ -1305,11 +1357,14 @@
 
 <footer class="site-footer">
   <p>
+    <a href="https://kolot-nodedim.netlify.app/" target="_blank" class="footer-kolot">&#x1F5F3;&#xFE0F; קולות נודדים — ניתוח ותצוגת תוצאות הבחירות לכנסת</a>
+  </p>
+  <p>
     &copy; הראל קין |
     <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> |
     מבוסס על נתוני <a href="https://main.knesset.gov.il/Activity/Info/Pages/Databases.aspx" target="_blank">הכנסת הפתוחה</a> |
-    <a href="https://kolot-nodedim.netlify.app/" target="_blank">קולות נודדים</a> |
-    <span id="bmc-wrap" style="display:inline-flex;align-items:center;gap:0;vertical-align:middle"><a href="https://www.buymeacoffee.com/harelc" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;background:#FFDD00;color:#000;padding:5px 14px;border-radius:10px 0 0 10px;font-weight:500;font-size:0.85rem;text-decoration:none;box-shadow:0 2px 8px rgba(255,221,0,0.3);transition:transform 0.15s,box-shadow 0.15s" onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 4px 14px rgba(255,221,0,0.5)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 8px rgba(255,221,0,0.3)'"><img src="https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg" alt="" style="width:18px;height:18px">רוצים לתמוך? קנו לי כוס קפה</a><button onclick="document.getElementById('bmc-wrap').remove()" style="background:#e6c800;border:none;color:#000;padding:5px 8px;border-radius:0 10px 10px 0;cursor:pointer;font-size:0.85rem;line-height:1;box-shadow:0 2px 8px rgba(255,221,0,0.3)" title="סגור">&times;</button></span>
+    <span class="visitor-counter">👁 <span id="visitor-count">—</span> מבקרים</span> |
+    <span id="bmc-wrap" style="display:inline-flex;align-items:center;gap:0;vertical-align:middle;position:relative"><a href="https://www.buymeacoffee.com/harelc" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;background:#FFDD00;color:#000;padding:5px 14px;border-radius:10px;font-weight:500;font-size:0.85rem;text-decoration:none;box-shadow:0 2px 8px rgba(255,221,0,0.3);transition:transform 0.15s,box-shadow 0.15s" onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 4px 14px rgba(255,221,0,0.5)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 8px rgba(255,221,0,0.3)'"><img src="https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg" alt="" style="width:18px;height:18px">אהבתם? רוצים לתמוך בפיתוח? קנו לי קפה</a><button onclick="document.getElementById('bmc-wrap').remove()" style="position:absolute;top:-6px;right:-6px;background:#fff;border:1px solid #ddd;color:#999;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:0.65rem;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.15)" title="סגור">&times;</button></span>
   </p>
 </footer>
 
@@ -2029,6 +2084,12 @@ function renderQuiz() {
 
     <div class="quiz-card" id="quiz-card">
       <div class="bill-number">הצעת חוק #${currentQ + 1}</div>
+      <div class="bill-meta">
+        ${bill.bill_type ? `<span class="bill-type-tag ${bill.bill_type === 'ממשלתית' ? 'gov' : bill.bill_type === 'ועדה' ? 'committee' : 'private'}">${bill.bill_type}</span>` : ''}
+        ${bill.vote_reading ? `<span class="bill-type-tag reading">קריאה ${bill.vote_reading === 3 ? 'שלישית' : 'שנייה'}</span>` : ''}
+        ${bill.knesset_num ? `<span class="bill-type-tag knesset">כנסת ${bill.knesset_num}</span>` : ''}
+        ${bill.vote_date ? `<span class="bill-type-tag" style="background:#f1f5f9;color:#475569">${bill.vote_date}</span>` : ''}
+      </div>
       ${topicsHTML}
       <div class="bill-synopsis">${displayText}</div>
       <div class="bill-footer">
@@ -2563,6 +2624,30 @@ async function fetchWikiBrief(mkName) {
 }
 
 loadData();
+
+// Visitor counter using CountAPI
+(function loadVisitorCount() {
+    const STORAGE_KEY = 'biapia_visit_counted';
+    const API_NS = 'bia-pia';
+    const API_KEY = 'page-visits';
+
+    const alreadyCounted = sessionStorage.getItem(STORAGE_KEY);
+    const endpoint = alreadyCounted
+        ? 'https://api.counterapi.dev/v1/' + API_NS + '/' + API_KEY + '/'
+        : 'https://api.counterapi.dev/v1/' + API_NS + '/' + API_KEY + '/up';
+
+    fetch(endpoint)
+        .then(r => r.json())
+        .then(data => {
+            const count = data.count || data.value || 0;
+            if (count > 0) {
+                const el = document.getElementById('visitor-count');
+                if (el) el.textContent = count.toLocaleString('he-IL');
+                if (!alreadyCounted) sessionStorage.setItem(STORAGE_KEY, '1');
+            }
+        })
+        .catch(() => {});
+})();
 </script>
 
 </body>
