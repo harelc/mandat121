@@ -2264,7 +2264,8 @@ function renderResults() {
   const { mkResults, partyResults } = computeResults();
 
   const top10 = mkResults.slice(0, 10);
-  const bottom5 = mkResults.slice(-5).reverse();
+  // For remotest, re-sort so more votes at same low pct = more remote (more confident mismatch)
+  const bottom5 = [...mkResults].sort((a, b) => a.pct - b.pct || b.total - a.total).slice(0, 5);
 
   app.innerHTML = `
     <div class="results-section">

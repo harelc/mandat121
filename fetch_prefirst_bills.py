@@ -43,17 +43,27 @@ HEADERS = {
     "User-Agent": "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7)",
 }
 
-DELAY = 0.1
+DELAY = 0.15
+MAX_NEW_BILLS = 600  # Only fetch this many newest bills
 
 
 # ── OData helpers (same as fetch_all_bills.py) ──
 
-def odata_get(url):
-    req = urllib.request.Request(url)
-    for k, v in HEADERS.items():
-        req.add_header(k, v)
-    with urllib.request.urlopen(req, timeout=60) as resp:
-        return json.loads(resp.read().decode("utf-8"))
+def odata_get(url, retries=3):
+    for attempt in range(retries):
+        try:
+            req = urllib.request.Request(url)
+            for k, v in HEADERS.items():
+                req.add_header(k, v)
+            with urllib.request.urlopen(req, timeout=120) as resp:
+                return json.loads(resp.read().decode("utf-8"))
+        except Exception as e:
+            if attempt < retries - 1:
+                wait = (attempt + 1) * 5
+                print(f"    Retry {attempt + 1}/{retries} after {wait}s: {e}", flush=True)
+                time.sleep(wait)
+            else:
+                raise
 
 
 def odata_query(entity, params=None):
@@ -163,34 +173,34 @@ def main():
             if not existing or (v.get("VoteDateTime") or "") > (existing.get("VoteDateTime") or ""):
                 best_vote[item_id] = v
         new_votes = list(best_vote.values())
+        # Sort by date descending (newest first), limit to MAX_NEW_BILLS
+        new_votes.sort(key=lambda v: v.get("VoteDateTime", ""), reverse=True)
+        if len(new_votes) > MAX_NEW_BILLS:
+            new_votes = new_votes[:MAX_NEW_BILLS]
         print(f"  Unique new bills: {len(new_votes)}")
 
         if not new_votes:
             print("Nothing new to fetch!")
             return
 
-        # Step 2: Fetch per-MK vote results
+        # Step 2: Fetch per-MK vote results (one at a time for reliability)
         print(f"\n=== Step 2: Fetching vote results for {len(new_votes)} votes ===")
         vote_results = {}
-        batch_size = 10
-        vote_ids = [v["Id"] for v in new_votes]
 
-        for i in range(0, len(vote_ids), batch_size):
-            batch = vote_ids[i:i + batch_size]
-            id_list = ",".join(str(vid) for vid in batch)
-            items = odata_fetch_all("KNS_PlenumVoteResult", {
-                "$filter": f"VoteID in ({id_list})",
-                "$select": "VoteID,MkId,ResultCode,ResultDesc,LastName,FirstName",
-                "$top": "1000",
-            })
-            for item in items:
-                vid = item["VoteID"]
-                if vid not in vote_results:
-                    vote_results[vid] = []
-                vote_results[vid].append(item)
+        for i, vote in enumerate(new_votes):
+            vid = vote["Id"]
+            try:
+                items, _ = odata_query("KNS_PlenumVoteResult", {
+                    "$filter": f"VoteID eq {vid}",
+                    "$select": "VoteID,MkId,ResultCode,ResultDesc,LastName,FirstName",
+                    "$top": "1000",
+                })
+                vote_results[vid] = items
+            except Exception as e:
+                print(f"  Warning: failed vote {vid}: {e}", flush=True)
 
-            if (i // batch_size + 1) % 5 == 0:
-                print(f"  {i + batch_size}/{len(vote_ids)} votes...", flush=True)
+            if (i + 1) % 50 == 0:
+                print(f"  {i + 1}/{len(new_votes)} votes...", flush=True)
             time.sleep(DELAY)
 
         print(f"  Got results for {len(vote_results)} votes")
@@ -199,20 +209,23 @@ def main():
         item_ids = list({v["ItemID"] for v in new_votes})
         print(f"\n=== Step 3: Fetching bill metadata for {len(item_ids)} bills ===")
         bill_meta = {}
-        batch_size = 20
 
-        for i in range(0, len(item_ids), batch_size):
-            batch = item_ids[i:i + batch_size]
+        for i in range(0, len(item_ids), 10):
+            batch = item_ids[i:i + 10]
             id_list = ",".join(str(bid) for bid in batch)
-            items = odata_fetch_all("KNS_Bill", {
-                "$filter": f"Id in ({id_list})",
-                "$select": "Id,Name,KnessetNum,SubTypeID,SubTypeDesc,SummaryLaw",
-            })
-            for item in items:
-                bill_meta[item["Id"]] = item
+            try:
+                items, _ = odata_query("KNS_Bill", {
+                    "$filter": f"Id in ({id_list})",
+                    "$select": "Id,Name,KnessetNum,SubTypeID,SubTypeDesc,SummaryLaw",
+                })
+                for item in items:
+                    bill_meta[item["Id"]] = item
+            except Exception as e:
+                print(f"  Warning: bill metadata batch failed: {e}", flush=True)
 
-            if (i // batch_size + 1) % 10 == 0:
-                print(f"  {i + batch_size}/{len(item_ids)} bills...", flush=True)
+            done = min(i + 10, len(item_ids))
+            if done % 50 == 0 or done == len(item_ids):
+                print(f"  {done}/{len(item_ids)} bills...", flush=True)
             time.sleep(DELAY)
 
         print(f"  Got metadata for {len(bill_meta)} bills")
@@ -221,21 +234,28 @@ def main():
         print(f"\n=== Step 4: Fetching documents for {len(item_ids)} bills ===")
         doc_urls = {}
 
-        for i, bid in enumerate(item_ids):
+        for i in range(0, len(item_ids), 10):
+            batch = item_ids[i:i + 10]
+            id_list = ",".join(str(bid) for bid in batch)
             try:
                 items, _ = odata_query("KNS_DocumentBill", {
-                    "$filter": f"BillID eq {bid}",
-                    "$select": "GroupTypeID,FilePath",
+                    "$filter": f"BillID in ({id_list})",
+                    "$select": "BillID,GroupTypeID,FilePath",
                 })
-                if items:
-                    by_type = {it["GroupTypeID"]: it["FilePath"] for it in items}
-                    doc_urls[bid] = by_type.get(2) or by_type.get(4) or items[-1]["FilePath"]
+                by_bill = {}
+                for it in items:
+                    bid = it["BillID"]
+                    if bid not in by_bill:
+                        by_bill[bid] = {}
+                    by_bill[bid][it["GroupTypeID"]] = it["FilePath"]
+                for bid, by_type in by_bill.items():
+                    doc_urls[bid] = by_type.get(2) or by_type.get(4) or list(by_type.values())[-1]
             except Exception as e:
-                if (i + 1) % 50 == 0:
-                    print(f"  Warning: failed to fetch doc for bill {bid}: {e}")
+                print(f"  Warning: doc batch failed: {e}", flush=True)
 
-            if (i + 1) % 50 == 0:
-                print(f"  {i + 1}/{len(item_ids)}...", flush=True)
+            done = min(i + 10, len(item_ids))
+            if done % 50 == 0 or done == len(item_ids):
+                print(f"  {done}/{len(item_ids)} docs ({len(doc_urls)} found)...", flush=True)
             time.sleep(DELAY)
 
         print(f"  Got {len(doc_urls)} document URLs")
