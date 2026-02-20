@@ -2088,7 +2088,7 @@ function renderQuiz() {
       <div class="bill-number">הצעת חוק #${currentQ + 1}</div>
       <div class="bill-meta">
         ${bill.bill_type ? `<span class="bill-type-tag ${bill.bill_type === 'ממשלתית' ? 'gov' : bill.bill_type === 'ועדה' ? 'committee' : 'private'}">${bill.bill_type}</span>` : ''}
-        ${bill.vote_reading ? `<span class="bill-type-tag reading">קריאה ${bill.vote_reading === 3 ? 'שלישית' : 'שנייה'}</span>` : ''}
+        ${bill.vote_reading !== undefined ? `<span class="bill-type-tag reading">${bill.vote_reading === 0 ? 'דיון מוקדם' : bill.vote_reading === 3 ? 'קריאה שלישית' : 'קריאה שנייה'}</span>` : ''}
         ${bill.knesset_num ? `<span class="bill-type-tag knesset">כנסת ${bill.knesset_num}</span>` : ''}
         ${bill.vote_date ? `<span class="bill-type-tag" style="background:#f1f5f9;color:#475569">${bill.vote_date}</span>` : ''}
       </div>
