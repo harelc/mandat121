@@ -4,6 +4,9 @@ Download bill documents, extract text, and generate catchy Hebrew synopses.
 
 Uses Claude API (via macOS Keychain token) for synopsis generation,
 with extractive fallback if API is unavailable.
+
+Outputs in batches — merges into bills.json every BATCH_SIZE synopses
+so the app gets updated data incrementally.
 """
 
 import json
@@ -13,6 +16,7 @@ import subprocess
 import time
 import urllib.request
 import zipfile
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
 from pathlib import Path
 from xml.etree import ElementTree
@@ -22,11 +26,12 @@ DOCS_DIR = DATA_DIR / "docs"
 DOCS_DIR.mkdir(parents=True, exist_ok=True)
 
 BILLS_PATH = DATA_DIR / "bills.json"
-SYNOPSES_PATH = DATA_DIR / "synopses.json"
 
 # Claude API config
 MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 300
+BATCH_SIZE = 10  # merge into bills.json every N synopses
+DOWNLOAD_WORKERS = 10  # parallel doc downloads
 
 
 def get_api_key():
@@ -59,8 +64,7 @@ def download_doc(url, dest):
             return False
         dest.write_bytes(data)
         return True
-    except Exception as e:
-        print(f"  Download failed: {e}")
+    except Exception:
         return False
 
 
@@ -77,8 +81,7 @@ def extract_docx_text(path):
             if texts:
                 paragraphs.append("".join(texts))
         return "\n".join(paragraphs)
-    except Exception as e:
-        print(f"  DOCX extraction failed: {e}")
+    except Exception:
         return ""
 
 
@@ -88,16 +91,14 @@ def extract_pdf_text(path):
         import pdfplumber
         text_parts = []
         with pdfplumber.open(path) as pdf:
-            for page in pdf.pages[:10]:  # First 10 pages max
+            for page in pdf.pages[:10]:
                 t = page.extract_text()
                 if t:
                     text_parts.append(t)
         return "\n".join(text_parts)
     except ImportError:
-        print("  pdfplumber not installed, skipping PDF")
         return ""
-    except Exception as e:
-        print(f"  PDF extraction failed: {e}")
+    except Exception:
         return ""
 
 
@@ -115,23 +116,19 @@ def extractive_synopsis(text, bill_name):
     if not text or len(text) < 50:
         return ""
 
-    # Try to find "דברי הסבר" (explanatory notes) section
     divrei_match = re.search(r"דברי\s+הסבר", text)
     if divrei_match:
         after = text[divrei_match.end():]
     else:
-        # Take text after the first ~20% (skip headers/legal boilerplate)
         start = len(text) // 5
         after = text[start:]
 
-    # Split into sentences and pick meaningful ones
     sentences = re.split(r"(?<=[.!?])\s+", after.strip())
     good = []
     for s in sentences:
         s = s.strip()
         if len(s) < 15 or len(s) > 300:
             continue
-        # Skip boilerplate
         if re.search(r"(סעיף\s+\d|תיקון\s+מס|פרק\s+[א-ת]|__)", s):
             continue
         good.append(s)
@@ -143,7 +140,6 @@ def extractive_synopsis(text, bill_name):
 
 def generate_synopsis_claude(client, bill_name, text):
     """Generate a catchy Hebrew synopsis using Claude API."""
-    # Truncate text to ~4000 chars to keep costs low
     truncated = text[:4000] if len(text) > 4000 else text
 
     if text and len(text) > 50:
@@ -161,7 +157,6 @@ def generate_synopsis_claude(client, bill_name, text):
 אל תכתוב "הצעת חוק זו" — פשוט תתחיל לתאר.
 אל תשתמש בשאלות רטוריות. אל תפנה לקורא. אל תזכיר שמות של חברי כנסת. אל תוסיף כותרת, מספר, או תבליטים — רק את הטקסט."""
     else:
-        # No document text — generate from bill name alone
         prompt = f"""אתה כותב תקצירים קליטים בעברית להצעות חוק, עבור אפליקציית חידון הצבעות.
 
 שם הצעת החוק: {bill_name}
@@ -186,59 +181,79 @@ def generate_synopsis_claude(client, bill_name, text):
         return ""
 
 
+def save_bills(bills):
+    """Save bills.json atomically."""
+    BILLS_PATH.write_text(json.dumps(bills, ensure_ascii=False, indent=2), "utf-8")
+
+
 def main():
     bills = json.loads(BILLS_PATH.read_text("utf-8"))
+    bills_by_id = {str(b["id"]): b for b in bills}
     print(f"Loaded {len(bills)} bills")
 
-    # Load existing synopses cache
-    if SYNOPSES_PATH.exists():
-        synopses = json.loads(SYNOPSES_PATH.read_text("utf-8"))
-        print(f"Loaded {len(synopses)} cached synopses")
-    else:
-        synopses = {}
+    # Filter to bills needing synopses (10+ votes, no existing synopsis)
+    need_synopsis = [
+        b for b in bills
+        if len(b.get("mk_votes", [])) >= 10
+        and not (b.get("synopsis") and len(b.get("synopsis", "")) > 20)
+    ]
+    already = len(bills) - len([b for b in bills if len(b.get("mk_votes", [])) < 10]) - len(need_synopsis)
+    print(f"Already have synopsis: {already}")
+    print(f"Need synopsis: {len(need_synopsis)}")
 
-    # Filter to bills with 10+ votes (doc_url optional — will generate from name if needed)
-    eligible = [b for b in bills if len(b.get("mk_votes", [])) >= 10]
-    print(f"Eligible bills (10+ votes): {len(eligible)}")
+    if not need_synopsis:
+        print("Nothing to do!")
+        return
 
-    # Set up Claude client
+    # Step 1: Download all docs in parallel
+    print(f"\n=== Downloading documents ({DOWNLOAD_WORKERS} workers) ===")
+    doc_tasks = {}
+    for bill in need_synopsis:
+        url = bill.get("doc_url")
+        if url:
+            ext = ".docx" if url.lower().endswith(".docx") else ".pdf"
+            doc_path = DOCS_DIR / f"{bill['id']}{ext}"
+            doc_tasks[str(bill["id"])] = (url, doc_path)
+
+    downloaded = 0
+    with ThreadPoolExecutor(max_workers=DOWNLOAD_WORKERS) as executor:
+        futures = {
+            executor.submit(download_doc, url, path): bid
+            for bid, (url, path) in doc_tasks.items()
+        }
+        for future in as_completed(futures):
+            if future.result():
+                downloaded += 1
+
+    print(f"  Downloaded/cached: {downloaded}/{len(doc_tasks)} docs")
+
+    # Step 2: Set up Claude client
     api_key = get_api_key()
     client = None
     if api_key:
         try:
             import anthropic
             client = anthropic.Anthropic(api_key=api_key)
-            print("Claude API available — will generate AI synopses")
+            print("\nClaude API available")
         except ImportError:
-            print("anthropic package not installed, using extractive fallback")
+            print("\nanthropic package not installed, using extractive fallback")
     else:
-        print("No API key found, using extractive fallback")
+        print("\nNo API key found, using extractive fallback")
 
-    # Step 1: Download docs and generate synopses
-    downloaded = 0
+    # Step 3: Generate synopses, merging into bills.json in batches
+    print(f"\n=== Generating synopses (batch size {BATCH_SIZE}) ===")
     generated = 0
-    failed = 0
+    batch_count = 0
 
-    for i, bill in enumerate(eligible):
+    for i, bill in enumerate(need_synopsis):
         bill_id = str(bill["id"])
 
-        # Skip if already have synopsis
-        if bill_id in synopses and synopses[bill_id]:
-            continue
-
-        url = bill.get("doc_url")
+        # Extract text from downloaded doc
         text = ""
-
-        if url:
-            ext = ".docx" if url.lower().endswith(".docx") else ".pdf"
-            doc_path = DOCS_DIR / f"{bill_id}{ext}"
-
-            # Download
-            if download_doc(url, doc_path):
-                downloaded += 1
+        if bill_id in doc_tasks:
+            url, doc_path = doc_tasks[bill_id]
+            if doc_path.exists():
                 text = extract_text(url, doc_path)
-            else:
-                print(f"  [{i+1}/{len(eligible)}] No doc: {bill['name'][:50]}")
 
         # Generate synopsis
         synopsis = ""
@@ -246,45 +261,37 @@ def main():
             synopsis = generate_synopsis_claude(client, bill["name"], text)
             label = "AI" if text and len(text) > 50 else "AI-NAME"
             if synopsis:
-                print(f"  [{i+1}/{len(eligible)}] {label}: {bill['name'][:40]}... → {synopsis[:60]}...")
-            # Rate limiting
-            time.sleep(0.3)
+                print(f"  [{i+1}/{len(need_synopsis)}] {label}: {bill['name'][:40]}... → {synopsis[:60]}...")
 
         if not synopsis and text:
             synopsis = extractive_synopsis(text, bill["name"])
             if synopsis:
-                print(f"  [{i+1}/{len(eligible)}] EXT: {bill['name'][:40]}... → {synopsis[:60]}...")
+                print(f"  [{i+1}/{len(need_synopsis)}] EXT: {bill['name'][:40]}... → {synopsis[:60]}...")
 
         if not synopsis:
-            # Last resort: use the bill name cleaned up
             name = bill["name"]
             name = re.sub(r"\(תיקון[^)]*\)", "", name).strip()
             name = re.sub(r",\s*הת?שפ\"?[א-ת].*$", "", name).strip()
             synopsis = name
-            print(f"  [{i+1}/{len(eligible)}] NAME: {synopsis[:60]}")
+            print(f"  [{i+1}/{len(need_synopsis)}] NAME: {synopsis[:60]}")
 
-        synopses[bill_id] = synopsis
+        # Update in bills list
+        bill["synopsis"] = synopsis
+        if bill_id in bills_by_id:
+            bills_by_id[bill_id]["synopsis"] = synopsis
         generated += 1
 
-        # Save cache periodically
-        if generated % 10 == 0:
-            SYNOPSES_PATH.write_text(json.dumps(synopses, ensure_ascii=False, indent=2), "utf-8")
-            print(f"  ... saved cache ({len(synopses)} synopses)")
+        # Batch save to bills.json
+        if generated % BATCH_SIZE == 0:
+            batch_count += 1
+            save_bills(bills)
+            print(f"  --- batch {batch_count}: saved {generated} synopses to bills.json ---")
 
-    # Final save of synopses
-    SYNOPSES_PATH.write_text(json.dumps(synopses, ensure_ascii=False, indent=2), "utf-8")
-    print(f"\nSynopses: {len(synopses)} total, {generated} new, {failed} failed downloads")
+    # Final save
+    if generated % BATCH_SIZE != 0:
+        save_bills(bills)
 
-    # Step 2: Merge into bills.json
-    merged = 0
-    for bill in bills:
-        bill_id = str(bill["id"])
-        if bill_id in synopses and synopses[bill_id]:
-            bill["synopsis"] = synopses[bill_id]
-            merged += 1
-
-    BILLS_PATH.write_text(json.dumps(bills, ensure_ascii=False, indent=2), "utf-8")
-    print(f"Merged {merged} synopses into {BILLS_PATH}")
+    print(f"\nDone: {generated} new synopses generated and merged into {BILLS_PATH}")
 
 
 if __name__ == "__main__":
