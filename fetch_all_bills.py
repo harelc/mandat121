@@ -6,7 +6,8 @@ Fetches קריאה שניה ושלישית votes, per-MK vote breakdowns, bill m
 and documents. Produces data/bills.json.
 
 Usage:
-    python3 fetch_all_bills.py
+    python3 fetch_all_bills.py          # incremental: only votes since last run
+    python3 fetch_all_bills.py --full   # full rebuild from 2020-03-01
 """
 
 import json
@@ -14,7 +15,7 @@ import time
 import sys
 import urllib.request
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -23,8 +24,12 @@ BILLS_PATH = DATA_DIR / "bills.json"
 
 ODATA_BASE = "https://knesset.gov.il/OdataV4/ParliamentInfo"
 
-# Knesset 23 started 2020-03-16
+# Knesset 23 started 2020-03-16 — full-rebuild start date
 VOTE_DATE_START = "2020-03-01T00:00:00Z"
+
+# Incremental fetch: re-check this many days before the latest stored vote,
+# so late vote corrections / status changes get picked up on the next run.
+OVERLAP_DAYS = 7
 
 # Bill SubTypeID → Hebrew label
 BILL_TYPES = {53: "ממשלתית", 54: "פרטית", 55: "ועדה"}
@@ -139,12 +144,41 @@ def load_faction_lookup():
 
 # ── Step 2: Fetch 2nd+3rd reading votes ──
 
-def fetch_votes():
-    """Fetch all 2nd and 3rd reading votes from K23-25."""
+def compute_start_date(existing_path, overlap_days=OVERLAP_DAYS):
+    """Incremental start date: latest stored 2nd/3rd-reading vote minus an
+    overlap window. Returns None (→ full rebuild) if no usable data exists."""
+    if not existing_path.exists():
+        return None
+    try:
+        bills = json.loads(existing_path.read_text("utf-8"))
+    except (json.JSONDecodeError, OSError):
+        return None
+    # Only this script's domain (2nd/3rd reading); pre-first dates are handled
+    # by fetch_prefirst_bills.py and would otherwise skew the window.
+    dates = [
+        b["vote_date"] for b in bills
+        if b.get("vote_reading") in (2, 3) and b.get("vote_date")
+    ]
+    if not dates:
+        return None
+    latest = datetime.strptime(max(dates), "%Y-%m-%d")
+    start = latest - timedelta(days=overlap_days)
+    return start.strftime("%Y-%m-%dT00:00:00Z")
+
+
+def fetch_votes(start_date=None):
+    """Fetch 2nd and 3rd reading votes from K23-25.
+
+    start_date: ISO timestamp to fetch votes after. None → full rebuild
+    from VOTE_DATE_START.
+    """
     print("\n=== Step 2: Fetching 2nd+3rd reading votes ===")
+    since = start_date or VOTE_DATE_START
+    mode = "incremental" if start_date else "full"
+    print(f"  Mode: {mode}, votes after {since}")
     votes = odata_fetch_all("KNS_PlenumVote", {
         "$filter": (
-            f"VoteDateTime gt {VOTE_DATE_START}"
+            f"VoteDateTime gt {since}"
             " and (contains(ForOptionDesc,'קריאה שלישית')"
             " or contains(ForOptionDesc,'לקבל בקריאה שנייה'))"
         ),
@@ -350,38 +384,47 @@ def assemble_bills(votes, vote_results, bill_meta, doc_urls, factions, name_map)
 
 
 def merge_existing(new_bills, existing_path):
-    """Merge new bills with existing, preserving synopsis and topics."""
+    """Merge freshly fetched bills with existing data.
+
+    Each vote (vote_id) is a distinct record, so we key on vote_id:
+    - newly fetched votes replace their existing counterpart (refreshed counts)
+      while carrying over preserved enrichment (synopsis/topics);
+    - existing bills NOT in the new set are kept untouched. This is what makes
+      an incremental fetch safe — older bills and pre-first-reading entries
+      (which this script never fetches) survive.
+    """
     if not existing_path.exists():
         return new_bills
 
     existing = json.loads(existing_path.read_text("utf-8"))
-    existing_by_id = {}
-    for b in existing:
-        existing_by_id[str(b["id"])] = b
-        # Also index by vote_id for fallback matching
-        if b.get("vote_id"):
-            existing_by_id[f"v_{b['vote_id']}"] = b
+    existing_by_vote = {b["vote_id"]: b for b in existing if b.get("vote_id")}
+    new_vote_ids = {b["vote_id"] for b in new_bills if b.get("vote_id")}
 
     preserved = 0
     for bill in new_bills:
-        bid = str(bill["id"])
-        vid = f"v_{bill['vote_id']}"
-        old = existing_by_id.get(bid) or existing_by_id.get(vid)
+        old = existing_by_vote.get(bill.get("vote_id"))
         if old:
-            # Preserve enrichment fields
             if old.get("synopsis") and not bill.get("synopsis"):
                 bill["synopsis"] = old["synopsis"]
                 preserved += 1
             if old.get("topics") and not bill.get("topics"):
                 bill["topics"] = old["topics"]
 
+    # Keep every existing bill the fetch didn't just replace.
+    retained = [b for b in existing if b.get("vote_id") not in new_vote_ids]
+    merged = retained + new_bills
+
     print(f"  Preserved {preserved} existing synopses")
-    return new_bills
+    print(f"  Retained {len(retained)} untouched bills, "
+          f"{len(new_bills)} fetched ({len(merged)} total)")
+    return merged
 
 
 # ── Main ──
 
 def main():
+    full = "--full" in sys.argv
+
     print(f"Knesset OData v4 bill fetch (K23-25)")
     print(f"Timestamp: {datetime.now().isoformat()}")
     print(f"API: {ODATA_BASE}")
@@ -390,10 +433,11 @@ def main():
         # Step 1: Faction lookup
         factions, name_map = load_faction_lookup()
 
-        # Step 2: Fetch votes
-        votes = fetch_votes()
+        # Step 2: Fetch votes (incremental by default; --full rebuilds)
+        start_date = None if full else compute_start_date(BILLS_PATH)
+        votes = fetch_votes(start_date)
         if not votes:
-            print("No votes found!")
+            print("No new votes found.")
             return
 
         # Step 3: Fetch per-MK results

@@ -32,7 +32,7 @@ MODEL = "claude-sonnet-4-6"
 MAX_TOKENS = 300
 BATCH_SIZE = 50  # merge into bills.json every N synopses
 DOWNLOAD_WORKERS = 10  # parallel doc downloads
-SYNOPSIS_WORKERS = 10  # parallel Claude API calls
+SYNOPSIS_WORKERS = 1  # serial Claude API calls to stay under rate limits
 
 
 def get_api_key():
@@ -170,16 +170,25 @@ def generate_synopsis_claude(client, bill_name, text):
 אל תכתוב "הצעת חוק זו" — פשוט תתחיל לתאר.
 אל תשתמש בשאלות רטוריות. אל תפנה לקורא. אל תזכיר שמות של חברי כנסת. אל תוסיף כותרת, מספר, או תבליטים — רק את הטקסט."""
 
-    try:
-        resp = client.messages.create(
-            model=MODEL,
-            max_tokens=MAX_TOKENS,
-            messages=[{"role": "user", "content": prompt}],
-        )
-        return resp.content[0].text.strip()
-    except Exception as e:
-        print(f"  Claude API error: {e}")
-        return ""
+    max_retries = 6
+    for attempt in range(max_retries):
+        try:
+            resp = client.messages.create(
+                model=MODEL,
+                max_tokens=MAX_TOKENS,
+                messages=[{"role": "user", "content": prompt}],
+            )
+            return resp.content[0].text.strip()
+        except Exception as e:
+            # Retry on rate limits / transient errors with exponential backoff
+            status = getattr(e, "status_code", None)
+            transient = status in (429, 500, 502, 503, 529) or "rate_limit" in str(e)
+            if transient and attempt < max_retries - 1:
+                backoff = min(2 ** attempt, 30)
+                time.sleep(backoff)
+                continue
+            print(f"  Claude API error (giving up after {attempt + 1} tries): {e}")
+            return ""
 
 
 def save_bills(bills):

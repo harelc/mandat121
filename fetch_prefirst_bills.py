@@ -6,7 +6,8 @@ These are bills that were voted on in plenum before reaching committee —
 most are rejected opposition bills. Adds them to existing bills.json.
 
 Usage:
-    python3 fetch_prefirst_bills.py
+    python3 fetch_prefirst_bills.py          # incremental: only votes since last run
+    python3 fetch_prefirst_bills.py --full   # backfill older pre-first bills (up to MAX_NEW_BILLS)
 """
 
 import json
@@ -14,7 +15,7 @@ import time
 import sys
 import urllib.request
 import urllib.parse
-from datetime import datetime
+from datetime import datetime, timedelta
 from pathlib import Path
 
 DATA_DIR = Path(__file__).parent / "data"
@@ -44,7 +45,24 @@ HEADERS = {
 }
 
 DELAY = 0.55
-MAX_NEW_BILLS = 600  # Only fetch this many newest bills
+MAX_NEW_BILLS = 600  # Safety cap on bills added in a single run
+
+# Incremental fetch: re-check this many days before the latest stored
+# pre-first vote, so late corrections get picked up on the next run.
+OVERLAP_DAYS = 7
+
+
+def prefirst_floor_date(existing_bills, overlap_days=OVERLAP_DAYS):
+    """Date floor for incremental pre-first fetch: latest stored pre-first
+    (reading 0) vote minus an overlap window. None if no pre-first data yet."""
+    dates = [
+        b["vote_date"] for b in existing_bills
+        if b.get("vote_reading") == 0 and b.get("vote_date")
+    ]
+    if not dates:
+        return None
+    latest = datetime.strptime(max(dates), "%Y-%m-%d")
+    return (latest - timedelta(days=overlap_days)).strftime("%Y-%m-%d")
 
 
 # ── OData helpers (same as fetch_all_bills.py) ──
@@ -143,11 +161,18 @@ def main():
     print(f"Knesset pre-first-reading bill fetch (K23-25)")
     print(f"Timestamp: {datetime.now().isoformat()}")
 
+    full = "--full" in sys.argv
+
     try:
         # Load existing bills to know what we already have
         existing_bills = json.loads(BILLS_PATH.read_text("utf-8"))
         existing_ids = {str(b["id"]) for b in existing_bills}
         print(f"Existing bills: {len(existing_bills)} ({len(existing_ids)} unique IDs)")
+
+        # Incremental date floor (skip in --full backfill mode)
+        floor = None if full else prefirst_floor_date(existing_bills)
+        print(f"Mode: {'full backfill' if full else 'incremental'}"
+              + (f", floor {floor}" if floor else ""))
 
         # Faction lookup
         factions, name_map = load_faction_lookup()
@@ -173,6 +198,13 @@ def main():
         # Skip bills we already have
         new_votes = [v for v in prefirst if v.get("ItemID") and str(v["ItemID"]) not in existing_ids]
         print(f"  New (not already in bills.json): {len(new_votes)}")
+
+        # Incremental: keep only votes on/after the date floor. Without this,
+        # the MAX_NEW_BILLS cap silently backfills older pre-first bills.
+        if floor:
+            before = len(new_votes)
+            new_votes = [v for v in new_votes if (v.get("VoteDateTime") or "")[:10] >= floor]
+            print(f"  After date floor ({floor}): {len(new_votes)} (dropped {before - len(new_votes)} older)")
 
         # For bills with multiple pre-first votes, keep the latest
         best_vote = {}
