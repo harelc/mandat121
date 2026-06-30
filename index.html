@@ -1460,10 +1460,32 @@ function isContested(b) {
   return Math.max(b.total_for || 0, b.total_against || 0) / total <= 0.75;
 }
 
+// Selection weight: prefer bills that better distinguish between MKs —
+// i.e. votes with many participants and a split (non-unanimous) result.
+// Unanimous or sparsely-attended votes get a low weight but aren't excluded.
+function billWeight(b) {
+  const f = b.total_for || 0, a = b.total_against || 0, ab = b.total_abstain || 0;
+  const participants = f + a + ab;
+  const decisive = f + a;
+  // balance in [0,1]: 1 = perfectly split (most informative), 0 = unanimous
+  const balance = decisive > 0 ? 1 - Math.abs(f - a) / decisive : 0;
+  // +0.15 floor keeps lopsided votes in play; participants scales the signal
+  return Math.max(participants, 1) * (balance + 0.15);
+}
+
+// Weighted random permutation (Efraimidis–Spirakis): higher-weight bills tend
+// to sort earlier, so a round-robin that picks the first unused bill favours them.
+function weightedShuffle(arr) {
+  return arr
+    .map(b => ({ b, key: Math.pow(Math.random(), 1 / billWeight(b)) }))
+    .sort((x, y) => y.key - x.key)
+    .map(x => x.b);
+}
+
 function selectUniformByTopic(pool, count) {
   // Group bills by their topics
   const byTopic = {};
-  const noTopic = [];
+  let noTopic = [];
   for (const b of pool) {
     if (b.topics && b.topics.length > 0) {
       for (const t of b.topics) {
@@ -1476,10 +1498,11 @@ function selectUniformByTopic(pool, count) {
   }
 
   const topics = Object.keys(byTopic);
-  if (topics.length === 0) return shuffle(pool).slice(0, count);
+  if (topics.length === 0) return weightedShuffle(pool).slice(0, count);
 
-  // Shuffle within each topic
-  for (const t of topics) byTopic[t] = shuffle(byTopic[t]);
+  // Weighted shuffle within each topic (favours informative, well-attended votes)
+  for (const t of topics) byTopic[t] = weightedShuffle(byTopic[t]);
+  noTopic = weightedShuffle(noTopic);
 
   // Round-robin pick from each topic
   const selected = [];
