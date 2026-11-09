@@ -1,0 +1,88 @@
+# Daily Knesset data build — המנדט ה־121
+#
+# Scaffolding (started 2026-11-10): refreshes the K25 datasets from the
+# official OData and, once the Knesset 26 entities are published there,
+# starts building K26 incrementally. All builders are stdlib-only Python
+# reading the public OData — no secrets needed.
+#
+# Flow: probe K26 → refresh K25 layers → build K26 if the probe is green →
+# commit data/ back to the repo if anything changed.
+name: knesset-daily
+
+on:
+  schedule:
+    - cron: "30 4 * * *" # 04:30 UTC ≈ 06:30–07:30 Israel
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "What to build"
+        type: choice
+        options: [all, k25-only, k26-only]
+        default: all
+
+permissions:
+  contents: write
+
+concurrency:
+  group: knesset-daily
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 180
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Probe Knesset 26 OData
+        id: probe
+        run: |
+          if python3 probe_knesset.py; then echo "k26_ready=true" >> "$GITHUB_OUTPUT";
+          else echo "k26_ready=false" >> "$GITHUB_OUTPUT"; fi
+        continue-on-error: true
+
+      - name: Refresh K25 datasets
+        if: ${{ inputs.target != 'k26-only' }}
+        run: |
+          python3 -u build_knesset.py --knesset 25
+          python3 -u build_committees.py
+          python3 -u build_protocols.py
+          python3 -u build_k25_tenure.py
+          python3 -u build_k25_committee_members.py
+          python3 -u build_k25_list_order.py
+
+      - name: Harvest per-MK vote results (K25)
+        if: ${{ inputs.target != 'k26-only' }}
+        run: python3 -u build_k25_vote_results.py # resumable; checkpoints to data/k25_vote_results.json
+
+      - name: Derived layers (analytics, contacts/presence, protocol search)
+        if: ${{ inputs.target != 'k26-only' }}
+        run: |
+          python3 -u build_analytics.py          # correlation matrix, close ties, ranks
+          python3 -u build_mk_contacts.py        # official contact/social + IsPresent snapshot (MkLobby API)
+          python3 -u build_mk_wiki.py            # Wikipedia abstracts (CC BY-SA) + Wikidata-discovered X handles (CC0)
+          python3 -u build_protocols_search.py   # protocol search index + word clouds
+
+      - name: Build K26 (when OData publishes it)
+        if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_ready == 'true' }}
+        run: |
+          python3 -u build_knesset.py --knesset 26
+          # TODO(k26): generalize + enable as K26 data lands:
+          #   build_k25_tenure.py / build_k25_list_order.py equivalents,
+          #   per-MK vote results for K26, committee members, protocols.
+
+      - name: Commit refreshed data
+        run: |
+          git config user.name "mandat121-data-bot"
+          git config user.email "actions@github.com"
+          git add data/
+          if git diff --cached --quiet; then
+            echo "No data changes."
+          else
+            git commit -m "data: daily OData refresh ($(date -u +%Y-%m-%d))"
+            git push
+          fi

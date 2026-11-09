@@ -7,3 +7,9 @@ data/docs/
 dist/
 .DS_Store
 *.bak.json
+
+# Local Netlify folder
+.netlify
+
+# local test snapshots
+__search_test.html

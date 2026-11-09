@@ -1,0 +1,455 @@
+{
+ "_note": "Official Knesset portraits (MkLobby API, fs.knesset.gov.il), fetched at build time. kind=leaver entries are NOT in mk_photos.json on purpose.",
+ "photos": {
+  "איזנקוט גדי": {
+   "kind": "leaver",
+   "mk_site_id": 1092,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1092/1_1092_3_19647.jpeg",
+   "file": "data/photos/mk_600f6590.jpg"
+  },
+  "אמסלם דוד": {
+   "kind": "leaver",
+   "mk_site_id": 912,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/912/1_912_3_2364.jpeg",
+   "file": "data/photos/mk_efd5c9c3.jpg"
+  },
+  "אקוניס אופיר": {
+   "kind": "leaver",
+   "mk_site_id": 830,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/830/1_830_3_1939.jpeg",
+   "file": "data/photos/mk_e632dc24.jpg"
+  },
+  "בן צור יואב": {
+   "kind": "leaver",
+   "mk_site_id": 906,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/906/1_906_3_2332.jpeg",
+   "file": "data/photos/mk_4d132c01.jpg"
+  },
+  "בצלאל אברהם": {
+   "kind": "leaver",
+   "mk_site_id": 1097,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1097/1_1097_3_19672.jpeg",
+   "file": "data/photos/mk_e311b712.jpg"
+  },
+  "ברביבאי אורנה": {
+   "kind": "leaver",
+   "mk_site_id": 980,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/980/1_980_3_11115.jpeg",
+   "file": "data/photos/mk_c3a20b3b.jpg"
+  },
+  "ברוכי אליהו": {
+   "kind": "leaver",
+   "mk_site_id": 1042,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1042/1_1042_3_15101.jpeg",
+   "file": "data/photos/mk_4ad73009.jpg"
+  },
+  "גלנט יואב": {
+   "kind": "leaver",
+   "mk_site_id": 921,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/921/1_921_3_2424.jpeg",
+   "file": "data/photos/mk_bc95c25a.jpg"
+  },
+  "דנון דני": {
+   "kind": "leaver",
+   "mk_site_id": 828,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/828/1_828_3_1930.jpeg",
+   "file": "data/photos/mk_81c54156.jpg"
+  },
+  "זוהר מכלוף מיקי": {
+   "kind": "leaver",
+   "mk_site_id": 922,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/922/1_922_3_2431.jpeg",
+   "file": "data/photos/mk_33a4b040.jpg"
+  },
+  "חיים עוז": {
+   "kind": "leaver",
+   "mk_site_id": 1131,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1131/1_1131_3_21578.jpeg",
+   "file": "data/photos/mk_199623ca.jpg"
+  },
+  "טור פז משה": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1050,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1050/1_1050_3_16606.jpeg",
+   "file": "data/photos/mk_7cb5beae.jpg"
+  },
+  "טייב יוסף": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1043,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1043/1_1043_3_15131.jpeg",
+   "file": "data/photos/mk_59386a63.jpg"
+  },
+  "טרופר חילי": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1000,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1000/1_1000_3_11227.jpeg",
+   "file": "data/photos/mk_3aa7173b.jpg"
+  },
+  "כהן אלי": {
+   "kind": "leaver",
+   "mk_site_id": 714,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/714/1_714_3_1565.jpeg",
+   "file": "data/photos/mk_ca0825b2.jpg"
+  },
+  "כהן אלמוג": {
+   "kind": "leaver",
+   "mk_site_id": 1104,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1104/1_1104_3_19707.jpeg",
+   "file": "data/photos/mk_342e45fe.jpg"
+  },
+  "כהן מאיר": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 874,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/874/1_874_3_2153.jpeg",
+   "file": "data/photos/mk_d1262884.jpg"
+  },
+  "כהן מירב": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1006,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1006/1_1006_3_11251.jpeg",
+   "file": "data/photos/mk_665ab479.jpg"
+  },
+  "כהנא מתן": {
+   "kind": "leaver",
+   "mk_site_id": 1030,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1030/1_1030_3_13542.jpeg",
+   "file": "data/photos/mk_c1331d0d.jpg"
+  },
+  "כץ אופיר": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 976,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/976/1_976_3_12324.jpeg",
+   "file": "data/photos/mk_b7321aed.jpg"
+  },
+  "כץ חיים": {
+   "kind": "leaver",
+   "mk_site_id": 212,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/212/1_212_3_535.jpeg",
+   "file": "data/photos/mk_29f44c55.jpg"
+  },
+  "כץ ישראל": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 69,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/69/1_69_3_191.jpeg",
+   "file": "data/photos/mk_95c7138a.jpg"
+  },
+  "להב הרצנו יוראי": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 998,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/998/1_998_3_11225.jpeg",
+   "file": "data/photos/mk_781dae83.jpg"
+  },
+  "לוי ירון": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1127,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1127/1_1127_3_20229.png",
+   "file": "data/photos/mk_bc643f1a.jpg"
+  },
+  "ליברמן אביגדור": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 214,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/214/1_214_3_548.jpeg",
+   "file": "data/photos/mk_0b61f519.jpg"
+  },
+  "מושיאשוילי סימון": {
+   "kind": "leaver",
+   "mk_site_id": 1120,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1120/1_1120_3_19940.jpeg",
+   "file": "data/photos/mk_5b405669.jpg"
+  },
+  "מזרסקי טטיאנה": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1076,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1076/1_1076_3_17974.jpeg",
+   "file": "data/photos/mk_a90af32c.jpg"
+  },
+  "מירון שלי טל": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1118,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1118/1_1118_3_19926.jpeg",
+   "file": "data/photos/mk_3630725a.jpg"
+  },
+  "מלביצקי חנוך דב": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1105,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1105/1_1105_3_19712.jpeg",
+   "file": "data/photos/mk_16d47bcb.jpg"
+  },
+  "מלול ארז": {
+   "kind": "leaver",
+   "mk_site_id": 1119,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1119/1_1119_3_19933.jpeg",
+   "file": "data/photos/mk_5dac6c07.jpg"
+  },
+  "מלינובסקי יוליה": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 956,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/956/1_956_3_2649.jpeg",
+   "file": "data/photos/mk_9a009436.jpg"
+  },
+  "מלקו צגה צגנש": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1122,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1122/1_1122_3_19962.jpeg",
+   "file": "data/photos/mk_e6cfda60.jpg"
+  },
+  "מעוז אבי": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1063,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1063/1_1063_3_17738.jpeg",
+   "file": "data/photos/mk_5e753f53.jpg"
+  },
+  "מקלב אורי": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 814,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/814/1_814_3_1874.jpeg",
+   "file": "data/photos/mk_ff515be8.jpg"
+  },
+  "סגלוביץ יואב": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 995,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/995/1_995_3_11219.jpeg",
+   "file": "data/photos/mk_3713d6cc.jpg"
+  },
+  "סובה יבגני": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 994,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/994/1_994_3_11217.jpeg",
+   "file": "data/photos/mk_e3988181.jpg"
+  },
+  "סולומון משה": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1107,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1107/1_1107_3_19723.jpeg",
+   "file": "data/photos/mk_fc9744ab.jpg"
+  },
+  "סילמן עידית": {
+   "kind": "leaver",
+   "mk_site_id": 1014,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1014/1_1014_3_12318.jpeg",
+   "file": "data/photos/mk_1243a866.jpg"
+  },
+  "סמוטריץ' בצלאל": {
+   "kind": "leaver",
+   "mk_site_id": 936,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/936/1_936_3_2523.jpeg",
+   "file": "data/photos/mk_3fed8cda.jpg"
+  },
+  "סעדה משה": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1109,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1109/1_1109_3_19733.jpeg",
+   "file": "data/photos/mk_14640781.jpg"
+  },
+  "סער גדעון": {
+   "kind": "leaver",
+   "mk_site_id": 725,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/725/1_725_3_1595.jpeg",
+   "file": "data/photos/mk_60d54cb1.jpg"
+  },
+  "עבאס מנסור": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1007,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1007/1_1007_3_12320.jpeg",
+   "file": "data/photos/mk_68518bcd.jpg"
+  },
+  "עבד עפיף": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1128,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1128/1_1128_3_20759.jpeg",
+   "file": "data/photos/mk_476bd5b4.jpg"
+  },
+  "עודה איימן": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 938,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/938/1_938_3_2537.jpeg",
+   "file": "data/photos/mk_420cc8b8.jpg"
+  },
+  "עזוז עדי": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1130,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1130/1_1130_3_21032.jpeg",
+   "file": "data/photos/mk_2985f687.jpg"
+  },
+  "עטאונה יוסף": {
+   "kind": "leaver",
+   "mk_site_id": 964,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/964/1_964_3_2697.jpeg",
+   "file": "data/photos/mk_83b11c01.jpg"
+  },
+  "עטייה חוה אתי": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 992,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/992/1_992_3_11212.jpeg",
+   "file": "data/photos/mk_fc458e30.jpg"
+  },
+  "עמאר חמד": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 837,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/837/1_837_3_1973.jpeg",
+   "file": "data/photos/mk_25c85908.jpg"
+  },
+  "פוגל צביקה": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1110,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1110/1_1110_3_19738.jpeg",
+   "file": "data/photos/mk_9c23a7b2.jpg"
+  },
+  "פורר עודד": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 951,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/951/1_951_3_2614.jpeg",
+   "file": "data/photos/mk_c890f4ec.jpg"
+  },
+  "פסל משה": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1124,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1124/1_1124_3_20007.jpeg",
+   "file": "data/photos/mk_136098a9.jpg"
+  },
+  "פרוש מאיר": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 103,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/103/1_103_3_285.jpeg",
+   "file": "data/photos/mk_4348896b.jpg"
+  },
+  "פרקש הכהן אורית": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 978,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/978/1_978_3_11111.jpeg",
+   "file": "data/photos/mk_b9bde134.jpg"
+  },
+  "צרפתי הרכבי מטי": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1091,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1091/1_1091_3_19743.jpeg",
+   "file": "data/photos/mk_d3cd5859.jpg"
+  },
+  "קיש יואב": {
+   "kind": "leaver",
+   "mk_site_id": 945,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/945/1_945_3_2583.jpeg",
+   "file": "data/photos/mk_9c5b73c5.jpg"
+  },
+  "קלנר אריאל": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 987,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/987/1_987_3_11129.jpeg",
+   "file": "data/photos/mk_31ebb5e3.jpg"
+  },
+  "קרויזר יצחק": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1114,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1114/1_1114_3_19866.jpeg",
+   "file": "data/photos/mk_fb97a23e.jpg"
+  },
+  "קריב גלעד": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1066,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1066/1_1066_3_17753.jpeg",
+   "file": "data/photos/mk_fe46bf09.jpg"
+  },
+  "רביבו אליהו": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1111,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1111/1_1111_3_19753.jpeg",
+   "file": "data/photos/mk_8fd573de.jpg"
+  },
+  "רגב מירי מרים": {
+   "kind": "leaver",
+   "mk_site_id": 831,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/831/1_831_3_1946.jpeg",
+   "file": "data/photos/mk_08fd96e6.jpg"
+  },
+  "רוט משה": {
+   "kind": "leaver",
+   "mk_site_id": 1117,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1117/1_1117_3_19896.jpeg",
+   "file": "data/photos/mk_0a1fa0bf.jpg"
+  },
+  "רוטמן שמחה": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1067,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1067/1_1067_3_17818.jpeg",
+   "file": "data/photos/mk_2147767a.jpg"
+  },
+  "רול עידן": {
+   "kind": "leaver",
+   "mk_site_id": 1009,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1009/1_1009_3_12328.jpeg",
+   "file": "data/photos/mk_09c66e33.jpg"
+  },
+  "רון בן משה יעל": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1048,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1048/1_1048_3_16568.jpeg",
+   "file": "data/photos/mk_fc4bd23d.jpg"
+  },
+  "רזבוזוב יואל": {
+   "kind": "leaver",
+   "mk_site_id": 897,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/897/1_897_3_2278.jpeg",
+   "file": "data/photos/mk_bd4a41e1.jpg"
+  },
+  "רייטן מרום אפרת": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1068,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1068/1_1068_3_17773.jpeg",
+   "file": "data/photos/mk_b78c0d51.jpg"
+  },
+  "שאשא ביטון יפעת": {
+   "kind": "leaver",
+   "mk_site_id": 946,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/946/1_946_3_2590.jpeg",
+   "file": "data/photos/mk_27a5ce28.jpg"
+  },
+  "שוסטר אלון": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 982,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/982/1_982_3_11099.jpeg",
+   "file": "data/photos/mk_99abe245.jpg"
+  },
+  "שטרית קטי קטרין": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1018,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1018/1_1018_3_12330.jpeg",
+   "file": "data/photos/mk_76aa9bc8.jpg"
+  },
+  "שטרן אלעזר": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 899,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/899/1_899_3_2289.jpeg",
+   "file": "data/photos/mk_ed96c398.jpg"
+  },
+  "שיקלי עמיחי": {
+   "kind": "leaver",
+   "mk_site_id": 1070,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1070/1_1070_3_17798.jpeg",
+   "file": "data/photos/mk_d8fd1310.jpg"
+  },
+  "שיר סגמן מיכל": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1004,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1004/1_1004_3_12334.jpeg",
+   "file": "data/photos/mk_1b27c080.jpg"
+  },
+  "שירי נאור": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1112,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1112/1_1112_3_19758.jpeg",
+   "file": "data/photos/mk_8e8ccb85.jpg"
+  },
+  "שקלים אושר": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 1123,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1123/1_1123_3_19975.jpeg",
+   "file": "data/photos/mk_cc1df842.jpg"
+  },
+  "תמנו פנינה": {
+   "kind": "roster-missing-file",
+   "mk_site_id": 905,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/905/1_905_3_2327.jpeg",
+   "file": "data/photos/mk_0081943c.jpg"
+  }
+ }
+}

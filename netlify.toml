@@ -1,0 +1,12 @@
+# המנדט ה־121 (mandat121 site) — builds from the repo root.
+# The bia-pia site does NOT read this file: its base directory is biapia/,
+# where biapia/netlify.toml governs its build instead.
+[build]
+  publish = "."
+  # Skip the mandat121 build when a push touches only the game folder
+  # (Netlify: exit 0 from `ignore` = skip build). Saves deploy credits.
+  ignore = "git diff --quiet HEAD^ HEAD -- . ':(exclude)biapia'"
+
+# The daily GitHub Actions workflow commits refreshed data/ back to main;
+# once this site is git-connected, that commit is what republishes the app
+# with fresh Knesset data — no manual deploy needed.

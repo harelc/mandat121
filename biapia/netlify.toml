@@ -1,0 +1,11 @@
+[build]
+  command = "bash build_site.sh"
+  publish = "dist"
+  # Skip rebuilding the game when a push changes neither the game nor the
+  # shared data files it assembles (e.g. the daily mandat121 data commit).
+  ignore = "git diff --quiet HEAD^ HEAD -- . ../data/bills.json ../data/mk_photos.json ../data/mk_wiki.json ../data/photos"
+
+# This site (bia-pia) builds from the biapia/ base directory (set in the
+# Netlify site settings). build_site.sh assembles dist/ from this folder's
+# index.html plus the shared game data files at the repo-root /data —
+# a single source of truth shared with the המנדט ה־121 app at the root.
