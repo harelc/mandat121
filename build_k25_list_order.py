@@ -26,7 +26,13 @@ DATA = Path(__file__).parent / "data"
 
 
 def main_k26():
-    """Rank = 1-based position in the party's official CEC list (elected only)."""
+    """Rank = 1-based position in the party's official CEC candidate list.
+
+    Derived from `candidates`, not by enumerating `elected`: after
+    pre-swearing resignations `elected` is no longer a prefix of the list,
+    and "place N on the list" must stay the original CEC position
+    (counting candidates who have since resigned) — as in the K25 builder.
+    """
     prev_path = DATA / "k26_preview.json"
     if not prev_path.exists():
         print("K26: data/k26_preview.json missing (run build_k26_preview.py) — skipping list-order build")
@@ -34,8 +40,10 @@ def main_k26():
     prev = json.loads(prev_path.read_text("utf-8"))
     result = {}
     for p in prev.get("parties", []):
-        for i, name in enumerate(p.get("elected", [])):
-            result[name] = {"rank": i + 1, "faction": p["name"]}
+        candidates = p.get("candidates", [])
+        for name in p.get("elected", []):
+            if name in candidates:
+                result[name] = {"rank": candidates.index(name) + 1, "faction": p["name"]}
     if not result:
         print("K26: preview has no elected MKs — skipping list-order build")
         return

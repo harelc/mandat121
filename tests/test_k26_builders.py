@@ -104,6 +104,13 @@ class K26ListOrderTest(unittest.TestCase):
         top = prev["parties"][0]
         self.assertEqual(out["ranks"][top["elected"][0]]["rank"], 1)
         self.assertEqual(out["ranks"][top["elected"][1]]["rank"], 2)
+        # Rank is the original CEC candidate-list position, not the index
+        # within `elected` — the two diverge after pre-swearing resignations
+        # (e.g. ש״ס 2026: places 1, 6, 7 resigned, so #8 and #9 entered).
+        for p in prev["parties"]:
+            for name in p["elected"]:
+                self.assertEqual(out["ranks"][name]["rank"],
+                                 p["candidates"].index(name) + 1)
 
 
 class K26CommitteesBillIdsTest(unittest.TestCase):

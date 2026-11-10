@@ -593,7 +593,7 @@ let allFilter={q:'',status:'',committee:'',type:'',limit:30,sort:'new'};
 let view='now', viewArg=null;
 let eraFilter={q:'',kind:'',topic:'',limit:30,from:'',to:'',sort:'new'};
 let committeeFilter={q:'',type:'',limit:90};
-let cmtSeg='committees', plenumFilter={q:'',limit:30}; // committees-tab segment: committees | plenum (דברי הכנסת)
+let cmtSeg='committees', plenumFilter={q:'',limit:30}; // committees-tab segment: committees | lobbyists. דברי הכנסת is its own tab (view 'plenum'; a sitting is view 'plenumSession')
 const $=s=>document.querySelector(s);
 const esc=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/"/g,'&quot;');
 const jsq=s=>String(s??'').replace(/\\/g,'\\\\').replace(/'/g,"\\'").replace(/"/g,'&quot;'); // &quot;: names like ש"ס must not break the onclick attribute
@@ -725,7 +725,7 @@ function ensureProtoIdx(){ if(Object.keys(PROTO_IDX).length) return Promise.reso
 function ensureCmem(){ return _lazyOnce('cmem',async()=>{ const j=await _fetchJson('data/k25_committee_members.json'); if(j){ CMEM=j; CMEM.by_mk=_normKeys(CMEM.by_mk); for(const arr of Object.values(CMEM.by_committee||{})) arr.forEach(m=>m.name=normName(m.name)); if(view==='mk') renderMkDetail(); else if(view==='committee') renderCommitteeDetail(); else if(view==='committees') renderCommittees() } return CMEM }) }
 function ensureAnalytics(){ if(ANALYTICS) return Promise.resolve(ANALYTICS); return _lazyOnce('analytics',async()=>{ const j=await _fetchJson('data/k25_analytics.json'); if(j){ ANALYTICS=j; if(view==='analysis') renderAnalysis(); else if(view==='mk') renderMkDetail() } return ANALYTICS }) }
 function ensureProtoSearch(){ return _lazyOnce('protoSearch',async()=>{ const j=await _fetchJson('data/protocol_search.json'); if(j){ PROTO_SEARCH=j; if(view==='committees') renderCommittees() } return PROTO_SEARCH }) }
-function ensurePlenumSearch(){ return _lazyOnce('plenumSearch',async()=>{ const j=await _fetchJson('data/plenum_search.json'); if(j){ PLENUM_SEARCH=j; if(view==='committees') renderCommittees(); else if(view==='vote') renderVote(); else if(view==='plenum') renderPlenumSession() } return PLENUM_SEARCH }) }
+function ensurePlenumSearch(){ return _lazyOnce('plenumSearch',async()=>{ const j=await _fetchJson('data/plenum_search.json'); if(j){ PLENUM_SEARCH=j; if(view==='plenum') renderPlenum(); else if(view==='vote') renderVote(); else if(view==='plenumSession') renderPlenumSession() } return PLENUM_SEARCH }) }
 function ensureWiki(){ return _lazyOnce('wiki',async()=>{ const j=await _fetchJson('data/mk_wiki_abstracts.json'); if(j){ WIKI=_normKeys(j.by_name); WIKI_META=j._meta||{}; if(view==='mk') renderMkDetail() } return WIKI }) }
 function ensureExtras(){ if(EXTRAS) return Promise.resolve(EXTRAS); return _lazyOnce('extras',async()=>{ const j=await _fetchJson('data/k25_extras.json'); if(j){ j.queries_by_mk=_normKeys(j.queries_by_mk); j.agendas_by_mk=_normKeys(j.agendas_by_mk); EXTRAS=j; if(view==='mk') renderMkDetail(); else if(view==='billAll') renderBillLite(); else if(view==='committee') renderCommitteeDetail(); else if(view==='session') renderSessionDetail(); else if(view==='committees') renderCommittees() } return EXTRAS }) }
 function ensureBillDocs(){ if(BILL_DOCS) return Promise.resolve(BILL_DOCS); return _lazyOnce('billDocs',async()=>{ const j=await _fetchJson(`data/k${KN}_bill_docs.json`); if(j){ BILL_DOCS=j; if(view==='billAll') renderBillLite(); else if(view==='vote') renderVote() } return BILL_DOCS }) }
@@ -1092,15 +1092,16 @@ const ICON_PATHS={
   alert:'<path d="M12 4 2.8 20h18.4z"/><path d="M12 10v4.2M12 17.2v.3"/>',
   leave:'<path d="M13.5 4H20v16h-6.5"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h11"/>',
   clock:'<circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/>',
+  plenum:'<path d="M4 4.5h16V16H9.5L4 19.8z"/><path d="M8 8.5h8M8 11.8h5.5"/>',
 };
 const icon=n=>`<svg class="icn" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[n]||''}</svg>`;
-const TABS=[['now','home','עכשיו'],['bills','bill','חוקים'],['votes','vote','הצבעות'],['mks','mks','ח״כים'],['factions','factions','סיעות'],['committees','committees','ועדות'],['analysis','analysis','ניתוח'],['mine','mine','שלי']];
+const TABS=[['now','home','עכשיו'],['bills','bill','חוקים'],['votes','vote','הצבעות'],['plenum','plenum','מליאה'],['mks','mks','ח״כים'],['factions','factions','סיעות'],['committees','committees','ועדות'],['analysis','analysis','ניתוח'],['mine','mine','שלי']];
 function myCount(){return Object.keys(S.myVotes).length}
 function followCount(){return S.followBills.length+S.followMks.length+(S.followCommittees?.length||0)}
-function buildTabs(){const active=view==='vote'?'votes':view==='billAll'?'bills':view==='mk'?'mks':view==='faction'?'factions':(view==='committee'||view==='session'||view==='plenum')?'committees':view; $('#tabs').innerHTML=TABS.map(([v,ic,l])=>`<button class="tab ${active===v?'active':''}" onclick="go('${v}')"><span class="ic">${icon(ic)}</span>${l}${v==='mine'&&(myCount()||followCount())?`<span class="dot">${myCount()+followCount()}</span>`:''}</button>`).join('')}
+function buildTabs(){const active=view==='vote'?'votes':view==='billAll'?'bills':view==='mk'?'mks':view==='faction'?'factions':(view==='committee'||view==='session')?'committees':view==='plenumSession'?'plenum':view; $('#tabs').innerHTML=TABS.map(([v,ic,l])=>`<button class="tab ${active===v?'active':''}" onclick="go('${v}')"><span class="ic">${icon(ic)}</span>${l}${v==='mine'&&(myCount()||followCount())?`<span class="dot">${myCount()+followCount()}</span>`:''}</button>`).join('')}
 function updateTabsBadge(){buildTabs()}
 function go(v,arg=null){ navTo('tab='+v,()=>{view=v;viewArg=arg;buildTabs();render();window.scrollTo({top:0})}) }
-function render(){({now:renderNow,bills:renderBills,votes:renderVotes,mks:renderMks,factions:renderFactions,committees:renderCommittees,analysis:renderAnalysis,mine:renderMine,about:renderAbout}[view]||renderNow)()}
+function render(){({now:renderNow,bills:renderBills,votes:renderVotes,plenum:renderPlenum,mks:renderMks,factions:renderFactions,committees:renderCommittees,analysis:renderAnalysis,mine:renderMine,about:renderAbout}[view]||renderNow)()}
 /* Hash router: every navigation writes the hash, and `hashchange` renders.
    That is what makes the browser Back/Forward buttons work — previously the
    hash was written but never listened to, so Back changed the URL while the
@@ -1126,9 +1127,9 @@ function applyRoute(){
   else if(h.get('faction')){ view='faction'; viewArg=h.get('faction'); buildTabs(); renderFactionDetail() }
   else if(h.get('committee')){ view='committee'; viewArg=h.get('committee'); buildTabs(); renderCommitteeDetail() }
   else if(h.get('session')){ view='session'; viewArg=h.get('session'); buildTabs(); renderSessionDetail() }
-  else if(h.get('plenum')){ view='plenum'; viewArg=h.get('plenum'); buildTabs(); renderPlenumSession() }
+  else if(h.get('plenum')){ view='plenumSession'; viewArg=h.get('plenum'); buildTabs(); renderPlenumSession() }
   else if(h.get('vote')){ view='vote'; viewArg=h.get('vote'); buildTabs(); renderVote() }
-  else { view=['now','bills','votes','mks','factions','committees','analysis','mine','about'].includes(h.get('tab'))?h.get('tab'):'now'; viewArg=null; buildTabs(); render() }
+  else { view=['now','bills','votes','plenum','mks','factions','committees','analysis','mine','about'].includes(h.get('tab'))?h.get('tab'):'now'; viewArg=null; buildTabs(); render() }
   window.scrollTo({top:0});
 }
 window.addEventListener('hashchange',applyRoute);
@@ -1142,7 +1143,7 @@ function openFaction(name){ navTo('faction='+encodeURIComponent(name),()=>{viewA
    first, exactly like the switchKnesset(25);openMk(…) pattern for people. */
 function openFactionIn(kn,name){ if(KN!==kn) switchKnesset(kn); openFaction(name) }
 function openCommittee(id){ navTo('committee='+id,()=>{viewArg=String(id); view='committee'; buildTabs(); renderCommitteeDetail(); window.scrollTo({top:0})}) }
-function openPlenum(sid){ navTo('plenum='+sid,()=>{viewArg=String(sid); view='plenum'; buildTabs(); renderPlenumSession(); window.scrollTo({top:0})}) }
+function openPlenum(sid){ navTo('plenum='+sid,()=>{viewArg=String(sid); view='plenumSession'; buildTabs(); renderPlenumSession(); window.scrollTo({top:0})}) }
 
 /* ============ global grouped autocomplete ============
    One index over the objects already in memory — MKs, factions/lists,
@@ -1389,13 +1390,15 @@ function homeKpisHTML({members,factions,bills,votes,detailed,lastVote}){
   return `<div class="kpis"><div class="kpi"><b>${n(members)}</b><span>חברי כנסת</span></div><div class="kpi"><b>${n(factions)}</b><span>סיעות</span></div><div class="kpi"><b>${n(bills)}</b><span>הצעות חוק</span></div><div class="kpi"><b>${n(votes)}</b><span>הצבעות מליאה</span></div><div class="kpi"><b>${n(detailed)}</b><span>הצבעות עם פירוט לפי ח״כ</span></div><div class="kpi"><b>${lastVote||'—'}</b><span>יום ההצבעות האחרון</span></div></div>`;
 }
 /* A K26 person page exists for everyone who can sit in the hemicycle:
-   the elected (first `seats` per list) AND anyone the official serving
-   roster seats later — a Norwegian-law replacement is a candidate beyond
-   the elected cut, so resolving only `elected` 404'd exactly those pages.
-   Returns {party, rank (CEC list position), elected, serving}. */
+   the elected (the preview's `elected` list — after pre-swearing
+   resignations not simply the first `seats` candidates) AND anyone the
+   official serving roster seats later — a Norwegian-law replacement is a
+   candidate beyond the elected cut, so resolving only `elected` 404'd
+   exactly those pages.
+   Returns {party, rank (original CEC list position), elected, serving}. */
 function k26Entry(name){
   const serving=(K26_TENURE[name]||[]).some(x=>!x[1]);
-  if(K26) for(const p of K26.parties){ const i=(p.candidates||[]).indexOf(name); if(i>=0) return {party:p,rank:i+1,elected:i<p.seats,serving} }
+  if(K26) for(const p of K26.parties){ const i=(p.candidates||[]).indexOf(name); if(i>=0) return {party:p,rank:i+1,elected:(p.elected||[]).includes(name),serving} }
   if(serving){ const fname=K26_FACTIONS[name]||''; const p=(K26?.parties||[]).find(x=>x.name===fname||shortF(x.name)===shortF(fname));
     return {party:p||{name:fname||'כנסת 26',color:fcol(fname),candidates:[],elected:[],seats:0},rank:RANK26[name]||null,elected:false,serving:true} }
   return null;
@@ -1420,7 +1423,7 @@ function renderNow26(){
   ensureLivePresence(); // live in-the-building overlay; re-renders when it lands
   const parties=K26?K26.parties.filter(p=>p.seats>0):[];
   const serving=k26ServingSeats();
-  const seats=serving||[]; if(!serving&&K26){ const arc=[...K26.parties].sort((a,b)=>partyRank(a.name,26)-partyRank(b.name,26)); for(const p of arc) p.elected.forEach((name,i)=>seats.push({name,faction:p.name,color:p.color,result:0,rank:i+1,listN:p.candidates.length})) }
+  const seats=serving||[]; if(!serving&&K26){ const arc=[...K26.parties].sort((a,b)=>partyRank(a.name,26)-partyRank(b.name,26)); for(const p of arc) p.elected.forEach(name=>seats.push({name,faction:p.name,color:p.color,result:0,rank:(p.candidates||[]).indexOf(name)+1,listN:p.candidates.length})) }
   // Live presence overlay — official serving roster only (see
   // LIVE_PRESENCE), and only when the feed actually covers this map.
   const presenceKnown=!!(serving&&LIVE_PRESENCE.map&&seats.filter(s=>s.name in LIVE_PRESENCE.map).length>=Math.max(60,seats.length*0.5));
@@ -2111,7 +2114,7 @@ function renderMks26(){
   // exists (incl. Norwegian-law replacements), else the elected preview.
   const servingSeats=k26ServingSeats();
   const elected=servingSeats? servingSeats.map(s=>({n:s.name,p:s.faction,color:s.color,rank:s.rank||RANK26[s.name]||999,serving:true}))
-    : []; if(!servingSeats) K26.parties.forEach(p=>p.elected.forEach((n,i)=>elected.push({n,p:p.name,color:p.color,rank:i+1,seats:p.seats})));
+    : []; if(!servingSeats) K26.parties.forEach(p=>p.elected.forEach(n=>elected.push({n,p:p.name,color:p.color,rank:(p.candidates||[]).indexOf(n)+1,seats:p.seats})));
   const parties=[...new Set(elected.map(x=>x.p))];
   const list=elected.filter(x=>{ if(mkFilter.q&&!normQ(disp(x.n)).includes(normQ(mkFilter.q))&&!normQ(x.n).includes(normQ(mkFilter.q)))return false; if(mkFilter.faction&&x.p!==mkFilter.faction)return false; return true});
   const byList=(a,b)=>partyRank(a.p,26)-partyRank(b.p,26)||a.rank-b.rank;
@@ -2299,7 +2302,7 @@ function renderMkDetail(){
     ${mkInitiatedHTML(name,true)}
     ${mkRolesHTML(name)}
     ${mkCommitteesHTML(name)}
-    <div class="card pad" style="margin-top:.85rem"><h3>${esc(e.party.name)} — סדר הרשימה</h3><div class="rows" style="margin:.5rem -.9rem 0">${e.party.candidates.slice(0,Math.max(e.party.seats, e.rank||0)).map((n,i)=>{const has=k26HasPage(n), srv=(K26_TENURE[n]||[]).some(x=>!x[1]); return `<div class="row" style="cursor:${has?'pointer':'default'};${i===e.rank-1?'background:var(--surface2)':''}" ${has?`onclick="openMk('${jsq(n)}')"`:''}><b style="width:1.6rem;color:${i<e.party.seats?'var(--accent)':'var(--dim)'}">${i+1}</b><span class="flex">${esc(disp(n))} ${n===name?'← כאן':''}</span>${srv?'<span class="chip for">מכהן/ת</span>':i<e.party.seats?'<span class="chip for">נבחר/ה</span>':'<span class="dim small">מחוץ למנדטים</span>'}</div>`}).join('')}</div></div>`;
+    <div class="card pad" style="margin-top:.85rem"><h3>${esc(e.party.name)} — סדר הרשימה</h3><div class="rows" style="margin:.5rem -.9rem 0">${e.party.candidates.slice(0,Math.max(e.party.seats, e.rank||0)).map((n,i)=>{const has=k26HasPage(n), srv=(K26_TENURE[n]||[]).some(x=>!x[1]); return `<div class="row" style="cursor:${has?'pointer':'default'};${i===e.rank-1?'background:var(--surface2)':''}" ${has?`onclick="openMk('${jsq(n)}')"`:''}><b style="width:1.6rem;color:${(e.party.elected||[]).includes(n)?'var(--accent)':'var(--dim)'}">${i+1}</b><span class="flex">${esc(disp(n))} ${n===name?'← כאן':''}</span>${srv?'<span class="chip for">מכהן/ת</span>':(e.party.elected||[]).includes(n)?'<span class="chip for">נבחר/ה</span>':'<span class="dim small">מחוץ למנדטים</span>'}</div>`}).join('')}</div></div>`;
     window.scrollTo(0,0); return }
   const m=mkIndex[name]; if(!m){app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצאו הצבעות מתועדות לח״כ הזה/זו באתר — לא בכנסת 25 ולא בכנסת 26.</div>';return}
   const pfaction=realFaction(MKP[name]?.faction||m.faction||FACTION25[name]||'');
@@ -2329,7 +2332,7 @@ function renderMkDetail(){
     else if(maj!==3) deviations.push({v,maj,faction:(own&&own.faction)||''});
   }
   deviations.sort((a,b)=>(b.v.bill.vote_date||'').localeCompare(a.v.bill.vote_date||''));
-  const k26elected=K26? Object.values(K26.parties).flatMap(p=>p.elected.map((n,i)=>({n,p:p.name,rank:i+1,seats:p.seats,color:p.color}))).find(x=>x.n===name):null;
+  const k26elected=K26? Object.values(K26.parties).flatMap(p=>p.elected.map(n=>({n,p:p.name,rank:(p.candidates||[]).indexOf(n)+1,seats:p.seats,color:p.color}))).find(x=>x.n===name):null;
   const topics={}; m.votes.forEach(v=>(v.bill.topics||[]).forEach(t=>topics[t]=(topics[t]||0)+1));
   const topTopics=Object.entries(topics).sort((a,b)=>b[1]-a[1]).slice(0,6);
   app.innerHTML=`
@@ -2623,7 +2626,7 @@ async function searchCorpus(corpus,terms){
 }
 function rerenderKeepingFocus(){
   const a=document.activeElement, key=a&&a.dataset?a.dataset.keep:null, pos=a?a.selectionStart:null;
-  renderCommittees();
+  render();
   if(key){ const n=document.querySelector(`input[data-keep="${key}"]`); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos) }catch(e){} } }
 }
 /* Protocol search box: results are computed async (shard fetches), cached
@@ -2653,7 +2656,7 @@ function protoSearchHTML(){
   if(q) scheduleProtoSearch();
   const results=protoResultsFor===q?protoResultsHTML:'<p class="muted small" style="margin-top:.4rem">מחפש בפרוטוקולים…</p>';
   return `<div class="card pad" style="margin-bottom:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg> חיפוש בפרוטוקולים <small class="dim">${Object.keys(PROTO_SEARCH).length||268} פרוטוקולי ועדות · ${Object.keys(PLENUM_SEARCH).length||418} ישיבות מליאה (דברי הכנסת) · כל מילה, לא רק השכיחות</small></h3>
-  <input type="search" data-keep="protoQ" placeholder="מילה או תחילית — למשל: תקציב, גיוס, שכירות…" value="${esc(protoQuery)}" style="width:100%;margin-top:.55rem" oninput="protoQuery=this.value;keepSearchFocus(this,renderCommittees)">
+  <input type="search" data-keep="protoQ" placeholder="מילה או תחילית — למשל: תקציב, גיוס, שכירות…" value="${esc(protoQuery)}" style="width:100%;margin-top:.55rem" oninput="protoQuery=this.value;keepSearchFocus(this,()=>render())">
   <div id="protoResults">${q?results:''}</div></div>`;
 }
 
@@ -2709,7 +2712,8 @@ function renderFactionDetail(){
       <h1 style="font-size:1.55rem;color:${p.color}">${esc(p.name)}</h1>
       <div class="progress" style="margin:.7rem 0"><i style="width:${p.seats/120*100}%;background:${p.color}"></i></div>
       <p class="small muted">הנבחרים לפי סדר הרשימה הרשמי. היסטוריית הצבעות תתחיל להיבנות עם הצבעות כנסת 26 הראשונות; מי שכיהנו בכנסת 25 מקושרים להיסטוריית ההצבעות שלהם.</p>
-      <div class="rows" style="margin:.6rem -.9rem 0">${p.elected.map((n,i)=>`<div class="row" onclick="openMk('${jsq(n)}')"><b style="width:1.7rem;color:${p.color}">${i+1}</b>${avatar(n,p.name,34)}<span class="flex">${esc(disp(n))}${IDX25[n]?`<br><span class="dim small">בכנסת 25: ${IDX25[n].votes.length} הצבעות</span>`:'<br><span class="dim small">חדש/ה בכנסת</span>'}</span><span class="chip acc">לכרטיס ←</span></div>`).join('')}</div>
+      <div class="rows" style="margin:.6rem -.9rem 0">${p.elected.map(n=>{const r=(p.candidates||[]).indexOf(n)+1; return `<div class="row" onclick="openMk('${jsq(n)}')"><b style="width:1.7rem;color:${p.color}">${r}</b>${avatar(n,p.name,34)}<span class="flex">${esc(disp(n))}${IDX25[n]?`<br><span class="dim small">בכנסת 25: ${IDX25[n].votes.length} הצבעות</span>`:'<br><span class="dim small">חדש/ה בכנסת</span>'}</span><span class="chip acc">לכרטיס ←</span></div>`}).join('')}</div>
+      ${p.elected.some((n,i)=>(p.candidates||[]).indexOf(n)!==i)?'<p class="small dim" style="margin-top:.6rem">המספרים הם המקומות ברשימת המועמדים הרשמית כפי שהוגשה לוועדת הבחירות; פער במספור הוא מועמד שפרש מהרשימה לפני ההשבעה, והבא אחריו נכנס במקומו.</p>':''}
     </article>`;
     return;
   }
@@ -2768,13 +2772,14 @@ function renderFactionDetail(){
 
 /* ============ COMMITTEES ============ */
 function renderCommitteesKeep(inp){ keepSearchFocus(inp,renderCommittees) }
-/* Plenum (דברי הכנסת) as a first-class citizen of this tab: a browsable
-   index of all 418 sittings, a page per sitting tying it to that day's
-   votes, and links in from every vote page. Search index only — the
-   sitting page links out to the official document (see ROADMAP). */
+/* Plenum (דברי הכנסת) is a first-class tab of its own (view 'plenum';
+   a sitting is view 'plenumSession'): a browsable index of all 418
+   sittings, a page per sitting tying it to that day's votes, and links
+   in from every vote page. Search index only — transcripts are parsed
+   on demand by the plenum function, not pre-shipped (see ROADMAP). */
 function plenumEntries(){ return Object.entries(PLENUM_SEARCH).map(([sid,p])=>({sid,...p})).sort((a,b)=>b.number-a.number) }
 function plenumForDate(date){ const hit=Object.entries(PLENUM_SEARCH).find(([,p])=>p.date===date); return hit?{sid:hit[0],...hit[1]}:null }
-const cmtSegHTML=()=>`<div class="chips" role="group" aria-label="ועדות, מליאה או שדלנים" style="margin-bottom:.9rem"><button class="chip ${cmtSeg==='committees'?'on':''}" onclick="cmtSeg='committees';renderCommittees()">ועדות</button><button class="chip ${cmtSeg==='plenum'?'on':''}" onclick="cmtSeg='plenum';plenumFilter.limit=30;renderCommittees()">מליאה · דברי הכנסת (${Object.keys(PLENUM_SEARCH).length||418} ישיבות)</button><button class="chip ${cmtSeg==='lobbyists'?'on':''}" onclick="cmtSeg='lobbyists';lobbyFilter.limit=40;renderCommittees()">🕴️ שדלנים · מרשם עדכני${EXTRAS?.lobbyists?` (${EXTRAS.lobbyists.length.toLocaleString('he-IL')})`:''}</button></div>`;
+const cmtSegHTML=()=>`<div class="chips" role="group" aria-label="ועדות או שדלנים" style="margin-bottom:.9rem"><button class="chip ${cmtSeg==='committees'?'on':''}" onclick="cmtSeg='committees';renderCommittees()">ועדות</button><button class="chip ${cmtSeg==='lobbyists'?'on':''}" onclick="cmtSeg='lobbyists';lobbyFilter.limit=40;renderCommittees()">🕴️ שדלנים · מרשם עדכני${EXTRAS?.lobbyists?` (${EXTRAS.lobbyists.length.toLocaleString('he-IL')})`:''}</button></div>`;
 /* Plenum-browser search also runs on the shards (async, cached per query);
    on completion it re-renders with focus restored to the search box. */
 let plenumHitsFor='', plenumHits=null, _plenumBusyFor='', _plenumTimer=null;
@@ -2788,7 +2793,7 @@ function schedulePlenumSearch(){
     const scored=await searchCorpus('p',protoTerms(q));
     plenumHits={}; for(const e of scored) plenumHits[e.sid]={score:e.score,hits:e.hits};
     plenumHitsFor=q; _plenumBusyFor='';
-    if(view==='committees'&&cmtSeg==='plenum') rerenderKeepingFocus();
+    if(view==='plenum') rerenderKeepingFocus();
     if(plenumFilter.q.trim()!==q) schedulePlenumSearch();
   },180);
 }
@@ -2799,22 +2804,27 @@ function plenumBrowserHTML(){
   let list=plenumEntries().map(e=>({...e,score:0,hits:[],votesThatDay:vc[e.date]||0}));
   if(q&&plenumHitsFor===q&&plenumHits){ for(const e of list){ const h=plenumHits[e.sid]; if(h){ e.score=h.score; e.hits=h.hits } }
     list=list.filter(e=>e.score>0||String(e.number)===q).sort((a,b)=>b.score-a.score||b.number-a.number) }
-  else if(q){ return `<input type="search" data-keep="plenumQ" placeholder="חיפוש בדברי הכנסת — מילה, או מספר ישיבה…" value="${esc(plenumFilter.q)}" style="width:100%;margin-bottom:.7rem" oninput="plenumFilter.q=this.value;plenumFilter.limit=30;keepSearchFocus(this,renderCommittees)"><div class="card empty">מחפש בדברי הכנסת…</div>` }
+  else if(q){ return `<input type="search" data-keep="plenumQ" placeholder="חיפוש בדברי הכנסת — מילה, או מספר ישיבה…" value="${esc(plenumFilter.q)}" style="width:100%;margin-bottom:.7rem" oninput="plenumFilter.q=this.value;plenumFilter.limit=30;keepSearchFocus(this,renderPlenum)"><div class="card empty">מחפש בדברי הכנסת…</div>` }
   const shown=list.slice(0,plenumFilter.limit);
-  return `<input type="search" data-keep="plenumQ" placeholder="חיפוש בדברי הכנסת — מילה, או מספר ישיבה…" value="${esc(plenumFilter.q)}" style="width:100%;margin-bottom:.7rem" oninput="plenumFilter.q=this.value;plenumFilter.limit=30;keepSearchFocus(this,renderCommittees)">
+  return `<input type="search" data-keep="plenumQ" placeholder="חיפוש בדברי הכנסת — מילה, או מספר ישיבה…" value="${esc(plenumFilter.q)}" style="width:100%;margin-bottom:.7rem" oninput="plenumFilter.q=this.value;plenumFilter.limit=30;keepSearchFocus(this,renderPlenum)">
   <div class="small dim" style="margin-bottom:.6rem">${q?`${list.length.toLocaleString('he-IL')} ישיבות נמצאו`:`${list.length.toLocaleString('he-IL')} ישיבות מליאה בכנסת 25 · מהאחרונה לראשונה`} · לחיצה על ישיבה: ההצבעות של אותו היום והמסמך הרשמי</div>
   ${shown.length?`<div class="card rows">${shown.map(e=>`<div class="row" onclick="openPlenum('${e.sid}')"><span class="chip acc">${fmtDate(e.date)}</span><span class="flex">ישיבת מליאה מס׳ ${e.number}<br><span class="dim small">${e.votesThatDay?`${e.votesThatDay} הצבעות באותו היום`:'ללא הצבעות באותו היום'}${e.hits.length?` · ${e.hits.map(([w,c])=>`${esc(w)} ×${c}`).join(' · ')}`:''}</span></span>${e.score?`<b>${e.score}</b>`:''}<span class="chip acc">לישיבה ←</span></div>`).join('')}</div>
-  ${list.length>shown.length?`<div style="text-align:center;margin-top:1rem"><button class="btn" onclick="plenumFilter.limit+=30;renderCommittees()">עוד ${Math.min(30,list.length-shown.length)} ישיבות</button></div>`:''}`:'<div class="card empty"><div class="big">🔍</div>לא נמצאו ישיבות בסינון הזה.</div>'}`;
+  ${list.length>shown.length?`<div style="text-align:center;margin-top:1rem"><button class="btn" onclick="plenumFilter.limit+=30;renderPlenum()">עוד ${Math.min(30,list.length-shown.length)} ישיבות</button></div>`:''}`:'<div class="card empty"><div class="big">🔍</div>לא נמצאו ישיבות בסינון הזה.</div>'}`;
+}
+function renderPlenum(){
+  if(KN===26){ $('#app').innerHTML=`<div class="sec-title">מליאה <small>דברי הכנסת · כנסת 26</small></div><div class="card empty"><div class="big">${icon('plenum')}</div>דברי הכנסת של כנסת 26 עוד לא פורסמו.<br><span class="small">כשתתכנס הכנסת ויתפרסמו ישיבות המליאה הראשונות, יופיעו כאן כל הישיבות עם חיפוש מלא בפרוטוקולים — כמו בכנסת 25.</span><br><button class="btn primary" style="margin-top:.8rem" onclick="switchKnesset(25)">לדברי הכנסת של כנסת 25 ←</button></div>`; return }
+  ensureProtoSearch(); ensurePlenumSearch();
+  $('#app').innerHTML=`<div class="sec-title">מליאה <small>דברי הכנסת · כל ישיבות כנסת 25 · ${Object.keys(PLENUM_SEARCH).length||418} ישיבות</small></div>${protoSearchHTML()}${plenumBrowserHTML()}`;
 }
 function renderPlenumSession(){
   ensurePlenumSearch();
   const app=$('#app'), p=PLENUM_SEARCH[String(viewArg)];
-  if(!p){ app.innerHTML='<button class="btn ghost" onclick="cmtSeg=\'plenum\';go(\'committees\')">› כל ישיבות המליאה</button><div class="card empty" style="margin-top:.6rem"><div class="big">🗳️</div>הישיבה לא נמצאה באינדקס דברי הכנסת.</div>'; return }
+  if(!p){ app.innerHTML='<button class="btn ghost" onclick="go(\'plenum\')">› כל ישיבות המליאה</button><div class="card empty" style="margin-top:.6rem"><div class="big">🗳️</div>הישיבה לא נמצאה באינדקס דברי הכנסת.</div>'; return }
   const entries=plenumEntries(), idx=entries.findIndex(e=>e.sid===String(viewArg));
   const newer=entries[idx-1], older=entries[idx+1]; // entries sorted newest-first
   const votes=VOTES_ALL.filter(v=>v.date===p.date).sort((a,b)=>(a.id||0)-(b.id||0));
   app.innerHTML=`
-  <button class="btn ghost" onclick="cmtSeg='plenum';go('committees')">› כל ישיבות המליאה</button>
+  <button class="btn ghost" onclick="go('plenum')">› כל ישיבות המליאה</button>
   <article class="card pad rise" style="margin-top:.6rem">
     <div class="card-top"><span class="chip acc">דברי הכנסת</span><span class="date">${fmtDate(p.date)}</span></div>
     <h1 style="font-size:1.4rem;line-height:1.35">ישיבת מליאה מס׳ ${p.number}</h1>
