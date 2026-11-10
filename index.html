@@ -221,8 +221,22 @@ mark{background:var(--abstain);color:#241a02;border-radius:4px;padding:0 .14em;f
 .step-sub{display:block;margin-top:.1rem;font-size:.62rem;font-weight:600;color:var(--dim);white-space:nowrap}
 .step-meta{font-size:.7rem;color:var(--dim);margin-top:.35rem}
 
-/* agenda (this week) */
-.agenda-day{padding:.9rem 1.05rem}
+/* agenda (this week) — one packed pane: header + toolbar + body, days are
+   divided sub-panels inside it, never cards-in-a-card */
+.agenda-pane{padding:1.05rem 1.15rem;margin-top:1.1rem}
+.agenda-head{display:flex;gap:.7rem 1rem;align-items:flex-start;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:.75rem;margin-bottom:.8rem}
+.agenda-head h2{font-family:'Frank Ruhl Libre','Rubik',serif;font-size:1.3rem;font-weight:800;line-height:1.25}
+.agenda-head .sub{font-size:.8rem;color:var(--dim);margin-top:.15rem;max-width:52ch}
+.agenda-tools{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;margin-inline-start:auto}
+.agenda-note{background:var(--abstain-dim);border:1px solid #dcc175;border-radius:12px;padding:.6rem .8rem;margin-bottom:.7rem}
+.agenda-empty{border:1px dashed var(--line);border-radius:14px}
+/* While a month shard loads, the previous body stays painted (dimmed,
+   inert) at its full height — swapping in a short loading box collapsed
+   the pane and made everything below it jump up, then back down. */
+.agenda-stale{position:relative;opacity:.5;pointer-events:none}
+.agenda-loading-pill{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:.45rem 1rem;font-size:.85rem;font-weight:800;color:var(--text);box-shadow:var(--shadow);white-space:nowrap}
+.agenda-loading{min-height:24rem;display:flex;flex-direction:column;align-items:center;justify-content:center}
+.agenda-day{padding:.9rem 1.05rem;background:var(--surface2);border:1px solid var(--line);border-radius:16px}
 .agenda-day.today{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim),var(--shadow)}
 .agenda-day.past{opacity:.82}
 .agenda-day h3{font-size:1rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
@@ -531,7 +545,7 @@ let K26B=[], K26V=[], K26CMT=null, K26CMEM={by_mk:{},by_committee:{}}; // K26 la
 let RANK26={}; // surname-first name -> CEC list position (build_k25_list_order.py --knesset 26); preview rank is the fallback
 const listRank26=n=>RANK26[n]??999;
 let CMT=null, CMT_BY_ID={}, IDX25={};
-let AGENDA=null, agendaMode='week', agendaAnchor=null; // agenda calendar (build_agenda.py): mode day|week|month, anchor = focused 'YYYY-MM-DD'
+let AGENDA=null, agendaMode='week', agendaAnchor=null, agendaLastBody=''; // agenda calendar (build_agenda.py): mode day|week|month, anchor = focused 'YYYY-MM-DD'; last painted body, kept on screen while the next month's shard loads
 const AG_LOADED=new Set(), AG_LOADING=new Set(); // months whose data/agenda/YYYY-MM.json shard is merged in (recent months ship inline in agenda.json)
 let CMEM={by_mk:{},by_committee:{}}; // committee memberships (build_k25_committee_members.py)
 let ALLB=[], ALLB_BY_ID={}, VOTES_ALL=[], MK_INITIATED={};
@@ -1515,12 +1529,12 @@ function agendaDayCard(d,maxP=6,maxC=4){
   const {plenum,cmts}=agOn(d), today=AGENDA.today;
   const cls=d===today?'today':d<today?'past':'';
   const dayChip=d===today?'<span class="chip acc">היום</span>':d<today?'<span class="chip">התקיים</span>':'<span class="chip">מתוכנן</span>';
-  return `<div class="card agenda-day ${cls}"><h3>${AG_DAYS[agDate(d).getDay()]} · ${fmtDate(d)} ${dayChip}</h3>
+  return `<div class="agenda-day ${cls}"><h3>${AG_DAYS[agDate(d).getDay()]} · ${fmtDate(d)} ${dayChip}</h3>
   ${!plenum.length&&!cmts.length?'<div class="small dim" style="margin-top:.4rem">אין ישיבות שפורסמו ליום זה</div>':''}
   ${plenum.map(s=>agendaPlenumHTML(s,maxP)).join('')}${cmts.map(s=>agendaCmtHTML(s,maxC)).join('')}</div>`;
 }
 function agendaEmptyHTML(period){
-  return `<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></div>לא פורסמו ישיבות ${period} ב־OData הרשמי — הכנסת לא מתכנסת כל הזמן (פגרה / חגים), וישיבות מופיעות במאגר רק כשהכנסת מפרסמת אותן.<br><button class="btn" style="margin-top:.7rem" onclick="agendaJumpLatest()">לישיבה האחרונה שפורסמה (${fmtDate(agendaLatestDate())}) ←</button></div>`;
+  return `<div class="empty agenda-empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></div>לא פורסמו ישיבות ${period} ב־OData הרשמי — הכנסת לא מתכנסת כל הזמן (פגרה / חגים), וישיבות מופיעות במאגר רק כשהכנסת מפרסמת אותן.<br><button class="btn" style="margin-top:.7rem" onclick="agendaJumpLatest()">לישיבה האחרונה שפורסמה (${fmtDate(agendaLatestDate())}) ←</button></div>`;
 }
 function agendaSummaryHTML(from,to){
   const sess=agAll().filter(s=>{const d=s.start.slice(0,10);return d>=from&&d<=to});
@@ -1528,12 +1542,25 @@ function agendaSummaryHTML(from,to){
   const nItems=sess.reduce((n,s)=>n+(s.items||[]).length,0);
   return `<div class="small muted" style="margin-bottom:.6rem"><b style="color:var(--text)" id="agendaPeriod">${esc(agendaPeriodLabel())}</b> · ${pl} ישיבות מליאה · ${sess.length-pl} ישיבות ועדה · ${nItems} פריטים על סדר היום · מקור: OData רשמי, נבנה ${fmtDate((AGENDA.generated_at||'').slice(0,10))}</div>`;
 }
+/* Paint the body for the current anchor. While the needed month shard is
+   in flight, keep the previous body on screen (see .agenda-stale) instead
+   of a short loading box, so the pane's height — and everything below it
+   on Now — doesn't jump. Only the very first paint has nothing to keep. */
 function agendaBodyHTML(){
-  if(agendaPending()){ agendaEnsure(); return `<div class="card empty"><div class="big">📅</div>טוען את סדר היום של ${esc(agendaPeriodLabel())}…</div>` }
+  if(agendaPending()){
+    agendaEnsure();
+    if(agendaLastBody) return `<div class="agenda-stale" aria-busy="true">${agendaLastBody}<div class="agenda-loading-pill">טוען את ${esc(agendaPeriodLabel())}…</div></div>`;
+    return `<div class="empty agenda-empty agenda-loading"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></div>טוען את סדר היום של ${esc(agendaPeriodLabel())}…</div>`;
+  }
+  const html=agendaBodyHTMLInner();
+  agendaLastBody=html;
+  return html;
+}
+function agendaBodyHTMLInner(){
   const today=AGENDA.today, tw=AGENDA.this_week[0];
   const thisWeekEmpty=!agCount(tw,agAdd(tw,4));
   const note=(thisWeekEmpty&&agendaAnchor!==today)
-    ?`<div class="card pad small muted" style="margin-bottom:.7rem">לשבוע הנוכחי (${fmtDate(tw)} – ${fmtDate(agAdd(tw,4))}) טרם פורסם סדר יום ב־OData הרשמי — הכנסת לא מתכנסת כל שבוע (פגרה / חגים), וישיבות מופיעות במאגר רק כשהכנסת מפרסמת אותן · נכון ל־${fmtDate(today)}.</div>`:'';
+    ?`<div class="agenda-note small muted">לשבוע הנוכחי (${fmtDate(tw)} – ${fmtDate(agAdd(tw,4))}) טרם פורסם סדר יום ב־OData הרשמי — הכנסת לא מתכנסת כל שבוע (פגרה / חגים), וישיבות מופיעות במאגר רק כשהכנסת מפרסמת אותן · נכון ל־${fmtDate(today)}.</div>`:'';
   if(agendaMode==='day'){
     agendaAnchor=agWorkdayOnOrBefore(agendaAnchor); // Fri/Sat have no day view — land on Thursday
     const {plenum,cmts}=agOn(agendaAnchor);
@@ -1569,14 +1596,25 @@ function agendaHTML(){
   if(!AGENDA) return '';
   if(!agendaAnchor) agendaAnchor=agendaDefaultAnchor();
   const [prev,next]=AG_NAVLBL[agendaMode];
-  return `<div class="sec-title">בכנסת — סדר היום <small>מליאה וועדות לפי יום / שבוע / חודש — כמו באתר הכנסת, רק עם כל חוק מקושר לדף שלו</small></div>
-  <div style="display:flex;gap:.6rem;align-items:center;flex-wrap:wrap;margin-bottom:.7rem">
+  /* One packed pane, first content on Now: this is the page's only
+     forward-looking, time-sensitive section — everything below it on Now
+     (hemicycle, vote pace, close/latest votes) is what already happened.
+     Header (title + what it is), toolbar (mode + stepping) and body all
+     live inside the same card; renderAgenda() only repaints #agendaBox
+     and the two nav labels, so the pane frame never flickers. */
+  return `<section class="card agenda-pane rise" aria-labelledby="agendaTitle">
+  <div class="agenda-head">
+    <div><h2 id="agendaTitle"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg> בכנסת — סדר היום</h2>
+    <p class="sub">מה מתוכנן במליאה ובוועדות — כמו באתר הכנסת, רק עם כל חוק מקושר לדף שלו. זה החלק היחיד ב״עכשיו״ שמסתכל קדימה; מתחתיו — מה כבר קרה.</p></div>
+    <div class="agenda-tools">
     <span class="agenda-modes" role="tablist" aria-label="תצוגת לוח">
       <button data-m="day" class="${agendaMode==='day'?'on':''}" onclick="agendaSetMode('day')">יום</button><button data-m="week" class="${agendaMode==='week'?'on':''}" onclick="agendaSetMode('week')">שבוע</button><button data-m="month" class="${agendaMode==='month'?'on':''}" onclick="agendaSetMode('month')">חודש</button>
     </span>
     <span class="agenda-nav"><button class="btn ghost small" style="padding:.3rem .7rem" onclick="agendaNav(-1)" id="agendaPrev">${prev}</button><button class="btn ghost small" style="padding:.3rem .7rem" onclick="agendaNav(1)" id="agendaNext">${next}</button><button class="btn ghost small" style="padding:.3rem .7rem" onclick="agendaAnchor=AGENDA.today;renderAgenda()">היום</button></span>
+    </div>
   </div>
-  <div id="agendaBox">${agendaBodyHTML()}</div>`;
+  <div id="agendaBox">${agendaBodyHTML()}</div>
+  </section>`;
 }
 
 /* ============ NOW ============ */
