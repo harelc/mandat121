@@ -65,7 +65,7 @@ main{max-width:1120px;margin:0 auto;padding:1rem 1rem 6.5rem;width:100%}
 
 /* bottom / side nav */
 nav.tabs{position:fixed;bottom:0;right:0;left:0;z-index:50;background:rgba(247,243,233,.94);backdrop-filter:blur(16px);border-top:1px solid var(--line);padding:.4rem .4rem calc(.4rem + env(safe-area-inset-bottom))}
-.tabs-in{max-width:700px;margin:0 auto;display:grid;grid-template-columns:repeat(8,1fr);gap:.25rem}
+.tabs-in{max-width:700px;margin:0 auto;display:grid;grid-template-columns:repeat(9,1fr);gap:.25rem}
 .tab{border:0;background:transparent;border-radius:14px;padding:.42rem .1rem .3rem;font-size:.72rem;font-weight:600;color:var(--dim);display:flex;flex-direction:column;align-items:center;gap:.12rem;position:relative}
 .tab .ic{display:flex;line-height:0}
 .tab .ic svg{width:1.3rem;height:1.3rem}
@@ -340,6 +340,14 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
 .fbar{display:flex;align-items:center;gap:.6rem;font-size:.83rem;padding:.35rem 0}
 .fbar .nm{width:7.2rem;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .fbar .tr{flex:1}
+/* faction tallies on the vote page: three fixed columns (בעד/נגד/נמנע),
+   never "3/0/0" — numbers align down the card whatever their digits */
+.ftallies{display:grid;grid-template-columns:repeat(3,2.1rem);text-align:center;font-weight:800;font-size:.86rem;flex-shrink:0;font-variant-numeric:tabular-nums}
+.ftallies .f{color:var(--for)} .ftallies .a{color:var(--against)} .ftallies .n{color:var(--abstain)}
+.ftallies .zero{color:var(--dim);opacity:.4;font-weight:600}
+.fbar.fthead{padding:0 0 .15rem;font-size:.7rem;color:var(--dim)}
+.fbar.fthead .ftallies{font-size:.7rem;font-weight:700}
+.fbar.fthead .ftallies span{color:var(--dim)}
 .donut-wrap{display:flex;align-items:center;gap:1rem}
 
 /* committees — a broadsheet index in three strata, not a card deck.
@@ -1095,7 +1103,7 @@ const ICON_PATHS={
   plenum:'<path d="M4 4.5h16V16H9.5L4 19.8z"/><path d="M8 8.5h8M8 11.8h5.5"/>',
 };
 const icon=n=>`<svg class="icn" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[n]||''}</svg>`;
-const TABS=[['now','home','עכשיו'],['bills','bill','חוקים'],['votes','vote','הצבעות'],['plenum','plenum','מליאה'],['mks','mks','ח״כים'],['factions','factions','סיעות'],['committees','committees','ועדות'],['analysis','analysis','ניתוח'],['mine','mine','שלי']];
+const TABS=[['now','home','עכשיו'],['bills','bill','חוקים'],['votes','vote','הצבעות'],['mks','mks','ח״כים'],['factions','factions','סיעות'],['plenum','plenum','דברי הכנסת'],['committees','committees','ועדות'],['analysis','analysis','ניתוח'],['mine','mine','שלי']];
 function myCount(){return Object.keys(S.myVotes).length}
 function followCount(){return S.followBills.length+S.followMks.length+(S.followCommittees?.length||0)}
 function buildTabs(){const active=view==='vote'?'votes':view==='billAll'?'bills':view==='mk'?'mks':view==='faction'?'factions':(view==='committee'||view==='session')?'committees':view==='plenumSession'?'plenum':view; $('#tabs').innerHTML=TABS.map(([v,ic,l])=>`<button class="tab ${active===v?'active':''}" onclick="go('${v}')"><span class="ic">${icon(ic)}</span>${l}${v==='mine'&&(myCount()||followCount())?`<span class="dot">${myCount()+followCount()}</span>`:''}</button>`).join('')}
@@ -1358,13 +1366,15 @@ function renderProtocol(){
 let PLENUM_CUR=null, plenumProtoFilter={speaker:'',q:''};
 async function togglePlenumProtocol(sid){
   const box=$('#plenumProtoBox'); if(!box) return;
-  if(PLENUM_CUR&&PLENUM_CUR.id===String(sid)){ PLENUM_CUR=null; box.innerHTML=''; return }
-  box.innerHTML='<p class="muted small">טוען את דברי הכנסת… (פתיחה ראשונה של ישיבה עשויה לקחת כמה שניות)</p>';
+  const btn=$('#plenumReadBtn');
+  if(PLENUM_CUR&&PLENUM_CUR.id===String(sid)){ PLENUM_CUR=null; box.innerHTML=''; if(btn) btn.innerHTML=`${icon('plenum')} הצג את פרוטוקול הישיבה`; return }
+  box.innerHTML='<p class="muted small">טוען… (פתיחה ראשונה עשויה לקחת כמה שניות)</p>';
   try{
     const r=await fetch(`/.netlify/functions/plenum?id=${encodeURIComponent(sid)}`);
     if(!r.ok) throw 0;
     PLENUM_CUR=await r.json(); PLENUM_CUR.id=String(sid); plenumProtoFilter={speaker:'',q:''}; renderPlenumProtocol();
-  }catch(e){ box.innerHTML='<p class="muted small">הקורא זמין באתר החי — כאן אפשר לפתוח את דברי הכנסת הרשמיים בכפתור למעלה.</p>' }
+    if(btn) btn.textContent='✕ סגירה';
+  }catch(e){ box.innerHTML='<p class="muted small">הקורא זמין באתר החי — כאן אפשר לפתוח את המסמך הרשמי למעלה.</p>' }
 }
 function renderPlenumProtocol(){
   const box=$('#plenumProtoBox'); if(!box||!PLENUM_CUR) return;
@@ -1962,7 +1972,8 @@ function renderVote(){
 
   <div class="grid c2" style="margin-top:.85rem">
     <div class="card pad"><h3 style="margin-bottom:.6rem">איך הצביעה כל סיעה</h3>
-      ${frows.map(([f,c])=>{const t=c.f+c.a+c.n||1;return `<div class="fbar" style="cursor:pointer" onclick="openFaction('${jsq(f)}')"><span class="nm" style="color:${fcol(c.full)}">${esc(f)} ←</span><span class="tr"><span class="scorebar"><i class="f" style="width:${c.f/t*100}%"></i><i class="a" style="width:${c.a/t*100}%"></i><i class="n" style="width:${c.n/t*100}%"></i></span></span><span class="dim small">${c.f}/${c.a}/${c.n}</span></div>`}).join('')}
+      <div class="fbar fthead" aria-hidden="true"><span class="nm"></span><span class="tr"></span><span class="ftallies"><span>בעד</span><span>נגד</span><span>נמנע</span></span></div>
+      ${frows.map(([f,c])=>{const t=c.f+c.a+c.n||1;const cell=(v,cls)=>`<span class="${cls}${v?'':' zero'}">${v}</span>`;return `<div class="fbar" style="cursor:pointer" title="${esc(f)}: ${c.f} בעד, ${c.a} נגד, ${c.n} נמנע" onclick="openFaction('${jsq(f)}')"><span class="nm" style="color:${fcol(c.full)}">${esc(f)} ←</span><span class="tr"><span class="scorebar"><i class="f" style="width:${c.f/t*100}%"></i><i class="a" style="width:${c.a/t*100}%"></i><i class="n" style="width:${c.n/t*100}%"></i></span></span><span class="ftallies">${cell(c.f,'f')}${cell(c.a,'a')}${cell(c.n,'n')}</span></div>`}).join('')}
     </div>
     <div class="card pad"><h3 style="margin-bottom:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M13 2.5 5 13.5h5L9 21.5l8-11h-5z"/></svg> חרגו מהסיעה (${reb.length})</h3>
       ${reb.length?`<div class="rows" style="margin:0 -.9rem">${reb.slice(0,10).map(v=>`<div class="row" onclick="openMk('${jsq(v.mk_name)}')">${avatar(v.mk_name,v.faction,34)}<span class="flex">${esc(disp(v.mk_name))} · ${esc(shortF(v.faction))}</span><span class="vchip ${v.result===1?'f':v.result===2?'a':'n'}">${{1:'בעד',2:'נגד',3:'נמנע'}[v.result]}</span><span class="dim small">הסיעה: ${{1:'בעד',2:'נגד',3:'נמנע'}[v.maj]}</span></div>`).join('')}</div>`:'<p class="muted small">אף אחד לא חרג מעמדת סיעתו בהצבעה הזאת.</p>'}
@@ -2812,9 +2823,9 @@ function plenumBrowserHTML(){
   ${list.length>shown.length?`<div style="text-align:center;margin-top:1rem"><button class="btn" onclick="plenumFilter.limit+=30;renderPlenum()">עוד ${Math.min(30,list.length-shown.length)} ישיבות</button></div>`:''}`:'<div class="card empty"><div class="big">🔍</div>לא נמצאו ישיבות בסינון הזה.</div>'}`;
 }
 function renderPlenum(){
-  if(KN===26){ $('#app').innerHTML=`<div class="sec-title">מליאה <small>דברי הכנסת · כנסת 26</small></div><div class="card empty"><div class="big">${icon('plenum')}</div>דברי הכנסת של כנסת 26 עוד לא פורסמו.<br><span class="small">כשתתכנס הכנסת ויתפרסמו ישיבות המליאה הראשונות, יופיעו כאן כל הישיבות עם חיפוש מלא בפרוטוקולים — כמו בכנסת 25.</span><br><button class="btn primary" style="margin-top:.8rem" onclick="switchKnesset(25)">לדברי הכנסת של כנסת 25 ←</button></div>`; return }
+  if(KN===26){ $('#app').innerHTML=`<div class="sec-title">דברי הכנסת <small>מליאה · כנסת 26</small></div><div class="card empty"><div class="big">${icon('plenum')}</div>דברי הכנסת של כנסת 26 עוד לא פורסמו.<br><span class="small">כשתתכנס הכנסת ויתפרסמו ישיבות המליאה הראשונות, יופיעו כאן כל הישיבות עם חיפוש מלא בפרוטוקולים — כמו בכנסת 25.</span><br><button class="btn primary" style="margin-top:.8rem" onclick="switchKnesset(25)">לדברי הכנסת של כנסת 25 ←</button></div>`; return }
   ensureProtoSearch(); ensurePlenumSearch();
-  $('#app').innerHTML=`<div class="sec-title">מליאה <small>דברי הכנסת · כל ישיבות כנסת 25 · ${Object.keys(PLENUM_SEARCH).length||418} ישיבות</small></div>${protoSearchHTML()}${plenumBrowserHTML()}`;
+  $('#app').innerHTML=`<div class="sec-title">דברי הכנסת <small>מליאה · כל ישיבות כנסת 25 · ${Object.keys(PLENUM_SEARCH).length||418} ישיבות</small></div>${protoSearchHTML()}${plenumBrowserHTML()}`;
 }
 function renderPlenumSession(){
   ensurePlenumSearch();
@@ -2829,12 +2840,13 @@ function renderPlenumSession(){
     <div class="card-top"><span class="chip acc">דברי הכנסת</span><span class="date">${fmtDate(p.date)}</span></div>
     <h1 style="font-size:1.4rem;line-height:1.35">ישיבת מליאה מס׳ ${p.number}</h1>
     <div class="bill-name">הפרוטוקול הרשמי המלא של הישיבה — כל הנאומים, ההצעות לסדר וההכרזות, כפי שנרשמו בדברי הכנסת.</div>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.9rem">
-      <a class="btn primary" href="${esc(p.doc)}" target="_blank" rel="noopener">📜 דברי הכנסת — המסמך הרשמי ↗</a>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.9rem;align-items:center">
+      <button class="btn primary" id="plenumReadBtn" style="font-size:1.02rem;padding:.65rem 1.5rem" onclick="togglePlenumProtocol('${viewArg}')">${icon('plenum')} הצג את פרוטוקול הישיבה</button>
+      <a class="btn" href="${esc(p.doc)}" target="_blank" rel="noopener">המסמך הרשמי ↗</a>
       ${older?`<button class="btn" onclick="openPlenum('${older.sid}')">› ישיבה ${older.number} (הקודמת)</button>`:''}
       ${newer?`<button class="btn" onclick="openPlenum('${newer.sid}')">ישיבה ${newer.number} (הבאה) ‹</button>`:''}
     </div>
-    <div style="margin-top:1.1rem"><button class="btn" onclick="togglePlenumProtocol('${viewArg}')">📜 קריאת דברי הכנסת כאן — מי אמר מה</button><div id="plenumProtoBox" style="margin-top:.7rem"></div></div>
+    <div id="plenumProtoBox" style="margin-top:.7rem"></div>
   </article>
   <div class="sec-title">🗳️ ההצבעות ביום הישיבה <small>${votes.length} הצבעות · ${fmtDate(p.date)}</small></div>
   ${votes.length?`<div class="card rows">${votes.map(v=>`<div class="row" onclick="openVote('${v.id}')"><span class="chip acc">${esc(v.kind_label||'')}</span><span class="flex">${esc(v.title||v.desc||'')}<br><span class="dim small">${v.for!=null?`${v.for}–${v.against} · ${v.for>v.against?'עברה':v.against>v.for?'נדחתה':'תיקו'}`:''}</span></span><span class="chip acc">להצבעה ←</span></div>`).join('')}</div>`
@@ -2857,11 +2869,10 @@ function renderCommittees(){
     $('#app').innerHTML=`<div class="sec-title">ועדות <small>כנסת 26 · ${cs.length} ועדות · ${(K26CMT.recent_sessions||[]).length} ישיבות אחרונות במאגר</small></div><div class="card rows">${cs.map(c=>{ const members=new Set((K26CMEM.by_committee[String(c.id)]||[]).filter(m=>!m.to).map(m=>m.name)).size; return `<div class="row"><span class="flex">${esc(c.name||'')}<br><span class="dim small">${esc(c.type||c.category||'')}${members?` · ${members} חברים כיום`:''}${c.last_session?` · ישיבה אחרונה ${fmtDate(c.last_session)}`:''}</span></span><span class="chip acc">${c.sessions_total||0} ישיבות</span></div>` }).join('')}</div><p class="small dim" style="margin-top:.6rem">רשימה בסיסית מהמאגר הרשמי — דפי ועדה מלאים ייפתחו כשיצטברו ישיבות ופרוטוקולים בכנסת 26.</p>`; return }
     $('#app').innerHTML=`<div class="sec-title">ועדות <small>כנסת 26</small></div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>ועדות כנסת 26 עוד לא הוקמו.<br><span class="small">כשהכנסת תתכנס ויוקמו הוועדות, יופיעו כאן הישיבות וסדרי היום שלהן — כמו ועדות כנסת 25.</span><br><button class="btn primary" style="margin-top:.8rem" onclick="switchKnesset(25)">לכנסת 25 המלאה ←</button></div>`; return }
   ensureCmem();
-  if(cmtSeg==='plenum'){ ensureProtoSearch(); ensurePlenumSearch(); $('#app').innerHTML=`<div class="sec-title">מליאה <small>דברי הכנסת · כל ישיבות כנסת 25</small></div>${cmtSegHTML()}${protoSearchHTML()}${plenumBrowserHTML()}`; return }
   if(cmtSeg==='lobbyists'){ ensureExtras(); $('#app').innerHTML=`<div class="sec-title">שדלנים <small>המרשם הרשמי של הכנסת · מי מייצג את מי מול הכנסת</small></div>${cmtSegHTML()}${lobbyBrowserHTML()}`; return }
-  // The committees segment renders protoSearchHTML() below, but (unlike the
-  // plenum segment) never loaded its indexes — PROTO_SEARCH/PLENUM_SEARCH
-  // stayed {} so typing silently produced no results at all.
+  // The committees view renders protoSearchHTML() below, so load its
+  // indexes here — otherwise PROTO_SEARCH/PLENUM_SEARCH stay {} and
+  // typing silently produces no results at all.
   ensureProtoSearch(); ensurePlenumSearch();
   if(!CMT){ $('#app').innerHTML=`<div class="sec-title">ועדות</div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>נתוני הוועדות לא נטענו.</div>`; return }
   const recentCount={}; CMT.recent_sessions.forEach(s=>recentCount[s.committee_id]=(recentCount[s.committee_id]||0)+1);

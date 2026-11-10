@@ -108,6 +108,9 @@ chair, recent sessions, protocol search per committee, bills in progress,
 follow button prominence. Builds on committees + protocols + members (P0.2).
 
 ✅ DONE 2026-11-10: plenum protocols — first-class.
+Promoted 2026-11-10 from a segment inside the committees tab to its own
+top-level **מליאה** tab (view `plenum`; a sitting is `plenumSession`,
+reader still parsed on demand — owner call).
 `build_plenum_search.py` → `data/plenum_search.json`: word/prefix search
 over **all 418 K25 plenum sessions' דברי הכנסת**
 (`KNS_DocumentPlenumSession`, GroupTypeID=28). Browsable sitting index
