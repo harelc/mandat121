@@ -1,16 +1,21 @@
 #!/usr/bin/env python3
-"""Committee memberships for Knesset 25, from official OData.
+"""Committee memberships for a Knesset, from official OData.
 
 KNS_PersonToPosition with CommitteeID set: PositionID 41 = committee chair
 (יו"ר ועדה), 42/66 = member (חבר/חברת ועדה), 67 = substitute member.
 Person matching follows build_k25_tenure.py (LastName+FirstName against the
 surname-first names our UI uses).
 
-Output: data/k25_committee_members.json
+Usage: python3 build_k25_committee_members.py [--knesset 25|26] (default 25)
+Output: data/k{N}_committee_members.json. No committee positions published
+for N yet = exit 0, no write (safe no-op in the daily K26 step).
   {"by_mk": {name: [{committee_id, committee, role, from, to}]},
    "by_committee": {committee_id: [{name, role, from, to}]}}
 """
-import json, sys, urllib.parse, urllib.request
+import argparse, json, sys, urllib.parse, urllib.request
+from pathlib import Path
+
+DATA = Path(__file__).parent / "data"
 
 V4 = "https://knesset.gov.il/OdataV4/ParliamentInfo/"   # positions live here
 SVC = "https://knesset.gov.il/Odata/ParliamentInfo.svc/"  # V4 400s on KNS_Person; svc serves it
@@ -34,8 +39,14 @@ def norm(s):
     return " ".join(str(s).replace("'", "").replace("׳", "").split())
 
 def main():
-    pos = [r for r in get("KNS_PersonToPosition", "KnessetNum eq 25")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--knesset", type=int, default=25, choices=(25, 26))
+    kn = ap.parse_args().knesset
+    pos = [r for r in get("KNS_PersonToPosition", f"KnessetNum eq {kn}")
            if r.get("PositionID") in ROLES and r.get("CommitteeID")]
+    if not pos:
+        print(f"K{kn}: no committee positions published yet — skipping committee-members build")
+        return
     pids = sorted({r["PersonID"] for r in pos})
     persons = {}
     for i in range(0, len(pids), 20):
@@ -44,11 +55,24 @@ def main():
             persons[p["PersonID"]] = p
     print(f"committee positions: {len(pos)}, persons: {len(persons)}", file=sys.stderr)
 
-    wanted = set(json.load(open("data/mk_photos.json", encoding="utf-8")))
+    wanted = set()
+    if kn == 25:
+        wanted.update(json.load(open(DATA / "mk_photos.json", encoding="utf-8")))
+    else:
+        try:  # CEC preview lists in full, as in build_k25_tenure.wanted_names:
+            # Norwegian-law replacements were not in the elected first-N.
+            prev = json.load(open(DATA / "k26_preview.json", encoding="utf-8"))
+            for p in prev.get("parties", []):
+                wanted.update(p.get("candidates", []))
+        except Exception:
+            pass
     try:  # mandate121-native: every name in the per-MK vote harvest
-        wanted.update(json.load(open("data/k25_vote_results.json", encoding="utf-8"))["names"])
+        wanted.update(json.load(open(DATA / f"k{kn}_vote_results.json", encoding="utf-8"))["names"])
     except Exception:
         pass
+    if not wanted:
+        print(f"K{kn}: no name pool to match persons against — skipping")
+        return
     orig = {norm(w): w for w in wanted}
     wanted_n = set(orig)
     ALIAS = {"גנץ בנימין": "גנץ בני"}
@@ -73,7 +97,7 @@ def main():
     for v in by_mk.values():
         v.sort(key=lambda x: (x["to"] is not None, x["from"]))
     json.dump({"by_mk": by_mk, "by_committee": by_cmt},
-              open("data/k25_committee_members.json", "w", encoding="utf-8"), ensure_ascii=False)
+              open(DATA / f"k{kn}_committee_members.json", "w", encoding="utf-8"), ensure_ascii=False)
     print(f"MKs with committees: {len(by_mk)}, committees: {len(by_cmt)}, unmatched persons: {len(set(unmatched))}")
     print("sample:", list(by_mk.items())[:1])
 

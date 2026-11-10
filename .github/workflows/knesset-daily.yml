@@ -5,8 +5,11 @@
 # starts building K26 incrementally. All builders are stdlib-only Python
 # reading the public OData — no secrets needed.
 #
-# Flow: probe K26 → refresh K25 layers → build K26 if the probe is green →
-# commit data/ back to the repo if anything changed.
+# Flow: probe K26 (per-layer) → refresh K25 layers → build whichever K26
+# layers OData has published → commit data/ back if anything changed.
+# Every K26 builder below takes --knesset 26 and is a safe no-op (exit 0,
+# no write) when its layer is unpublished, so partial publication — e.g.
+# factions before bills — builds incrementally instead of failing.
 name: knesset-daily
 
 on:
@@ -41,24 +44,38 @@ jobs:
       - name: Probe Knesset 26 OData
         id: probe
         run: |
-          if python3 probe_knesset.py; then echo "k26_ready=true" >> "$GITHUB_OUTPUT";
-          else echo "k26_ready=false" >> "$GITHUB_OUTPUT"; fi
+          python3 probe_knesset.py || true # exits 2 until bills publish — never abort this step on it
+          # --json prints even on exit 2, so capture it either way and
+          # derive per-layer outputs from it.
+          python3 probe_knesset.py --json > probe_k26.json || true
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json
+          try:
+              r = json.load(open("probe_k26.json"))["probe"]
+          except Exception:
+              r = {"ready": False, "any": False, "layers": {}}
+          print(f"k26_ready={str(r['ready']).lower()}")
+          print(f"k26_any={str(r['any']).lower()}")
+          for layer, ok in sorted(r["layers"].items()):
+              print(f"k26_{layer}={str(ok).lower()}")
+          EOF
+          rm -f probe_k26.json
         continue-on-error: true
 
       - name: Refresh K25 datasets
         if: ${{ inputs.target != 'k26-only' }}
         run: |
           python3 -u build_knesset.py --knesset 25
-          python3 -u build_committees.py
-          python3 -u build_protocols.py
+          python3 -u build_committees.py --knesset 25
+          python3 -u build_protocols.py --knesset 25
           python3 -u build_mk_contacts.py # roster first: tenure resolves factions against the current 120, incl. just-sworn-in MKs
-          python3 -u build_k25_tenure.py
-          python3 -u build_k25_committee_members.py
-          python3 -u build_k25_list_order.py
+          python3 -u build_k25_tenure.py --knesset 25
+          python3 -u build_k25_committee_members.py --knesset 25
+          python3 -u build_k25_list_order.py --knesset 25
 
       - name: Harvest per-MK vote results (K25)
         if: ${{ inputs.target != 'k26-only' }}
-        run: python3 -u build_k25_vote_results.py # resumable; checkpoints to data/k25_vote_results.json
+        run: python3 -u build_k25_vote_results.py --knesset 25 # resumable; checkpoints to data/k25_vote_results.json
 
       - name: Derived layers (analytics, contacts/presence, protocol search)
         if: ${{ inputs.target != 'k26-only' }}
@@ -69,13 +86,29 @@ jobs:
           python3 -u build_plenum_search.py      # plenum (דברי הכנסת) search index — incremental, new sessions only
           python3 -u build_agenda.py             # this-week agenda: plenum order of the day + committee sittings (windowed, recess-honest)
 
-      - name: Build K26 (when OData publishes it)
-        if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_ready == 'true' }}
+      # K26 layers, in dependency order. Each builder no-ops until its
+      # OData layer exists, so this whole step is gated only on "anything
+      # published at all" (probe k26_any) — not on bills specifically.
+      - name: Build K26 core (bills + vote headers)
+        if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_bills == 'true' }}
+        run: python3 -u build_knesset.py --knesset 26
+
+      - name: Harvest per-MK vote results (K26)
+        if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_bills == 'true' }}
+        run: python3 -u build_k25_vote_results.py --knesset 26 # resumable; checkpoints to data/k26_vote_results.json
+
+      - name: Build K26 people layers (tenure, list order, committee members)
+        if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_any == 'true' }}
         run: |
-          python3 -u build_knesset.py --knesset 26
-          # TODO(k26): generalize + enable as K26 data lands:
-          #   build_k25_tenure.py / build_k25_list_order.py equivalents,
-          #   per-MK vote results for K26, committee members, protocols.
+          python3 -u build_k25_tenure.py --knesset 26          # -> data/k26_tenure.json (no-op until positions publish)
+          python3 -u build_k25_list_order.py --knesset 26      # -> data/k26_list_order.json (from CEC preview, works pre-OData)
+          python3 -u build_k25_committee_members.py --knesset 26 # -> data/k26_committee_members.json
+
+      - name: Build K26 committees + protocols
+        if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_committee_sessions == 'true' }}
+        run: |
+          python3 -u build_committees.py --knesset 26 # -> data/k26_committees.json (never touches K25 committees.json)
+          python3 -u build_protocols.py --knesset 26  # -> data/k26_protocols_index.json + shared data/protocols/
 
       - name: Commit refreshed data
         run: |

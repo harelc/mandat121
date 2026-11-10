@@ -1,18 +1,25 @@
 #!/usr/bin/env python3
-"""Authoritative MK tenure periods for Knesset 25, from official OData.
+"""Authoritative MK tenure periods for a Knesset, from official OData.
 
-KNS_PersonToPosition (KnessetNum=25, PositionID=43 = חבר כנסת) gives real
+KNS_PersonToPosition (KnessetNum=N, PositionID=43 = חבר כנסת) gives real
 StartDate/FinishDate per stint — this handles Norwegian-law resignations and
 mid-term replacements exactly, unlike first/last-vote approximations.
 
-Output: data/k25_tenure.json
+Usage: python3 build_k25_tenure.py [--knesset 25|26]   (default 25)
+Output: data/k{N}_tenure.json. If OData has no MK positions for N yet,
+exits 0 without writing (so the daily K26 step is a safe no-op until the
+feed publishes that layer).
   { "<surname-first name as in bills.json mk_votes>": [[from, to|null], ...] }
 Names are matched by LastName+FirstName against the names our datasets use
 (mk_photos.json keys + mk_votes names); unmatched persons are reported.
+For K26 the name pool is the CEC preview roster (data/k26_preview.json
+elected) plus any harvested K26 vote-result names.
 """
-import json, sys, urllib.request
+import argparse, json, sys, urllib.parse, urllib.request
+from pathlib import Path
 
 BASE = "https://knesset.gov.il/Odata/ParliamentInfo.svc/"
+DATA = Path(__file__).parent / "data"
 
 def get(entity, filt):
     rows, skip = [], 0
@@ -26,9 +33,40 @@ def get(entity, filt):
             return rows
         skip += len(vals)
 
+def wanted_names(kn):
+    """Surname-first names the UI/datasets use for this Knesset."""
+    wanted = set()
+    if kn == 25:
+        wanted.update(json.load(open(DATA / "mk_photos.json", encoding="utf-8")))
+        try:
+            wanted.update(json.load(open(DATA / "mk_contacts.json", encoding="utf-8"))["by_name"])
+        except Exception:
+            pass
+    else:
+        try:  # CEC preview lists, in full: a Norwegian-law replacement is a
+            # candidate who was NOT in the elected first-N, so matching only
+            # `elected` would miss exactly the people who start serving later.
+            prev = json.load(open(DATA / "k26_preview.json", encoding="utf-8"))
+            for p in prev.get("parties", []):
+                wanted.update(p.get("candidates", []))
+        except Exception:
+            pass
+    try:
+        wanted.update(json.load(open(DATA / f"k{kn}_vote_results.json", encoding="utf-8"))["names"])
+    except Exception:
+        pass
+    return wanted
+
+
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--knesset", type=int, default=25, choices=(25, 26))
+    kn = ap.parse_args().knesset
     # PositionID 43 = חבר הכנסת, 61 = חברת הכנסת (gendered position titles)
-    pos = get("KNS_PersonToPosition", "KnessetNum eq 25 and (PositionID eq 43 or PositionID eq 61)")
+    pos = get("KNS_PersonToPosition", f"KnessetNum eq {kn} and (PositionID eq 43 or PositionID eq 61)")
+    if not pos:
+        print(f"K{kn}: no MK positions published yet — skipping tenure build")
+        return
     pids = sorted({r["PersonID"] for r in pos})
     persons = {}
     for i in range(0, len(pids), 20):  # or-chain batches (no `in` operator assumed)
@@ -38,21 +76,11 @@ def main():
             persons[p["PersonID"]] = p
     print(f"positions: {len(pos)} rows, persons: {len(persons)}", file=sys.stderr)
 
-    # Names our UI uses, surname-first.
-    # mandate121-native name sources (no legacy game dataset): the roster
-    # file + every name in the per-MK vote harvest.
-    wanted = set(json.load(open("data/mk_photos.json", encoding="utf-8")))
-    try:
-        wanted.update(json.load(open("data/k25_vote_results.json", encoding="utf-8"))["names"])
-    except Exception:
-        pass
-    # The current-120 roster (mk_contacts) is authoritative for who serves
-    # now: a newly sworn-in MK has no votes and no photo-snapshot entry yet,
-    # and without this they landed in the UI with no faction ("ללא סיעה").
-    try:
-        wanted.update(json.load(open("data/mk_contacts.json", encoding="utf-8"))["by_name"])
-    except Exception:
-        pass
+    # Names our UI uses, surname-first (see wanted_names). For K25 the
+    # current-120 roster (mk_contacts) is authoritative for who serves now:
+    # a newly sworn-in MK has no votes and no photo-snapshot entry yet, and
+    # without this they landed in the UI with no faction ("ללא סיעה").
+    wanted = wanted_names(kn)
 
     def norm_name(s):
         return " ".join(str(s).replace("'", "").replace("׳", "").split())
@@ -99,7 +127,7 @@ def main():
     # latest-stint convenience map.
     factions = {}
     faction_stints = {}
-    fpos = get("KNS_PersonToPosition", "KnessetNum eq 25 and PositionID eq 54")
+    fpos = get("KNS_PersonToPosition", f"KnessetNum eq {kn} and PositionID eq 54")
     latest = {}
     for r in fpos:
         if not r.get("FactionName"):
@@ -122,17 +150,19 @@ def main():
         v.sort(key=lambda s: s[0] or "")
     print(f"faction rows: {len(fpos)}, mapped: {len(factions)}", file=sys.stderr)
 
-    json.dump({"_note": "MK tenure stints [from,to] (to=null = still serving) from KNS_PersonToPosition KnessetNum=25 PositionID=43/61; factions + faction_stints [from,to,faction] from PositionID=54, fetched at build time.",
+    json.dump({"_note": f"MK tenure stints [from,to] (to=null = still serving) from KNS_PersonToPosition KnessetNum={kn} PositionID=43/61; factions + faction_stints [from,to,faction] from PositionID=54, fetched at build time.",
                "tenure": {k: sorted(v) for k, v in tenure.items()}, "factions": factions,
                "faction_stints": faction_stints},
-              open("data/k25_tenure.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
+              open(DATA / f"k{kn}_tenure.json", "w", encoding="utf-8"), ensure_ascii=False, indent=1)
     missing = sorted(set(orig_by_norm.values()) - set(tenure))
     print(f"MATCHED {len(tenure)}/{len(wanted)} UI names; persons unmatched: {len(unmatched_persons)}")
-    print("UI names without tenure:", missing)
+    # K26's pool is every candidate (466) so Norwegian-law replacements can
+    # resolve; most will never serve, so listing all of them is just noise.
+    print("UI names without tenure:", missing if kn == 25 else f"{len(missing)} candidates never (yet) in a tenure stint")
     # Every UI name must resolve to a faction — the UI renders a missing one
     # as "ללא סיעה", which is never true for a serving/former K25 MK.
     no_faction = sorted(set(orig_by_norm.values()) - set(factions))
-    print("UI names without faction:", no_faction)
+    print("UI names without faction:", no_faction if kn == 25 else f"{len(no_faction)} (candidates, expected)")
     print("persons without UI name:", unmatched_persons[:20])
 
 if __name__ == "__main__":

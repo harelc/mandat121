@@ -66,7 +66,20 @@ def probe(knesset_num):
     }
     for label, (entity, filt) in checks.items():
         report["entities"][label] = count(entity, filt)
-    report["ready"] = report["entities"]["bills"] > 0
+    e = report["entities"]
+    report["ready"] = e["bills"] > 0
+    # Per-layer readiness for the daily workflow: layers land independently
+    # (factions/committees may publish before bills), and every generalized
+    # builder is a safe no-op when its layer is absent — so the workflow
+    # gates on `any`, and each builder re-checks its own inputs.
+    report["layers"] = {
+        "bills": e["bills"] > 0,
+        "roster": e["mks (PositionID=54)"] > 0 or e["factions"] > 0,
+        "committees": e["committees"] > 0,
+        "committee_sessions": e["committee_sessions"] > 0,
+        "plenum_sessions": e["plenum_sessions"] > 0,
+    }
+    report["any"] = any(report["layers"].values())
     return report
 
 
@@ -116,7 +129,8 @@ def main():
         print(f"Knesset {args.knesset} readiness:")
         for label, n in report["entities"].items():
             print(f"  {label:<24} {n}")
-        print(f"  => {'READY' if report['ready'] else 'NOT YET PUBLISHED'}")
+        print(f"  => {'READY' if report['ready'] else 'NOT YET PUBLISHED'}"
+              f" (layers: {', '.join(k for k, v in report['layers'].items() if v) or 'none'})")
         print("\nLatest activity in feed:")
         print(f"  current Knesset (KNS_KnessetDates.IsCurrent): "
               f"{activity['current_knesset']}")

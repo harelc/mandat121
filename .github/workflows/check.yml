@@ -28,6 +28,9 @@ jobs:
       - name: Inline JS syntax
         run: python3 scripts/check_inline_js.py
 
+      - name: K26 builder tests (offline, synthetic OData)
+        run: python3 -m unittest discover -s tests 2>&1 | tail -5
+
       - name: data/*.json parses
         run: |
           python3 - <<'EOF'

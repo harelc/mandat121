@@ -9,9 +9,15 @@ parsing is structural, not guesswork.
 
 Outputs:
   data/protocols/{session_id}.json — {committee, date, speakers, turns[]}
-  data/protocols_index.json        — {session_id: {turns, speakers, mks}}
+    (shared across Knessets: session IDs are globally unique)
+  data/protocols_index.json        — K25 index (index.html loads this)
+  data/k26_protocols_index.json    — K26 index, same shape
+
+Usage: python3 build_protocols.py [--knesset 25|26]  (default 25; input is
+committees.json for K25, data/k26_committees.json for K26. Missing input
+or no protocol documents = exit 0, no write.)
 """
-import json, re, sys, time, urllib.request, zipfile
+import argparse, json, re, sys, time, urllib.request, zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
 from pathlib import Path
@@ -68,8 +74,15 @@ def parse(session, url):
             "date": (session.get("start") or "")[:10], "speakers": speakers, "turns": turns}
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--knesset", type=int, default=25, choices=(25, 26))
+    kn = ap.parse_args().knesset
+    src = Path("data/committees.json" if kn == 25 else f"data/k{kn}_committees.json")
+    if not src.exists():
+        print(f"K{kn}: {src} not built yet — skipping protocols build")
+        return
     OUT.mkdir(parents=True, exist_ok=True)
-    data = json.load(open("data/committees.json", encoding="utf-8"))
+    data = json.load(open(src, encoding="utf-8"))
     jobs = []
     for s in data["recent_sessions"]:
         for d in s.get("docs", []):
@@ -77,6 +90,9 @@ def main():
                 jobs.append((s, d["path"]))
                 break
     print(f"{len(jobs)} sessions with protocols", flush=True)
+    if not jobs:
+        print(f"K{kn}: no protocol documents yet — skipping (index left untouched)")
+        return
     index, done, failed = {}, 0, []
     with ThreadPoolExecutor(max_workers=6) as ex:
         futs = {ex.submit(parse, s, u): s["id"] for s, u in jobs}
@@ -91,7 +107,8 @@ def main():
             done += 1
             if done % 50 == 0:
                 print(f"{done}/{len(jobs)} done, {len(failed)} failed", flush=True)
-    json.dump(index, open("data/protocols_index.json", "w", encoding="utf-8"), ensure_ascii=False)
+    idx_out = "data/protocols_index.json" if kn == 25 else f"data/k{kn}_protocols_index.json"
+    json.dump(index, open(idx_out, "w", encoding="utf-8"), ensure_ascii=False)
     print(f"DONE {len(index)} protocols, failed: {failed[:8]}")
 
 if __name__ == "__main__":

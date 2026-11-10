@@ -1,5 +1,10 @@
 #!/usr/bin/env python3
-"""Full per-MK results for every K25-era plenum vote.
+"""Full per-MK results for every plenum vote of a Knesset era.
+
+Usage: python3 build_k25_vote_results.py [--knesset 25|26]  (default 25;
+run build_knesset.py --knesset N first — vote IDs come from k{N}_votes.json.
+Missing/empty vote file = exit 0, no write: safe no-op before OData
+publishes that Knesset's votes.)
 
 Why: the legacy biapia pipeline only kept per-MK results for preliminary
 and third-reading votes (9 second-reading records!), so whole vote types
@@ -7,21 +12,19 @@ looked missing. KNS_PlenumVoteResult holds all of it (~526K era rows);
 the service caps pages at 100 rows and has no aggregation, so this pools
 8 workers, streams pages, and writes:
 
-  data/k25_vote_results.json — compact: {"names":[...], "votes":{"<id>":[[nameIdx,1|2|3],...]}}
-  data/k25_votes.json        — patched in place with for/against/abstain tallies
+  data/k{N}_vote_results.json — compact: {"names":[...], "votes":{"<id>":[[nameIdx,1|2|3],...]}}
+  data/k{N}_votes.json        — patched in place with for/against/abstain tallies
 
 ResultDesc mapping: בעד=1, נגד=2, נמנע=3 (other descs are non-votes, skipped).
 Names are surname-first exactly as bills.json mk_votes (LastName + FirstName).
 """
-import json, time, urllib.parse, urllib.request
+import argparse, json, time, urllib.parse, urllib.request
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 BASE = "https://knesset.gov.il/OdataV4/ParliamentInfo"
 HEADERS = {"Accept": "application/json", "User-Agent": "Mozilla/5.0 mandat121-build"}
-ERA = "2022-11-15T00:00:00Z"
-TOTAL = 526_483
 CODE = {"בעד": 1, "נגד": 2, "נמנע": 3}
 
 def fetch_vote(vid):
@@ -52,15 +55,24 @@ def fetch_vote(vid):
         skip += 100
 
 def main():
-    votes_path = Path("data/k25_votes.json")
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--knesset", type=int, default=25, choices=(25, 26))
+    kn = ap.parse_args().knesset
+    votes_path = Path(f"data/k{kn}_votes.json")
+    if not votes_path.exists():
+        print(f"K{kn}: {votes_path} not built yet — skipping vote-results harvest")
+        return
     votes = json.load(open(votes_path, encoding="utf-8"))
+    if not votes:
+        print(f"K{kn}: no plenum votes published yet — skipping vote-results harvest")
+        return
     want = {v["id"] for v in votes}
     names, name_idx = [], {}
     per_vote = {}
     tallies = {}
     # Resume from checkpoint if a previous run was interrupted (the service
     # occasionally returns HTTP 481 mid-run; one bad vote must not kill it).
-    ckpt = Path("data/k25_vote_results.json")
+    ckpt = Path(f"data/k{kn}_vote_results.json")
     if ckpt.exists():
         try:
             prev = json.loads(ckpt.read_text(encoding="utf-8"))
@@ -115,7 +127,7 @@ def main():
             if done % 1000 == 0:  # checkpoint
                 ckpt.write_text(json.dumps({"names": names, "votes": {str(k): v for k, v in per_vote.items()}}, ensure_ascii=False), encoding="utf-8")
     out = {"names": names, "votes": {str(k): v for k, v in per_vote.items()}}
-    Path("data/k25_vote_results.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+    Path(f"data/k{kn}_vote_results.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     patched = 0
     for v in votes:
         t = tallies.get(v["id"])

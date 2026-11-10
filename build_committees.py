@@ -10,11 +10,16 @@ What the plenum-only bills.json cannot see, from the official OData v4 feed:
   2. Recent committee activity feed: all sessions since RECENT_SINCE with
      their agenda items and document types — committee work continues
      months after the plenum stops voting.
-  3. Committee roster + per-committee session totals for Knesset 25.
+  3. Committee roster + per-committee session totals for the Knesset.
 
 Stdlib only, no auth. Explicit $skip/$top pagination (nextLink hangs on
-filtered queries — see KNESSET_APIS.md). Usage: python3 build_committees.py
+filtered queries — see KNESSET_APIS.md).
+Usage: python3 build_committees.py [--knesset 25|26]  (default 25)
+Output: data/committees.json for K25 (the file index.html loads today),
+data/k26_committees.json for K26 — never clobber the K25 file. No
+committees published for N yet = exit 0, no write.
 """
+import argparse
 import json
 import time
 import urllib.parse
@@ -25,8 +30,9 @@ from pathlib import Path
 BASE = "https://knesset.gov.il/OdataV4/ParliamentInfo"
 HEADERS = {"Accept": "application/json", "User-Agent": "Mozilla/5.0 mandat121-build"}
 DATA = Path(__file__).parent / "data"
-KNESSET = 25
-RECENT_SINCE = "2026-06-24T00:00:00Z"  # = bills.json vote cutoff
+# "Recent" window per Knesset: K25 = bills.json vote cutoff; K26 = era start
+# (build_knesset.ERA_START) so every K26 session counts as recent at first.
+RECENT_SINCE = {25: "2026-06-24T00:00:00Z", 26: "2026-10-01T00:00:00Z"}
 DELAY = 0.12
 
 
@@ -71,17 +77,33 @@ def fetch_in(entity, field, ids, extra_filter, select, batch=15):
     return out
 
 
+def bill_ids_for(kn):
+    if kn == 25:  # legacy dataset, as before
+        bills = json.loads((DATA / "bills.json").read_text("utf-8"))
+        return sorted({b["bill_id"] for b in bills if b.get("knesset_num") == 25 and b.get("bill_id")})
+    p = DATA / f"k{kn}_bills.json"  # build_knesset.py output: [{"id": ...}]
+    if not p.exists():
+        return []
+    return sorted({b["id"] for b in json.loads(p.read_text("utf-8")) if b.get("id")})
+
+
 def main():
-    bills = json.loads((DATA / "bills.json").read_text("utf-8"))
-    bill_ids = sorted({b["bill_id"] for b in bills if b.get("knesset_num") == KNESSET and b.get("bill_id")})
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--knesset", type=int, default=25, choices=(25, 26))
+    kn = ap.parse_args().knesset
+    recent_since = RECENT_SINCE[kn]
+    bill_ids = bill_ids_for(kn)
     bill_id_set = set(bill_ids)
     print(f"bills in dataset: {len(bill_ids)}")
 
     print("committees...")
     committees = fetch_all("KNS_Committee", {
-        "$filter": f"KnessetNum eq {KNESSET}",
+        "$filter": f"KnessetNum eq {kn}",
         "$select": "Id,Name,CategoryDesc,CommitteeTypeDesc,IsCurrent",
     })
+    if not committees:
+        print(f"K{kn}: no committees published yet — skipping committees build")
+        return
     cmap = {c["Id"]: c for c in committees}
 
     print("bill statuses...")
@@ -97,11 +119,11 @@ def main():
 
     print("recent committee sessions...")
     recent = fetch_all("KNS_CommitteeSession", {
-        "$filter": f"KnessetNum eq {KNESSET} and StartDate gt {RECENT_SINCE}",
+        "$filter": f"KnessetNum eq {kn} and StartDate gt {recent_since}",
         "$orderby": "StartDate desc",
         "$select": "Id,CommitteeID,StartDate,TypeDesc,StatusDesc,Location",
     })
-    print(f"  {len(recent)} sessions since {RECENT_SINCE[:10]}")
+    print(f"  {len(recent)} sessions since {recent_since[:10]}")
     recent_ids = [s["Id"] for s in recent]
     r_items = fetch_in("KNS_CmtSessionItem", "CommitteeSessionID", recent_ids,
                        "", "CommitteeSessionID,ItemID,Name,ItemTypeID,StatusID")
@@ -123,7 +145,7 @@ def main():
 
     print("per-committee session totals (all K25)...")
     all_sessions = fetch_all("KNS_CommitteeSession", {
-        "$filter": f"KnessetNum eq {KNESSET}", "$select": "CommitteeID,StartDate",
+        "$filter": f"KnessetNum eq {kn}", "$select": "CommitteeID,StartDate",
     })
     totals = Counter(s["CommitteeID"] for s in all_sessions)
     last_session = {}
@@ -152,8 +174,8 @@ def main():
 
     out = {
         "generated_from": "Knesset OData v4: KNS_Committee(Session), KNS_CmtSessionItem, KNS_DocumentCommitteeSession, KNS_Status",
-        "knesset": KNESSET,
-        "recent_since": RECENT_SINCE[:10],
+        "knesset": kn,
+        "recent_since": recent_since[:10],
         "status_map": {str(k): v for k, v in smap.items()},
         "committees": [{
             "id": c["Id"], "name": c["Name"], "category": c.get("CategoryDesc"),
@@ -178,7 +200,7 @@ def main():
                      for d in docs_by_session.get(s["Id"], [])],
         } for s in recent],
     }
-    p = DATA / "committees.json"
+    p = DATA / ("committees.json" if kn == 25 else f"k{kn}_committees.json")
     p.write_text(json.dumps(out, ensure_ascii=False), "utf-8")
     print(f"\nwrote {p} ({p.stat().st_size/1e6:.1f} MB)")
     print(f"committees: {len(committees)}, bills with committee history: {len(bill_committees)}, "
