@@ -510,7 +510,7 @@ try{ const raw=JSON.parse(localStorage.getItem(LS)||localStorage.getItem('openkn
 let S=STORE['26'];
 let prevSeen=S.lastSeen;
 function save(){S.lastSeen=new Date().toISOString().slice(0,10);localStorage.setItem(LS,JSON.stringify(STORE))}
-function switchKnesset(n){ KN=n; S=STORE[String(n)]; prevSeen=S.lastSeen; save(); renderKSwitch(); buildTabs(); render(); window.scrollTo({top:0}); toast(n===26?'כנסת 26 — מתמלאת ככל שנתונים מתפרסמים':'כנסת 25 — כיסוי מלא') }
+function switchKnesset(n){ KN=n; S=STORE[String(n)]; prevSeen=S.lastSeen; AGENDA=AG_CACHE[n]||null; agendaAnchor=null; agendaLastBody=''; save(); renderKSwitch(); buildTabs(); render(); window.scrollTo({top:0}); toast(n===26?'כנסת 26 — מתמלאת ככל שנתונים מתפרסמים':'כנסת 25 — כיסוי מלא') }
 function renderKSwitch(){ const a=$('#ksw25'),b=$('#ksw26'); if(a)a.classList.toggle('on',KN===25); if(b)b.classList.toggle('on',KN===26) }
 const followedBill=id=>S.followBills.includes(String(id));
 const followedMk=n=>S.followMks.includes(n);
@@ -555,7 +555,8 @@ let RANK26={}; // surname-first name -> CEC list position (build_k25_list_order.
 const listRank26=n=>RANK26[n]??999;
 let CMT=null, CMT_BY_ID={}, IDX25={};
 let AGENDA=null, agendaMode='week', agendaAnchor=null, agendaLastBody=''; // agenda calendar (build_agenda.py): mode day|week|month, anchor = focused 'YYYY-MM-DD'; last painted body, kept on screen while the next month's shard loads
-const AG_LOADED=new Set(), AG_LOADING=new Set(); // months whose data/agenda/YYYY-MM.json shard is merged in (recent months ship inline in agenda.json)
+const AG_CACHE={}; // built agenda per Knesset; each object carries _loaded/_loading Sets of merged month shards
+const AG_MAIN_LOADING=new Set(); // Knessets whose main agenda file is in flight
 let CMEM={by_mk:{},by_committee:{}}; // committee memberships (build_k25_committee_members.py)
 let ALLB=[], ALLB_BY_ID={}, VOTES_ALL=[], MK_INITIATED={};
 let VOTE_RES={names:[],votes:{}}, VOTE_BY_ID={}; // full per-MK results (build_k25_vote_results.py)
@@ -734,7 +735,11 @@ const _lazyPromises={};
 function _lazyOnce(key,loader){ if(!_lazyPromises[key]) _lazyPromises[key]=Promise.resolve().then(loader).catch(()=>{ delete _lazyPromises[key] }); return _lazyPromises[key] }
 const _fetchJson=url=>fetch(url).then(r=>r.ok?r.json():null).catch(()=>null);
 const _normKeys=o=>{ const r={}; for(const[k,v]of Object.entries(o||{})) r[normName(k)]=v; return r };
-function ensureAgenda(){ if(AGENDA) return Promise.resolve(AGENDA); return _lazyOnce('agenda',async()=>{ const j=await _fetchJson('data/agenda.json'); if(j){ AGENDA=j; (AGENDA.committees||[]).forEach(s=>s.docs=s.docs||[]); (AGENDA.loaded_months||[]).forEach(m=>AG_LOADED.add(m)); if(view==='now'&&KN===25) renderNow(); else if(view==='session') renderSessionDetail() } return AGENDA }) }
+function ensureAgenda(){ const kn=KN; if(AG_CACHE[kn]){ AGENDA=AG_CACHE[kn]; return Promise.resolve(AGENDA) } if(AG_MAIN_LOADING.has(kn)) return Promise.resolve(null); AG_MAIN_LOADING.add(kn);
+  return _fetchJson(kn===26?'data/k26_agenda.json':'data/agenda.json').then(j=>{ AG_MAIN_LOADING.delete(kn); if(!j||j.error) return null;
+    j._loaded=new Set(j.loaded_months||[]); j._loading=new Set();
+    (j.committees||[]).forEach(x=>x.docs=x.docs||[]); AG_CACHE[kn]=j;
+    if(kn===KN){ AGENDA=j; if(view==='now') renderNow(); else if(view==='session') renderSessionDetail() } return j }).catch(()=>{ AG_MAIN_LOADING.delete(kn); return null }) }
 function ensureProtoIdx(){ if(Object.keys(PROTO_IDX).length) return Promise.resolve(PROTO_IDX); return _lazyOnce('protoIdx',async()=>{ const j=await _fetchJson('data/protocols_index.json'); if(j){ PROTO_IDX=j; if(view==='session') renderSessionDetail() } return PROTO_IDX }) }
 function ensureCmem(){ return _lazyOnce('cmem',async()=>{ const j=await _fetchJson('data/k25_committee_members.json'); if(j){ CMEM=j; CMEM.by_mk=_normKeys(CMEM.by_mk); for(const arr of Object.values(CMEM.by_committee||{})) arr.forEach(m=>m.name=normName(m.name)); if(view==='mk') renderMkDetail(); else if(view==='committee') renderCommitteeDetail(); else if(view==='committees') renderCommittees() } return CMEM }) }
 function ensureAnalytics(){ if(ANALYTICS) return Promise.resolve(ANALYTICS); return _lazyOnce('analytics',async()=>{ const j=await _fetchJson('data/k25_analytics.json'); if(j){ ANALYTICS=j; if(view==='analysis') renderAnalysis(); else if(view==='mk') renderMkDetail() } return ANALYTICS }) }
@@ -1506,6 +1511,7 @@ function k26ServingSeats(){
 }
 function renderNow26(){
   ensureLivePresence(); // live in-the-building overlay; re-renders when it lands
+  ensureAgenda(); // סדר יום pane (k26_agenda.json) — shows below once OData has published a sitting
   const parties=K26?K26.parties.filter(p=>p.seats>0):[];
   const serving=k26ServingSeats();
   const seats=serving||[]; if(!serving&&K26){ const arc=[...K26.parties].sort((a,b)=>partyRank(a.name,26)-partyRank(b.name,26)); for(const p of arc) p.elected.forEach(name=>seats.push({name,faction:p.name,color:p.color,result:0,rank:(p.candidates||[]).indexOf(name)+1,listN:p.candidates.length})) }
@@ -1523,6 +1529,7 @@ function renderNow26(){
     <p>הבחירות הסתיימו, 120 המנדטים חולקו — ומעכשיו כל ישיבה, חוק והצבעה של הכנסת הזאת יופיעו כאן בדיוק כמו בכנסת 25, עם אותם ח״כים, סיעות וצבעים — של הכנסת הזאת.</p>
     ${homeKpisHTML({members:seats.length,factions:serving?legend.length:parties.length,bills:K26B.length,votes:K26V.length,detailed:K26V.filter(v=>v.for!=null).length,lastVote:K26V.length?fmtDate([...K26V].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date):''})}
   </section>
+  ${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?agendaHTML():''}
   <div class="sec-title">${serving?'מליאת הכנסת ה־26':'המליאה הנכנסת'} <small>${serving?'מי מכהן/ת בפועל — כולל כניסות ויציאות לפי החוק הנורווגי':'רחפו או לחצו על מושב — חלקם כיהנו גם בכנסת 25'}</small></div>
   <div class="card pad plenum-wrap home rise"><div id="k26plenum">${K26?plenumSVG(seats,'k26',null):''}</div>
   <div class="legend">${legend.map(([f,v])=>`<span><i style="background:${v.color}"></i>${esc(f)} ${v.n}</span>`).join('')}</div>
@@ -1531,7 +1538,7 @@ function renderNow26(){
   </div>
   <div class="sec-title">מה כבר יש, ומה יגיע</div>
   <div class="grid c2">
-    <div class="card pad"><h3>✓ כבר כאן</h3><div class="small muted" style="line-height:2">תוצאות הבחירות הרשמיות ומנדטים<br>רשימות המועמדים בסדר הרשמי (466)<br>120 הנבחרים וצבעי הסיעות של כנסת 26<br>${serving?'מי מכהן/ת בפועל — מעל המפה<br>':''}קישור מהנבחרים להיסטוריית ההצבעות שלהם בכנסת 25</div></div>
+    <div class="card pad"><h3>✓ כבר כאן</h3><div class="small muted" style="line-height:2">תוצאות הבחירות הרשמיות ומנדטים<br>רשימות המועמדים בסדר הרשמי (466)<br>120 הנבחרים וצבעי הסיעות של כנסת 26<br>${serving?'מי מכהן/ת בפועל — מעל המפה<br>':''}${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?'סדר היום — ישיבות שפורסמו כבר כאן, מעל המפה<br>':''}קישור מהנבחרים להיסטוריית ההצבעות שלהם בכנסת 25</div></div>
     <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> יגיע בהמשך — מעצמו</h3><div class="small muted" style="line-height:2">${serving?'':'רשימת הח״כים הרשמית של הכנסת ה־26<br>'}הצעות החוק הראשונות<br>ישיבות הוועדות הראשונות<br>ההצבעות הראשונות במליאה — ומהן גם ״אני הייתי מצביע״ ו״מי מצביע כמוני״<br><span class="dim">${serving?'המכהנים והתפקידים כבר פורסמו (עם ישיבת הפתיחה, 10 בנובמבר 2026); חוקים, ועדות והצבעות עוד לא פורסמו. ברגע שיתפרסמו — הם יופיעו כאן לבד.':'הכנסת החדשה עוד לא פרסמה כלום. ברגע שתתחיל — זה יופיע כאן לבד.'}</span></div></div>
   </div>
   <div style="text-align:center;margin-top:1.1rem"><button class="btn" onclick="switchKnesset(25)">לראות איך זה נראה עם נתונים מלאים — כנסת 25 ←</button></div>`;
@@ -1580,16 +1587,18 @@ function agendaNeededMonths(){
   if(agendaMode==='month'||agendaMode==='day') return [agendaAnchor.slice(0,7)];
   const w=agSunday(agendaAnchor); return [...new Set([w.slice(0,7),agAdd(w,4).slice(0,7)])];
 }
-const agendaPending=()=>agendaNeededMonths().some(m=>!AG_LOADED.has(m)&&!AG_LOADING.has(m)&&(AGENDA.months||[]).includes(m));
+const agendaPending=()=>agendaNeededMonths().some(m=>!(AGENDA._loaded||new Set()).has(m)&&!(AGENDA._loading||new Set()).has(m)&&(AGENDA.months||[]).includes(m));
 function agendaEnsure(){
+  AGENDA._loaded=AGENDA._loaded||new Set(); AGENDA._loading=AGENDA._loading||new Set();
+  const dir=KN===26?'data/k26_agenda':'data/agenda';
   for(const m of agendaNeededMonths()){
-    if(AG_LOADED.has(m)||AG_LOADING.has(m)||!(AGENDA.months||[]).includes(m)) continue;
-    AG_LOADING.add(m);
-    fetch(`data/agenda/${m}.json`).then(r=>r.ok?r.json():null).then(j=>{
+    if(AGENDA._loaded.has(m)||AGENDA._loading.has(m)||!(AGENDA.months||[]).includes(m)) continue;
+    AGENDA._loading.add(m);
+    fetch(`${dir}/${m}.json`).then(r=>r.ok?r.json():null).then(j=>{
       if(j){ const pi=new Set((AGENDA.plenum||[]).map(s=>s.id)), ci=new Set((AGENDA.committees||[]).map(s=>s.id));
         (j.plenum||[]).forEach(s=>{ if(!pi.has(s.id)) AGENDA.plenum.push(s) });
         (j.committees||[]).forEach(s=>{ s.docs=s.docs||[]; if(!ci.has(s.id)) AGENDA.committees.push(s) }); }
-    }).catch(()=>{}).finally(()=>{ AG_LOADING.delete(m); AG_LOADED.add(m); if(view==='now') renderAgenda(); else if(view==='session') renderSessionDetail() });
+    }).catch(()=>{}).finally(()=>{ AGENDA._loading.delete(m); AGENDA._loaded.add(m); if(view==='now') renderAgenda(); else if(view==='session') renderSessionDetail() });
   }
 }
 function agendaPeriodLabel(){
@@ -1609,7 +1618,11 @@ function agendaPlenumHTML(s,max=6){
 }
 function agendaCmtHTML(s,max=4){
   const cancelled=(s.status||'').includes('מבוטלת');
-  return `<div class="agenda-sess ${cancelled?'cancelled':''}"><div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap"><b>${esc((s.start||'').slice(11,16))}</b><button class="chip cmt" title="${esc(s.committee||'')}" onclick="openCommittee('${s.committee_id}')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(s.committee||'ועדה')} ←</button>${followedCommittee(s.committee_id)?'<span class="chip abstain">★ במעקב שלי</span>':''}${s.type?`<span class="chip">${esc(s.type)}</span>`:''}${s.status?`<span class="chip ${cancelled?'against':''}">${esc(s.status)}</span>`:''}<button class="btn ghost small" style="padding:.25rem .65rem;margin-inline-start:auto" onclick="openSession('${s.id}')">לישיבה ←</button></div>
+  // Link to the committee page only when this Knesset actually has that
+  // committee in its data (K26 committees arrive after the sittings do).
+  const canOpenCmt=KN===26?!!((K26CMT?.committees)||[]).find(c=>String(c.id)===String(s.committee_id)):!!CMT_BY_ID[s.committee_id];
+  const cmtBtn=canOpenCmt?`<button class="chip cmt" title="${esc(s.committee||'')}" onclick="openCommittee('${s.committee_id}')">`:`<span class="chip cmt" title="${esc(s.committee||'')}">`;
+  return `<div class="agenda-sess ${cancelled?'cancelled':''}"><div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap"><b>${esc((s.start||'').slice(11,16))}</b>${cmtBtn}<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(s.committee||'ועדה')} ←${canOpenCmt?'</button>':'</span>'}${followedCommittee(s.committee_id)?'<span class="chip abstain">★ במעקב שלי</span>':''}${s.type?`<span class="chip">${esc(s.type)}</span>`:''}${s.status?`<span class="chip ${cancelled?'against':''}">${esc(s.status)}</span>`:''}<button class="btn ghost small" style="padding:.25rem .65rem;margin-inline-start:auto" onclick="openSession('${s.id}')">לישיבה ←</button></div>
   <div class="agenda-name small" style="margin-top:.25rem">${s.location?`<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.4-6.5-10.3A6.5 6.5 0 0 1 12 4a6.5 6.5 0 0 1 6.5 6.7C18.5 15.6 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg> ${esc(s.location)} · `:''}${s.items.length?`${s.items.length} נושאים על סדר היום`:'סדר היום טרם פורסם'}</div>
   ${s.items.length?`<ul class="agenda-items">${s.items.slice(0,max).map(agendaItemHTML).join('')}${s.items.length>max?`<li class="dim">…ועוד ${s.items.length-max} נושאים</li>`:''}</ul>`:''}</div>`;
 }

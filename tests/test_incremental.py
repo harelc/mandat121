@@ -35,7 +35,7 @@ class AgendaLoadExistingTest(unittest.TestCase):
                 "committees": [{"id": 11, "start": "2026-07-20"}],
             }), "utf-8")
             mod.DATA = data
-            out = mod.load_existing()
+            out = mod.load_existing(data / "agenda.json", data / "agenda")
         self.assertEqual(sorted(out["plenum"]), [1, 2])
         self.assertEqual(sorted(out["committees"]), [10, 11])
 
@@ -43,7 +43,7 @@ class AgendaLoadExistingTest(unittest.TestCase):
         mod = load_module("build_agenda.py")
         with tempfile.TemporaryDirectory() as td:
             mod.DATA = Path(td)
-            self.assertEqual(mod.load_existing(),
+            self.assertEqual(mod.load_existing(Path(td) / "agenda.json", Path(td) / "agenda"),
                              {"plenum": {}, "committees": {}})
 
 

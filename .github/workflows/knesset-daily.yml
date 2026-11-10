@@ -106,6 +106,7 @@ jobs:
       - name: Build K26 people layers (tenure, list order, committee members)
         if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_any == 'true' }}
         run: |
+          python3 -u build_agenda.py --knesset 26              # -> data/k26_agenda.json + data/k26_agenda/ (סדר יום pane on the K26 home; incremental window merge)
           python3 -u build_k25_tenure.py --knesset 26          # -> data/k26_tenure.json (no-op until positions publish)
           python3 -u build_k26_photos_official.py              # -> data/k26_official_photos.json + data/photos/ (portraits for K26 MKs with none yet; no-op until tenure exists)
           python3 -u build_mk_contacts.py --knesset 26         # -> data/k26_contacts.json (official contact/social/presence snapshot; --knesset 25 is refused, K25 file stays frozen)

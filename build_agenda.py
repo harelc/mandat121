@@ -38,7 +38,7 @@ from zoneinfo import ZoneInfo
 BASE = "https://knesset.gov.il/OdataV4/ParliamentInfo"
 HEADERS = {"Accept": "application/json", "User-Agent": "Mozilla/5.0 mandat121-build"}
 DATA = Path(__file__).parent / "data"
-KNESSET = 25
+KNESSET = 25  # default; --knesset selects the instance (25 -> data/agenda*, 26 -> data/k26_agenda*)
 DELAY = 0.12
 MONTHS_BACK = 2   # calendar window for the UI's day/week/month views
 MONTHS_AHEAD = 1  # future-dated sessions OData has already published
@@ -104,11 +104,11 @@ def sunday_of(d):
     return d - timedelta(days=(d.weekday() + 1) % 7)
 
 
-def load_existing():
-    """Previously built sessions, {(kind): {id: session}} from agenda.json
-    + every month shard. Session objects keep their built shape."""
+def load_existing(main_path, shard_dir):
+    """Previously built sessions, {kind: {id: session}} from the main
+    agenda file + every month shard. Session objects keep their built shape."""
     out = {"plenum": {}, "committees": {}}
-    p = DATA / "agenda.json"
+    p = main_path
     if p.exists():
         try:
             d = json.loads(p.read_text("utf-8"))
@@ -118,7 +118,6 @@ def load_existing():
                 out["committees"][s["id"]] = s
         except Exception:
             pass
-    shard_dir = DATA / "agenda"
     if shard_dir.exists():
         for f in shard_dir.glob("*.json"):
             try:
@@ -135,11 +134,15 @@ def load_existing():
 def main():
     import argparse
     ap = argparse.ArgumentParser()
+    ap.add_argument("--knesset", type=int, default=25, choices=(25, 26))
     ap.add_argument("--full", action="store_true",
                     help="rebuild the whole term from OData (default: "
                          "incremental — refetch only the recent window and "
                          "merge with the existing shards)")
     args = ap.parse_args()
+    kn = args.knesset
+    main_path = DATA / ("agenda.json" if kn == 25 else f"k{kn}_agenda.json")
+    shard_dir = DATA / ("agenda" if kn == 25 else f"k{kn}_agenda")
     today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
     this_sunday = sunday_of(today)
 
@@ -157,7 +160,7 @@ def main():
     win_end = sunday_of(last_ahead) + timedelta(days=7)  # exclusive
 
     def first_start(entity):
-        d = get(entity, {"$filter": f"KnessetNum eq {KNESSET}",
+        d = get(entity, {"$filter": f"KnessetNum eq {kn}",
                          "$orderby": "StartDate asc", "$top": "1", "$select": "StartDate"})
         v = d.get("value", [])
         return v[0]["StartDate"][:10] if v else today.isoformat()
@@ -170,7 +173,7 @@ def main():
     # existing shards. Old in-window sessions missing from the fresh fetch
     # drop out (unpublished/cancelled). --full or no previous output =
     # whole-term rebuild, exactly as before.
-    existing = {} if args.full else load_existing()
+    existing = {} if args.full else load_existing(main_path, shard_dir)
     incremental = bool(existing["plenum"] or existing["committees"])
     lo_date = win_start if incremental else full_start
     lo = f"{lo_date.isoformat()}T00:00:00Z"
@@ -181,7 +184,8 @@ def main():
     print(f"today (Israel): {today} · this week: {this_sunday} – {this_sunday + timedelta(days=6)}")
     print(f"inline window: {win_start} – {win_end - timedelta(days=1)} · full range from {full_start} (earliest session {earliest})")
 
-    bills = json.loads((DATA / "k25_bills.json").read_text("utf-8"))
+    bills_path = DATA / f"k{kn}_bills.json"
+    bills = json.loads(bills_path.read_text("utf-8")) if bills_path.exists() else []
     bill_ids = {b["id"] for b in bills if b.get("id")}
     print(f"bills in dataset: {len(bill_ids)}")
 
@@ -191,14 +195,14 @@ def main():
 
     print("committees...")
     committees = fetch_all("KNS_Committee", {
-        "$filter": f"KnessetNum eq {KNESSET}",
+        "$filter": f"KnessetNum eq {kn}",
         "$select": "Id,Name",
     })
     cmap = {c["Id"]: c["Name"] for c in committees}
 
     print("plenum sessions...")
     plenum = fetch_all("KNS_PlenumSession", {
-        "$filter": f"KnessetNum eq {KNESSET} and StartDate ge {lo} and StartDate lt {hi}",
+        "$filter": f"KnessetNum eq {kn} and StartDate ge {lo} and StartDate lt {hi}",
         "$orderby": "StartDate asc",
         "$select": "Id,Number,StartDate,FinishDate,IsSpecialMeeting",
     })
@@ -211,7 +215,7 @@ def main():
 
     print("committee sessions...")
     csessions = fetch_all("KNS_CommitteeSession", {
-        "$filter": f"KnessetNum eq {KNESSET} and StartDate ge {lo} and StartDate lt {hi}",
+        "$filter": f"KnessetNum eq {kn} and StartDate ge {lo} and StartDate lt {hi}",
         "$orderby": "StartDate asc",
         "$select": "Id,CommitteeID,StartDate,TypeDesc,StatusDesc,Location",
     })
@@ -281,7 +285,7 @@ def main():
 
     meta = {
         "generated_from": "Knesset OData v4: KNS_PlenumSession, KNS_PlmSessionItem, KNS_CommitteeSession, KNS_CmtSessionItem, KNS_Status",
-        "knesset": KNESSET,
+        "knesset": kn,
         "generated_at": datetime.now(ZoneInfo("Asia/Jerusalem")).isoformat(timespec="seconds"),
         "today": today.isoformat(),
         "this_week": [this_sunday.isoformat(), (this_sunday + timedelta(days=6)).isoformat()],
@@ -289,14 +293,13 @@ def main():
         "months": months,
         "loaded_months": inline_months,
     }
-    p = DATA / "agenda.json"
+    p = main_path
     p.write_text(json.dumps({**meta,
                              "plenum": [s for s in plenum_out if in_inline(s)],
                              "committees": [s for s in csess_out if in_inline(s)]},
                             ensure_ascii=False), "utf-8")
     print(f"\nwrote {p} ({p.stat().st_size/1e3:.0f} KB, inline months {inline_months})")
 
-    shard_dir = DATA / "agenda"
     shard_dir.mkdir(exist_ok=True)
     for old in shard_dir.glob("*.json"):
         old.unlink()

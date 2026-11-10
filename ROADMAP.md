@@ -160,6 +160,17 @@ now queued for refetch).
    (run 42819693977 — the lost commit predated the K26 alias fix, so
    nothing of value was lost). The commit step now rebases the data-only
    commit onto latest main and retries ×3; conflicts fail loudly.
+   **K26 סדר יום (2026-11-10):** `build_agenda.py --knesset 26` writes
+   `data/k26_agenda.json` + `data/k26_agenda/` shards (K25 paths untouched;
+   incremental window merge works per-Knesset). The UI agenda state is now
+   per-Knesset (`AG_CACHE`, `_loaded`/`_loading` on each agenda object,
+   reset in `switchKnesset`), and the K26 home renders the same agenda
+   pane as K25 — but only once the file contains ≥1 session, so it
+   appeared by itself with the inaugural sitting (2026-11-10 16:00,
+   1 item). Committee-session chips on K26 link to a committee page only
+   when that committee exists in `K26CMT`; otherwise the chip is plain
+   text. Daily workflow runs the K26 agenda build in the `k26_any`-gated
+   people-layers step.
 4. Party tab icon: replace 🚩/yellow-ribbon-adjacent imagery — the yellow
    ribbon is associated with the Gaza hostages; do not use it for parties.
 
