@@ -563,7 +563,8 @@ let VOTE_MODELS={}; // vote id -> normalised vote model (voteModel()); the only 
 let OFFICIAL_PHOTOS={}; // name -> official-portrait manifest entry (build_k25_photos_official.py); covers MKs absent from the roster file, notably those who left mid-term
 let PROTO_IDX={}, PROTO_CUR=null, protoFilter={speaker:'',q:''}; // committee protocols (build_protocols.py)
 let ANALYTICS=null; // MK analytics: correlation, close ties, ranks (build_analytics.py)
-let CONTACTS={}, CONTACTS_META={}; // official contact/social/presence snapshot (build_mk_contacts.py)
+let CONTACTS={}, CONTACTS_META={}; // official contact/social/presence snapshot, K25 (build_mk_contacts.py; data/mk_contacts.json is the frozen final-K25 roster)
+let CONTACTS26={}, CONTACTS26_META={}; // same, Knesset 26 (data/k26_contacts.json) — each Knesset's MK pages read their own roster's card
 let WIKI={}, WIKI_META={}; // Wikipedia abstracts + Wikidata-discovered X handles (build_mk_wiki.py) — NOT Knesset-official; label provenance
 let ROSTER25=new Set(); // the official current-120 roster (CONTACTS names, whitespace-normalised) — authoritative for current vs former
 let PROTO_SEARCH={}; // global protocol search index (build_protocols_search.py)
@@ -776,7 +777,7 @@ function billDocsHTML(b){
 /* ============ load ============ */
 async function load(){
   const vrP=fetch('data/k25_vote_results.json').then(r=>r.ok?r.json():null).catch(()=>null); // started now, awaited before the MK index is built
-  const [pr,kr,cr,abr,avr,lor,tnr,oph,cor,t26,b26,v26,lo26,c26,cm26,oph26]=await Promise.all([fetch('data/mk_photos.json'),fetch('data/k26_preview.json').catch(()=>null),fetch('data/committees.json').catch(()=>null),fetch('data/k25_bills.json').catch(()=>null),fetch('data/k25_votes.json').catch(()=>null),fetch('data/k25_list_order.json').catch(()=>null),fetch('data/k25_tenure.json').catch(()=>null),fetch('data/k25_official_photos.json').catch(()=>null),fetch('data/mk_contacts.json').catch(()=>null),fetch('data/k26_tenure.json').catch(()=>null),fetch('data/k26_bills.json').catch(()=>null),fetch('data/k26_votes.json').catch(()=>null),fetch('data/k26_list_order.json').catch(()=>null),fetch('data/k26_committees.json').catch(()=>null),fetch('data/k26_committee_members.json').catch(()=>null),fetch('data/k26_official_photos.json').catch(()=>null)]);
+  const [pr,kr,cr,abr,avr,lor,tnr,oph,cor,t26,b26,v26,lo26,c26,cm26,oph26,cor26]=await Promise.all([fetch('data/mk_photos.json'),fetch('data/k26_preview.json').catch(()=>null),fetch('data/committees.json').catch(()=>null),fetch('data/k25_bills.json').catch(()=>null),fetch('data/k25_votes.json').catch(()=>null),fetch('data/k25_list_order.json').catch(()=>null),fetch('data/k25_tenure.json').catch(()=>null),fetch('data/k25_official_photos.json').catch(()=>null),fetch('data/mk_contacts.json').catch(()=>null),fetch('data/k26_tenure.json').catch(()=>null),fetch('data/k26_bills.json').catch(()=>null),fetch('data/k26_votes.json').catch(()=>null),fetch('data/k26_list_order.json').catch(()=>null),fetch('data/k26_committees.json').catch(()=>null),fetch('data/k26_committee_members.json').catch(()=>null),fetch('data/k26_official_photos.json').catch(()=>null),fetch('data/k26_contacts.json').catch(()=>null)]);
   // Name keys are canonicalised (whitespace-collapsed) at ingestion: some
   // builders emit 'גואטה  ששון ששי' / 'דיסטל אטבריאן  גלית' with a double
   // space, others the single-space form. Un-normalised, the same person
@@ -800,6 +801,7 @@ async function load(){
   MKP=normKeys(await pr.json()); if(kr&&kr.ok){ K26=await kr.json(); (K26.parties||[]).forEach(p=>{ p.elected=(p.elected||[]).map(normName); p.candidates=(p.candidates||[]).map(normName) }) }
   const vr=await vrP; if(vr){ vr.names=(vr.names||[]).map(normName); VOTE_RES=vr }
   if(cor&&cor.ok){ const cj=await cor.json(); CONTACTS=normKeys(cj.by_name); CONTACTS_META=cj._meta||{}; ROSTER25=new Set(Object.keys(CONTACTS)) }
+  if(cor26&&cor26.ok){ const cj=await cor26.json(); CONTACTS26=normKeys(cj.by_name); CONTACTS26_META=cj._meta||{} }
   if(cr&&cr.ok){ CMT=await cr.json(); (CMT.committees||[]).forEach(c=>CMT_BY_ID[c.id]=c) }
   /* There is exactly one kind of vote: a plenum vote (VOTES_ALL), keyed
      everywhere — routes, "my vote", MK histories — by its vote id. A vote
@@ -2475,7 +2477,7 @@ function mkWikiHTML(name){
   <span class="small dim">טקסט: ויקיפדיה (CC BY-SA 4.0) · לא נוסח רשמי של הכנסת</span></div></div>`;
 }
 function mkContactHTML(name){
-  const c=CONTACTS[name];
+  const c=(KN===26?CONTACTS26:CONTACTS)[name]; // each Knesset reads its own roster's contact card
   // Presence: live read (ensureLivePresence) wins; until it lands — or if
   // it fails — the daily snapshot in `c` is the fallback, and the header
   // says which one you're looking at and as of when.
@@ -2487,13 +2489,14 @@ function mkContactHTML(name){
     if(live===undefined&&!wx) return '';
     return `${live!==undefined?`<div class="card pad" style="margin-top:.85rem"><h3>נוכחות <small class="dim">קריאה חיה מאפליקציית לובי הח״כים של הכנסת · נכון ל־${esc(liveWhen)}</small></h3><div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.55rem;align-items:center">${chipFor(live)}</div></div>`:''}${wx?`<div class="card pad" style="margin-top:.85rem"><h3>𝕏 ברשת <small class="dim">מויקינתונים בלבד</small></h3>
     <div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.55rem"><a class="chip" href="https://x.com/${esc(wx)}" target="_blank" rel="noopener" title="מקור: ויקינתונים (Wikidata), לא אתר הכנסת">𝕏 @${esc(wx)} · מויקינתונים ↗</a></div>
-    <p class="small dim" style="margin-top:.5rem">לח״כ לשעבר אין כרטיס קשר באתר הכנסת; הקישור הזה מויקינתונים (CC0) ועלול להיות לא מעודכן — בדקו בעמוד עצמו.</p></div>`:''}`;
+    <p class="small dim" style="margin-top:.5rem">${KN===26?'טרם פורסם כרטיס קשר לח״כ הזה/זו באתר הכנסת;':'לח״כ לשעבר אין כרטיס קשר באתר הכנסת;'} הקישור הזה מויקינתונים (CC0) ועלול להיות לא מעודכן — בדקו בעמוד עצמו.</p></div>`:''}`;
   }
   const soc=[['twitter','𝕏'],['facebook','פייסבוק'],['instagram','אינסטגרם'],['youtube','יוטיוב'],['website','אתר/ערוץ']].filter(([k])=>c[k]);
   // Wikidata-discovered X (build_mk_wiki.py): only when the Knesset publishes none.
   // Provenance is kept visibly separate — never presented as Knesset-official.
   const wdX=(!c.twitter&&WIKI[name]?.x_handles?.length)?WIKI[name].x_handles[0]:'';
-  const when=CONTACTS_META.fetched_at?new Date(CONTACTS_META.fetched_at).toLocaleString('he-IL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  const meta=KN===26?CONTACTS26_META:CONTACTS_META;
+  const when=meta.fetched_at?new Date(meta.fetched_at).toLocaleString('he-IL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
   return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m4 7.5 8 6 8-6"/></svg> יצירת קשר רשמית <small class="dim">כפי שמפורסם באתר הכנסת${live!==undefined?` · נוכחות חיה נכון ל־${esc(liveWhen)}`:when?` · נוכחות מצילום יומי, נכון ל־${esc(when)}`:''}</small></h3>
   <div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.55rem;align-items:center">
   ${chipFor(live!==undefined?live:c.present)}

@@ -132,6 +132,20 @@ def main():
         universe.update(norm(n) for n in json.loads(vp.read_text(encoding="utf-8")).get("names", []))
     universe.update(contacts)  # MkLobby spellings can differ from tenure/vote spellings
 
+    # Knesset 26: everyone serving (open stints) in the official roster.
+    # Same acceptance rules apply — a search hit needs Wikidata P39
+    # verification or the abstract itself saying חבר/ת הכנסת, so a new MK
+    # with no article (or a same-named non-MK) stays unresolved, honestly.
+    tp26 = Path("data/k26_tenure.json")
+    if tp26.exists():
+        tj = json.loads(tp26.read_text(encoding="utf-8"))
+        for sect in ("tenure", "factions"):
+            universe.update(norm(k) for k in tj.get(sect, {}))
+    cp26 = Path("data/k26_contacts.json")
+    if cp26.exists():
+        universe.update(norm(k) for k in
+                        json.loads(cp26.read_text(encoding="utf-8")).get("by_name", {}))
+
     resolved = {}   # name -> (title, method)
     for n, t in mapping.items():
         resolved[n] = (t, "curated_mapping")

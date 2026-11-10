@@ -68,12 +68,10 @@ jobs:
           python3 -u build_knesset.py --knesset 25
           python3 -u build_committees.py --knesset 25
           python3 -u build_protocols.py --knesset 25
-          # FROZEN 2026-11-10: build_mk_contacts.py intentionally NOT run.
-          # The MK-lobby feed flipped to the Knesset-26 roster at the 16:00
-          # swearing-in; overwriting data/mk_contacts.json would flip
-          # ROSTER25 to K26 names and break the K25 "current roster" views
-          # (only ~49 names overlap). The file stays the final K25 roster
-          # snapshot until contacts are split per-Knesset (mk_contacts25/26).
+          # data/mk_contacts.json is the frozen final-K25 roster snapshot —
+          # never rebuilt (the MK-lobby feed now serves K26). K26 contacts
+          # are built per-Knesset in the K26 step below; build_mk_contacts.py
+          # refuses --knesset 25 outright so this can't regress by accident.
           python3 -u build_k25_tenure.py --knesset 25
           python3 -u build_k25_committee_members.py --knesset 25
           python3 -u build_k25_list_order.py --knesset 25
@@ -110,6 +108,7 @@ jobs:
         run: |
           python3 -u build_k25_tenure.py --knesset 26          # -> data/k26_tenure.json (no-op until positions publish)
           python3 -u build_k26_photos_official.py              # -> data/k26_official_photos.json + data/photos/ (portraits for K26 MKs with none yet; no-op until tenure exists)
+          python3 -u build_mk_contacts.py --knesset 26         # -> data/k26_contacts.json (official contact/social/presence snapshot; --knesset 25 is refused, K25 file stays frozen)
           python3 -u build_k25_list_order.py --knesset 26      # -> data/k26_list_order.json (from CEC preview, works pre-OData)
           python3 -u build_k25_committee_members.py --knesset 26 # -> data/k26_committee_members.json
           python3 -u build_k25_roles.py --knesset 26             # -> data/k26_roles.json (no-op until positions publish)

@@ -14,21 +14,37 @@ must label it as such, never as history. There is no OData presence entity
 (verified against $metadata 2026-11-10) and no presence history in this
 API — do not fabricate a time series from it.
 
-Output: data/mk_contacts.json keyed by surname-first name (our MK key),
+Output: data/k{N}_contacts.json keyed by surname-first name (our MK key),
 plus `_meta`. Only official, Knesset-published channels are kept.
 Stdlib only. No auth, no secrets.
+
+The feed always returns the *current* roster — since 2026-11-10 that is
+Knesset 26. data/mk_contacts.json (no number) is the frozen final-K25
+snapshot and is never written by this builder again; --knesset 25 is
+refused so the K25 roster can never be silently overwritten with K26
+names (the UI derives its "current K25 roster" from that file).
 """
+import argparse
 import json
+import sys
 import urllib.request
 from datetime import datetime, timezone
 from pathlib import Path
 
 URL = "https://www.knesset.gov.il/WebSiteApi/knessetapi/MkLobby/GetMkLobbyData120?lang=he"
 HEADERS = {"Accept": "application/json", "User-Agent": "Mozilla/5.0 mandat121-build"}
-OUT = Path("data/mk_contacts.json")
 
 
 def main():
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--knesset", type=int, default=26, choices=(25, 26))
+    kn = ap.parse_args().knesset
+    if kn == 25:
+        print("REFUSED: the MK-lobby feed now serves the Knesset-26 roster; "
+              "data/mk_contacts.json stays the frozen final-K25 snapshot. "
+              "Run with --knesset 26.", file=sys.stderr)
+        return 1
+    out_path = Path(f"data/k{kn}_contacts.json")
     req = urllib.request.Request(URL, headers=HEADERS)
     with urllib.request.urlopen(req, timeout=60) as r:
         data = json.loads(r.read().decode("utf-8"))
@@ -62,8 +78,8 @@ def main():
         },
         "by_name": out,
     }
-    OUT.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
-    print(f"DONE {OUT} — {len(out)} MKs, {present} present at fetch time, "
+    out_path.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    print(f"DONE {out_path} — {len(out)} MKs, {present} present at fetch time, "
           f"twitter {sum(bool(v['twitter']) for v in out.values())}, "
           f"facebook {sum(bool(v['facebook']) for v in out.values())}, "
           f"instagram {sum(bool(v['instagram']) for v in out.values())}, "
@@ -71,4 +87,4 @@ def main():
 
 
 if __name__ == "__main__":
-    main()
+    sys.exit(main())

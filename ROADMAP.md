@@ -46,13 +46,20 @@ Built + verified locally (not pushed, per owner rule):
   the lobby feed (`?v=20261110`); the builder downloads only MKs missing
   from both K25 photo files, so no K25 portrait is replaced. Coverage is
   now 120/120. The UI merges the K26 manifest over the K25 one in `load()`.
-- `mk_contacts.json` deliberately **not** refreshed: the lobby feed now
-  returns the K26 120 (49-name overlap with K25), and the UI uses that file
-  as the K25 current roster (`ROSTER25`). The daily workflow's
-  `build_mk_contacts.py` step is frozen with an explanatory comment until
-  contacts are split per-Knesset. K26 MK pages get presence live in-browser;
-  their contact cards still show the frozen K25 snapshot's data for
-  returning MKs only — split is the next step here.
+- Contacts split per-Knesset (done same day): `build_mk_contacts.py
+  --knesset 26` → `data/k26_contacts.json` (120 MKs, 117 emails), wired
+  into the daily workflow's K26 step. `--knesset 25` is refused outright —
+  the lobby feed serves only the current roster, and `data/mk_contacts.json`
+  stays the frozen final-K25 snapshot the UI derives `ROSTER25` from.
+  `mkContactHTML` reads the active Knesset's file. Result: every K26 MK
+  page has its official contact card (120/120).
+- Wikipedia abstracts for K26 (done same day): `build_mk_wiki.py`'s
+  universe now includes the K26 serving roster. 115/120 resolved by the
+  usual rules; the last 5 have articles under different transliterations
+  than any of our name sources (כמיל אבו רוקון, חסן א-נסאסרה, יהודה
+  וייספיש, עבד מסרי, משה רוזנטל (פוליטיקאי)) — added to the hand-curated
+  `data/mk_wiki.json` (source C), each verified by hand ("נבחר לכנסת
+  ה־26" in the lead). Coverage: **120/120** serving MKs with abstracts.
 - Still unpublished by the Knesset, so still empty states (honest, not
   backfilled): K26 bills, committees, committee memberships, votes.
 
