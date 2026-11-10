@@ -206,7 +206,14 @@ def main():
         d += timedelta(days=7)
     if (win_end - timedelta(days=1)).isoformat()[:7] not in months:
         months.append((win_end - timedelta(days=1)).isoformat()[:7])
-    inline_months = [m for m in months if win_start.isoformat()[:7] <= m <= (win_end - timedelta(days=1)).isoformat()[:7]]
+    # Only months FULLY inside the inline window count as loaded: the window
+    # is week-padded, so its first/last months are partial (e.g. inline from
+    # Aug 30 must not mark August loaded — its shard still has Aug 3–29).
+    def month_first(m):
+        y, mo = map(int, m.split("-"))
+        return date(y, mo, 1)
+    inline_months = [m for m in months
+                     if month_first(m) >= win_start and add_months(month_first(m), 1) <= win_end]
     in_inline = lambda s: s["start"][:10] >= win_start.isoformat() and s["start"][:10] < win_end.isoformat()
 
     meta = {

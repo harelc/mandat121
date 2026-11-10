@@ -773,7 +773,7 @@ function scoreHTML(b,big=false){
 }
 function myVoteHTML(b,large=false){
   const mine=S.myVotes[String(b.id)];
-  return `<div class="myvote" onclick="event.stopPropagation()"><span class="lbl">אני הייתי:</span>
+  return `<div class="myvote" onclick="event.stopPropagation()"><span class="lbl">אני הייתי מצביע:</span>
     ${[1,2,3].map(v=>`<button class="mv ${mine===v?'sel':''}" data-v="${v}" style="${large?'padding:.75rem .2rem;font-size:1rem':''}" onclick="castMine('${b.id}',${v},this)">${v===1?'✓ בעד':v===2?'✕ נגד':'– נמנע'}</button>`).join('')}</div>`;
 }
 function castMine(id,v,el){
@@ -1301,7 +1301,7 @@ function renderNow26(){
   <div class="sec-title">מה כבר יש, ומה יגיע</div>
   <div class="grid c2">
     <div class="card pad"><h3>✓ כבר כאן</h3><div class="small muted" style="line-height:2">תוצאות הבחירות הרשמיות ומנדטים<br>רשימות המועמדים בסדר הרשמי (466)<br>120 הנבחרים וצבעי הסיעות של כנסת 26<br>קישור מהנבחרים להיסטוריית ההצבעות שלהם בכנסת 25</div></div>
-    <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> יגיע בהמשך — מעצמו</h3><div class="small muted" style="line-height:2">רשימת הח״כים הרשמית של הכנסת ה־26<br>הצעות החוק הראשונות<br>ישיבות הוועדות הראשונות<br>ההצבעות הראשונות במליאה — ומהן גם ״אני הייתי״ ו״מי מצביע כמוני״<br><span class="dim">הכנסת החדשה עוד לא פרסמה כלום. ברגע שתתחיל — זה יופיע כאן לבד.</span></div></div>
+    <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> יגיע בהמשך — מעצמו</h3><div class="small muted" style="line-height:2">רשימת הח״כים הרשמית של הכנסת ה־26<br>הצעות החוק הראשונות<br>ישיבות הוועדות הראשונות<br>ההצבעות הראשונות במליאה — ומהן גם ״אני הייתי מצביע״ ו״מי מצביע כמוני״<br><span class="dim">הכנסת החדשה עוד לא פרסמה כלום. ברגע שתתחיל — זה יופיע כאן לבד.</span></div></div>
   </div>
   <div style="text-align:center;margin-top:1.1rem"><button class="btn" onclick="switchKnesset(25)">לראות איך זה נראה עם נתונים מלאים — כנסת 25 ←</button></div>`;
   if(K26) setTimeout(()=>{document.querySelectorAll('#k26plenum .seat').forEach((el,i)=>el.addEventListener('click',()=>{
@@ -1589,7 +1589,7 @@ function openBillPage(billId){
 function renderBillLite(){
   const b=ALLB_BY_ID[viewArg]; const app=$('#app'); if(!b){go('bills');return}
   location.hash='bill='+b.id;
-  // This is the bill page: no single vote's plenum map or "אני הייתי" here —
+  // This is the bill page: no single vote's plenum map or "אני הייתי מצביע" here —
   // those live on each vote's own page, reached from the vote list below.
   const eraVotes=VOTES_ALL.filter(v=>v.item_id===b.id);
   app.innerHTML=`
@@ -1615,7 +1615,7 @@ function renderBillLite(){
   ${b.doc_url&&String(b.doc_url).toLowerCase().includes('.pdf')?`<div class="card pad" style="margin-top:.85rem"><div style="display:flex;gap:.6rem;align-items:center"><h3 style="flex:1"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> נוסח ההצעה — לקריאה כאן</h3><button class="btn" id="pdfbtn" onclick="togglePdf('${b.id}')">הצגת הנוסח</button></div><div id="pdfbox" style="margin-top:.6rem"></div></div>`:''}
   ${billCmtHTML({bill_id:b.id})}
   <div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> כל אירועי המליאה על ההצעה (${eraVotes.length})</h3>
-  ${eraVotes.length?`<div class="small dim" style="margin-top:.3rem">כל שורה היא הצבעה נפרדת — לחיצה פותחת את דף ההצבעה שלה, עם מפת המליאה ו״אני הייתי״ לאותה הצבעה.</div><div class="rows" style="margin:.5rem -.9rem 0">${eraVotes.map(v=>`<div class="row" onclick="openVote('${v.id}')"><span class="chip acc">${esc(v.kind_label)}</span><span class="flex">${esc(v.desc||v.title||'')}<br><span class="dim small">${fmtDate(v.date)}${v.for!=null?` · ${v.for}–${v.against} · ${v.for>v.against?'עברה':'נדחתה'}`:''}</span></span><span class="chip acc">להצבעה ←</span></div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">ההצעה לא הגיעה למליאה בתקופה המתועדת — זה בדיוק סוג החוקים שנעלמים באתר הכנסת.</p>'}
+  ${eraVotes.length?`<div class="small dim" style="margin-top:.3rem">כל שורה היא הצבעה נפרדת — לחיצה פותחת את דף ההצבעה שלה, עם מפת המליאה ו״אני הייתי מצביע״ לאותה הצבעה.</div><div class="rows" style="margin:.5rem -.9rem 0">${eraVotes.map(v=>`<div class="row" onclick="openVote('${v.id}')"><span class="chip acc">${esc(v.kind_label)}</span><span class="flex">${esc(v.desc||v.title||'')}<br><span class="dim small">${fmtDate(v.date)}${v.for!=null?` · ${v.for}–${v.against} · ${v.for>v.against?'עברה':'נדחתה'}`:''}</span></span><span class="chip acc">להצבעה ←</span></div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">ההצעה לא הגיעה למליאה בתקופה המתועדת — זה בדיוק סוג החוקים שנעלמים באתר הכנסת.</p>'}
   </div>`;
   window.scrollTo(0,0);
 }
@@ -1736,7 +1736,7 @@ function renderVote(){
   const plnSess=plenumForDate(b.vote_date);
   app.innerHTML=`
   <button class="btn ghost" onclick="go('votes')">› חזרה להצבעות</button>
-  <div class="sec-title" style="margin-top:.4rem">הצבעה במליאה <small>דף הצבעה — מפת המליאה, פירוט לפי ח״כ ו״אני הייתי״ מתייחסים להצבעה הזאת בלבד</small></div>
+  <div class="sec-title" style="margin-top:.4rem">הצבעה במליאה <small>דף הצבעה — מפת המליאה, פירוט לפי ח״כ ו״אני הייתי מצביע״ מתייחסים להצבעה הזאת בלבד</small></div>
   <article class="card pad rise" style="margin-top:.6rem">
     <div style="display:flex;gap:.6rem;align-items:flex-start">
       <div style="flex:1">
@@ -1884,7 +1884,7 @@ function mkSortPillsHTML(){
     ['votes',KN===26?'הכי הרבה הצבעות בכנסת 25':'הכי הרבה הצבעות'],
     ['initiated',KN===26?'הכי הרבה חוקים שיזמו בכנסת 25':'הכי הרבה חוקים שיזמו'],
     ['agreement','הכי כמוני בהצבעות']];
-  return `<div class="chips" role="group" aria-label="מיון"><span class="pill-lbl">מיון:</span>${opts.map(([k,v])=>`<button class="chip ${mkFilter.sort===k?'on':''}" ${k==='agreement'&&!hasMine?'disabled title="סמנו קודם ״אני הייתי״ על חוק" style="opacity:.45;cursor:not-allowed"':''} onclick="mkFilter.sort='${k}';renderMks()">${v}</button>`).join('')}</div>`;
+  return `<div class="chips" role="group" aria-label="מיון"><span class="pill-lbl">מיון:</span>${opts.map(([k,v])=>`<button class="chip ${mkFilter.sort===k?'on':''}" ${k==='agreement'&&!hasMine?'disabled title="סמנו קודם ״אני הייתי מצביע״ על חוק" style="opacity:.45;cursor:not-allowed"':''} onclick="mkFilter.sort='${k}';renderMks()">${v}</button>`).join('')}</div>`;
 }
 function mkStatusPillsHTML(currentCount,formerCount){
   const total=currentCount+formerCount;
@@ -2108,7 +2108,7 @@ function renderMkDetail(){
         <div><span style="color:var(--against)">●</span> נגד <b>${c[2]}</b> (${Math.round(c[2]/tot*100)}%)</div>
         <div><span style="color:var(--abstain)">●</span> נמנע <b>${c[3]}</b> (${Math.round(c[3]/tot*100)}%)</div>
         ${loyT?`<div><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> נאמנות לסיעה: <b>${Math.round(loy/loyT*100)}%</b> (${loy}/${loyT})</div>`:''}
-        ${mine?`<div><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3S4 15.4 2.6 10.6C1.7 7.4 3.9 4.5 6.9 4.5c2 0 3.9 1.2 5.1 3 1.2-1.8 3.1-3 5.1-3 3 0 5.2 2.9 4.3 6.1C20 15.4 12 20.3 12 20.3z"/></svg> התאמה אליך: <b style="color:var(--accent)">${mine.pct}%</b> על ${mine.n} הצבעות משותפות</div>`:'<div class="dim">סמנו ״אני הייתי״ על חוקים — ותראו כאן התאמה אליכם.</div>'}
+        ${mine?`<div><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3S4 15.4 2.6 10.6C1.7 7.4 3.9 4.5 6.9 4.5c2 0 3.9 1.2 5.1 3 1.2-1.8 3.1-3 5.1-3 3 0 5.2 2.9 4.3 6.1C20 15.4 12 20.3 12 20.3z"/></svg> התאמה אליך: <b style="color:var(--accent)">${mine.pct}%</b> על ${mine.n} הצבעות משותפות</div>`:'<div class="dim">סמנו ״אני הייתי מצביע״ על חוקים — ותראו כאן התאמה אליכם.</div>'}
       </div>
     </div>
     ${topTopics.length?`<div class="chips" style="margin-top:.8rem"><span class="small dim" style="align-self:center">מצביע/ה הרבה על:</span>${topTopics.map(([t,n])=>`<button class="chip" onclick="filterTopic('${jsq(t)}')">${esc(t)} · ${n}</button>`).join('')}</div>`:''}
@@ -2669,7 +2669,7 @@ function renderMine(){
   ${prevSeen&&newSince.length?`<div class="card pad rise" style="margin-bottom:.85rem"><b>מאז הביקור הקודם (${fmtDate(prevSeen)}):</b> <span class="muted">${newSince.length} הצבעות חדשות במליאה.</span> <button class="btn" style="margin-inline-start:.5rem" onclick="go('now')">לראות ←</button></div>`:''}
   <div class="grid c2">
     <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> איך הייתי מצביע/ה (${mineBills.length})</h3>
-      ${mineBills.length?`<div class="rows" style="margin:.4rem -.9rem 0">${mineBills.slice(0,12).map(({b,v})=>`<div class="row" onclick="openVote('${b.id}')"><span class="flex">${esc(displayText(b))}<br><span class="dim small">${fmtDate(b.vote_date)}${b.kind_label?` · ${esc(b.kind_label)}`:b.vote_reading!=null?` · ${RL[b.vote_reading]||''}`:''}</span></span><span class="vchip ${v===1?'f':v===2?'a':'n'}">אני: ${{1:'בעד',2:'נגד',3:'נמנע'}[v]}</span><span class="dim small">${b.total_for}–${b.total_against}</span></div>`).join('')}</div>${mineBills.length>12?`<div class="small dim" style="margin-top:.45rem">מוצגות 12 ההצבעות האחרונות; דירוג הח״כים והסיעות למטה מחושב על כל ${mineBills.length} ההצבעות שסימנת.</div>`:''}`:'<p class="muted small" style="margin-top:.4rem">עוד לא סימנתם כלום. פתחו חוק ולחצו ״אני הייתי: בעד / נגד / נמנע״ — כאן תיבנה תמונת הייצוג שלכם.</p><button class="btn primary" style="margin-top:.6rem" onclick="go(\'bills\')">לחוקים ←</button>'}
+      ${mineBills.length?`<div class="rows" style="margin:.4rem -.9rem 0">${mineBills.slice(0,12).map(({b,v})=>`<div class="row" onclick="openVote('${b.id}')"><span class="flex">${esc(displayText(b))}<br><span class="dim small">${fmtDate(b.vote_date)}${b.kind_label?` · ${esc(b.kind_label)}`:b.vote_reading!=null?` · ${RL[b.vote_reading]||''}`:''}</span></span><span class="vchip ${v===1?'f':v===2?'a':'n'}">אני: ${{1:'בעד',2:'נגד',3:'נמנע'}[v]}</span><span class="dim small">${b.total_for}–${b.total_against}</span></div>`).join('')}</div>${mineBills.length>12?`<div class="small dim" style="margin-top:.45rem">מוצגות 12 ההצבעות האחרונות; דירוג הח״כים והסיעות למטה מחושב על כל ${mineBills.length} ההצבעות שסימנת.</div>`:''}`:'<p class="muted small" style="margin-top:.4rem">עוד לא סימנתם כלום. פתחו חוק ולחצו ״אני הייתי מצביע: בעד / נגד / נמנע״ — כאן תיבנה תמונת הייצוג שלכם.</p><button class="btn primary" style="margin-top:.6rem" onclick="go(\'bills\')">לחוקים ←</button>'}
     </div>
     <div class="card pad"><h3>★ במעקב שלי (${followCount()})</h3>
       ${followCount()?`
@@ -2684,7 +2684,7 @@ function renderMine(){
   ${farRank.length?`<h3 style="margin:.9rem 0 .5rem">הכי רחוקים ממני</h3>${farRank.map((r,i)=>`<div class="row" style="margin:0 -.9rem" onclick="openMk('${jsq(r.n)}')"><b style="color:var(--dim);width:1.7rem">${rank.length-i}</b>${avatar(r.n,r.f,36)}<span class="flex">${esc(disp(r.n))}<br><span class="dim small">${esc(shortF(r.f))} · ${r.t} משותפות</span></span><b style="color:var(--against)">${r.pct}%</b></div>`).join('')}`:''}</div>
   <div class="card pad"><h3 style="margin-bottom:.5rem">לפי סיעה</h3>${partyGroups.map(g=>`<div style="display:flex;gap:.45rem;align-items:center;margin:.2rem 0 .35rem"><span class="chip acc">כנסת ${g.kn}</span><span class="small dim">לפי ההצבעות שסימנת בכנסת ${g.kn}</span></div>${g.rows.map(x=>`<div class="fbar" style="cursor:pointer" onclick="openFactionIn(${g.kn},'${jsq(x.f)}')" title="${esc(x.f)}: ${x.pct}% התאמה · ${x.n} ח״כים בדירוג — לדף הסיעה בכנסת ${g.kn}"><span class="nm" style="color:${fcol(x.f)}">${esc(x.f)} ←</span><span class="tr"><span class="progress"><i style="width:${x.pct}%;background:linear-gradient(90deg,var(--accent),var(--for))"></i></span></span><b>${x.pct}%</b></div>`).join('')}`).join('')}
   <div class="small dim" style="margin-top:.45rem">כשיתחילו הצבעות כנסת 26, סיעותיה יופיעו כאן בקבוצה נפרדת מתויגת ״כנסת 26״ — שמות סיעות לא נפתרים מול הכנסת הלא־נכונה.</div></div></div>`
-  :`<div class="card empty" style="margin-top:.85rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg></div>אחרי שתסמנו לפחות 2–3 ״אני הייתי״, כאן יופיע מי מצביע כמוכם — ח״כים וסיעות.</div>`}`;
+  :`<div class="card empty" style="margin-top:.85rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg></div>אחרי שתסמנו לפחות 2–3 ״אני הייתי מצביע״, כאן יופיע מי מצביע כמוכם — ח״כים וסיעות.</div>`}`;
 }
 
 load().catch(e=>{$('#app').innerHTML=`<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.8 20h18.4z"/><path d="M12 10v4.2M12 17.2v.3"/></svg></div>שגיאה בטעינת הנתונים: ${esc(e.message)}<br><span class="small">הריצו שרת מקומי: python3 -m http.server 8080 ופתחו את הדף הראשי</span></div>`});

@@ -137,11 +137,17 @@ home page — `build_agenda.py` → `data/agenda.json` (wired into
 (`KNS_PlenumSession`+`KNS_PlmSessionItem`) and committee sittings
 (`KNS_CommitteeSession`+`KNS_CmtSessionItem`) in a **day / week / month**
 calendar (month grid clicks through to the day view; prev/next steps by the
-active mode; window = whole calendar months, 2 back / 1 ahead, padded to
-full weeks). Bill items
+active mode). Recent months (2 back / 1 ahead) ship inline in
+`agenda.json`; **every month back to the Knesset's first session ships as a
+`data/agenda/YYYY-MM.json` shard** (52 shards, 11,274 sessions at first
+build) that the UI fetches and merges on first navigation to that month —
+so the calendar scrolls back the whole term (Nov 2022 →) without one huge
+file. Builder note: item rows are fetched in one `ge/le` range scan over
+session IDs (chronological) filtered locally, not hundreds of `in (...)`
+queries (~15× faster). Bill items
 deep-link to bill pages, sittings open in-app (agenda sessions resolve in
 `renderSessionDetail` too), followed committees are ★-highlighted, and
-prev/next-week navigation covers every published week in the window.
+prev/next navigation steps day/week/month across the whole term.
 Honest recess behaviour: OData creates session rows only when the Knesset
 publishes them (verified 2026-11-10: no rows at all for 8–14 Nov, last
 plenum 2026-07-28), so an unpublished week is labelled as such and the
