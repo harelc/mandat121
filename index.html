@@ -1202,13 +1202,25 @@ function searchGroups(qRaw){
   const q=normQ(qRaw); if(!q) return [];
   const groups=[];
   const push=(label,all,items,more)=>{ if(!all.length)return; if(more&&all.length>items.length) items=[...items,more(all.length)]; groups.push([`${label}${all.length>SEARCH_GROUP_LIMIT?` · ${all.length.toLocaleString('he-IL')} התאמות`:''}`,items]) };
-  { // MKs: typed given-first or surname-first; current members first
+  { // MKs: typed given-first or surname-first; current members first.
+    // Universe = K25 sources (photos / vote index / frozen contacts) PLUS
+    // the K26 serving roster and elected lists — new K26 MKs are in none
+    // of the K25 files, so without this they were unsearchable.
     const factionOf=n=>MKP[n]?.faction||mkIndex[n]?.faction||FACTION25[n]||'';
-    const all=dedupeNames([...Object.keys(MKP),...Object.keys(mkIndex),...Object.keys(CONTACTS)])
-      .map(n=>({n,r:bestRank([disp(n),n],q)})).filter(x=>x.r>=0)
-      .sort((a,b)=>a.r-b.r||(isCurrentMk(b.n)-isCurrentMk(a.n))||disp(a.n).localeCompare(disp(b.n),'he'));
+    const in26={}, party26={};
+    for(const [n,st] of Object.entries(K26_TENURE)) if((st||[]).some(x=>!x[1])) in26[n]=1;
+    if(K26) for(const p of K26.parties){ (p.elected||[]).forEach(n=>{ in26[n]=1; party26[n]=p.name }); (p.candidates||[]).forEach(n=>{ if(in26[n]&&!party26[n]) party26[n]=p.name }) }
+    const all=dedupeNames([...Object.keys(MKP),...Object.keys(mkIndex),...Object.keys(CONTACTS),...Object.keys(in26),...Object.keys(CONTACTS26)])
+      .map(n=>{ const has25=!!(mkIndex[n]||MKP[n]), has26=!!in26[n];
+        return {n,has25,has26,r:bestRank([disp(n),n],q)} }).filter(x=>x.r>=0)
+      .sort((a,b)=>a.r-b.r||(((KN===26?b.has26:b.has25)) - ((KN===26?a.has26:a.has25)))||disp(a.n).localeCompare(disp(b.n),'he'));
     const items=all.slice(0,SEARCH_GROUP_LIMIT)
-      .map(({n})=>{ const f=factionOf(n); return {html:`${avatar(n,f,28)}<span class="flex">${esc(disp(n))}<span class="sub">${esc(shortF(f))} · ${isCurrentMk(n)?'מכהן/ת כיום':'כיהן/ה בכנסת 25'}</span></span>`, go:()=>openMk(n)} });
+      .map(({n,has25,has26})=>{ const f=factionOf(n);
+        const sub=(has26&&(KN===26||!has25))?`${esc(party26[n]||shortF(K26_FACTIONS[n]||''))} · כנסת 26${has25?' · כיהן/ה גם בכנסת 25':''}`:`${esc(shortF(f))} · ${isCurrentMk(n)?'מכהן/ת כיום':'כיהן/ה בכנסת 25'}`;
+        // Open the person in a Knesset they actually sat in: K26-only MKs
+        // in 26, K25-only in 25, both — wherever the user already is.
+        const target=has26&&!has25?26:has25&&!has26?25:KN;
+        return {html:`${avatar(n,party26[n]||f,28)}<span class="flex">${esc(disp(n))}<span class="sub">${sub}</span></span>`, go:()=>{ if(KN!==target) switchKnesset(target); openMk(n) }} });
     push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> ח״כים',all,items,total=>searchMoreItem(total,items.length,'הח״כים',()=>{ mkFilter.q=qRaw; mkFilter.status='all'; go('mks') }));
   }
   { // Factions / lists of the active Knesset

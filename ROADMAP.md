@@ -143,6 +143,23 @@ now queued for refetch).
    to prove it end-to-end. Note: Netlify deploys here are currently manual
    (`netlify deploy --prod --dir=<staging>`, see Deploy) — the workflow
    does not yet trigger one.
+   **Speed (2026-11-10):** a full run took 62 min, almost all of it three
+   builders re-fetching all of history daily. Now incremental:
+   `build_agenda.py` refetches only the recent window and merges with the
+   existing shards (22 min → ~4 s; `--full` = old behaviour), and
+   `build_knesset.py` pulls only bills changed since the watermark in
+   `data/k25_build_meta.json` plus a 7-day vote window (full ~8–12 min →
+   ~4 s). Caveat found live: on 2026-11-04 the Knesset mass-bumped every
+   bill's `LastUpdatedDate` (7,484/7,491 on one day), so the first
+   incremental run after a sweep like that costs a full pass — after it,
+   the watermark is current and daily deltas are a handful of bills.
+   Still full-rescan daily (next targets): `build_odata_extras.py`
+   (~13 min) and `build_committees.py` + protocols (~7 min).
+   **Push race (2026-11-10):** the scheduled run's bare `git push` was
+   rejected non-fast-forward after main moved during its hour-long build
+   (run 42819693977 — the lost commit predated the K26 alias fix, so
+   nothing of value was lost). The commit step now rebases the data-only
+   commit onto latest main and retries ×3; conflicts fail loudly.
 4. Party tab icon: replace 🚩/yellow-ribbon-adjacent imagery — the yellow
    ribbon is associated with the Gaza hostages; do not use it for parties.
 

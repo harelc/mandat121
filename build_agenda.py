@@ -104,7 +104,42 @@ def sunday_of(d):
     return d - timedelta(days=(d.weekday() + 1) % 7)
 
 
+def load_existing():
+    """Previously built sessions, {(kind): {id: session}} from agenda.json
+    + every month shard. Session objects keep their built shape."""
+    out = {"plenum": {}, "committees": {}}
+    p = DATA / "agenda.json"
+    if p.exists():
+        try:
+            d = json.loads(p.read_text("utf-8"))
+            for s in d.get("plenum", []):
+                out["plenum"][s["id"]] = s
+            for s in d.get("committees", []):
+                out["committees"][s["id"]] = s
+        except Exception:
+            pass
+    shard_dir = DATA / "agenda"
+    if shard_dir.exists():
+        for f in shard_dir.glob("*.json"):
+            try:
+                d = json.loads(f.read_text("utf-8"))
+            except Exception:
+                continue
+            for s in d.get("plenum", []):
+                out["plenum"][s["id"]] = s
+            for s in d.get("committees", []):
+                out["committees"][s["id"]] = s
+    return out
+
+
 def main():
+    import argparse
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--full", action="store_true",
+                    help="rebuild the whole term from OData (default: "
+                         "incremental — refetch only the recent window and "
+                         "merge with the existing shards)")
+    args = ap.parse_args()
     today = datetime.now(ZoneInfo("Asia/Jerusalem")).date()
     this_sunday = sunday_of(today)
 
@@ -129,8 +164,20 @@ def main():
 
     earliest = min(first_start("KNS_PlenumSession"), first_start("KNS_CommitteeSession"))
     full_start = sunday_of(add_months(date.fromisoformat(earliest), 0))
-    lo = f"{full_start.isoformat()}T00:00:00Z"
+    # Incremental (default): history months are immutable once past — only
+    # the inline window (recent ±, where new sittings get published, items
+    # change and sittings get cancelled) is refetched, then merged over the
+    # existing shards. Old in-window sessions missing from the fresh fetch
+    # drop out (unpublished/cancelled). --full or no previous output =
+    # whole-term rebuild, exactly as before.
+    existing = {} if args.full else load_existing()
+    incremental = bool(existing["plenum"] or existing["committees"])
+    lo_date = win_start if incremental else full_start
+    lo = f"{lo_date.isoformat()}T00:00:00Z"
     hi = f"{win_end.isoformat()}T00:00:00Z"
+    print(f"mode: {'incremental from ' + lo_date.isoformat() if incremental else 'FULL'}"
+          f" · existing sessions: {len(existing.get('plenum', {}))} plenum, "
+          f"{len(existing.get('committees', {}))} committees")
     print(f"today (Israel): {today} · this week: {this_sunday} – {this_sunday + timedelta(days=6)}")
     print(f"inline window: {win_start} – {win_end - timedelta(days=1)} · full range from {full_start} (earliest session {earliest})")
 
@@ -196,6 +243,22 @@ def main():
         "status": s.get("StatusDesc"), "location": s.get("Location"),
         "items": [item(it) for it in c_by_session.get(s["Id"], [])],
     } for s in csessions]
+
+    if incremental:
+        # Fresh window wins; in-window sessions the feed no longer returns
+        # are dropped; everything older carries over untouched.
+        ws, we = win_start.isoformat(), win_end.isoformat()
+        merged_p = {i: s for i, s in existing["plenum"].items()
+                    if not (ws <= (s.get("start") or "")[:10] < we)}
+        merged_c = {i: s for i, s in existing["committees"].items()
+                    if not (ws <= (s.get("start") or "")[:10] < we)}
+        for s in plenum_out:
+            merged_p[s["id"]] = s
+        for s in csess_out:
+            merged_c[s["id"]] = s
+        plenum_out = sorted(merged_p.values(), key=lambda s: (s.get("start") or "", s["id"]))
+        csess_out = sorted(merged_c.values(), key=lambda s: (s.get("start") or "", s["id"]))
+        print(f"merged: {len(plenum_out)} plenum, {len(csess_out)} committee sessions total")
 
     # All months in the full range, and which of them ship inline.
     months, d = [], full_start

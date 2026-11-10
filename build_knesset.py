@@ -17,11 +17,21 @@ Unlike fetch_all_bills.py (vote-linked bills only), this builds:
       by kind (readings, reservations, no-confidence, transfers, agenda…)
       with tallies merged from the existing results dataset where known.
 
-Usage: python3 -u build_knesset.py [--knesset 25]
+Usage: python3 -u build_knesset.py [--knesset 25] [--full]
+
+Default is incremental: bills whose LastUpdatedDate is newer than the
+watermark in data/k{N}_build_meta.json (minus a 2-day overlap) are
+refetched with their initiators/documents, votes are refetched from a
+7-day overlap window, and everything else is carried over from the
+existing k{N}_bills.json / k{N}_bill_docs.json / k{N}_votes.json.
+Bills are never deleted from OData (withdrawal is a status change,
+which bumps LastUpdatedDate), so a changed-only merge cannot lose one;
+--full (or a missing watermark/output) rebuilds everything as before.
 Stdlib only. Explicit $skip/$top pagination throughout.
 """
 import argparse
 import json
+import re
 import time
 import urllib.parse
 import urllib.request
@@ -177,9 +187,25 @@ def classify(desc, title=""):
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--knesset", type=int, default=25)
+    ap.add_argument("--full", action="store_true")
     args = ap.parse_args()
     kn = args.knesset
-    print(f"=== Full build, Knesset {kn} ===", flush=True)
+
+    pb = DATA / f"k{kn}_bills.json"
+    pv = DATA / f"k{kn}_votes.json"
+    pd_ = DATA / f"k{kn}_bill_docs.json"
+    meta_path = DATA / f"k{kn}_build_meta.json"
+    old_bills, old_docs, old_votes, meta = {}, {}, [], {}
+    if not args.full and pb.exists() and pv.exists() and meta_path.exists():
+        try:
+            old_bills = {b["id"]: b for b in json.loads(pb.read_text("utf-8"))}
+            old_docs = json.loads(pd_.read_text("utf-8")) if pd_.exists() else {}
+            old_votes = json.loads(pv.read_text("utf-8"))
+            meta = json.loads(meta_path.read_text("utf-8"))
+        except Exception:
+            old_bills, old_docs, old_votes, meta = {}, {}, [], {}
+    incremental = bool(old_bills and meta.get("bills_watermark"))
+    print(f"=== {'Incremental' if incremental else 'Full'} build, Knesset {kn} ===", flush=True)
 
     print("statuses + committees...", flush=True)
     smap = {s["Id"]: s["Desc"] for s in fetch_all(
@@ -188,17 +214,35 @@ def main():
         "KNS_Committee", {"$filter": f"KnessetNum eq {kn}",
                           "$select": "Id,Name"}, label="committees")}
 
-    print("all bills...", flush=True)
-    bills = fetch_all("KNS_Bill", {
-        "$filter": f"KnessetNum eq {kn}",
-        "$select": ("Id,Name,TypeDesc,SubTypeID,SubTypeDesc,StatusID,CommitteeID,"
-                    "PrivateNumber,Number,PublicationDate,SummaryLaw,LastUpdatedDate,"
-                    "PostponementReasonDesc,IsContinuationBill,PublicationSeriesDesc,"
-                    "MagazineNumber,PageNumber"),
-        "$orderby": "Id",
-    }, label="bills")
+    BILL_SELECT = ("Id,Name,TypeDesc,SubTypeID,SubTypeDesc,StatusID,CommitteeID,"
+                   "PrivateNumber,Number,PublicationDate,SummaryLaw,LastUpdatedDate,"
+                   "PostponementReasonDesc,IsContinuationBill,PublicationSeriesDesc,"
+                   "MagazineNumber,PageNumber")
+    if incremental:
+        # Watermark minus a 2-day overlap: OData clock vs ours, and bills
+        # updated while the previous build was still running.
+        from datetime import datetime, timedelta
+        wm = meta["bills_watermark"]
+        # OData fractional seconds have variable digits ('.68', '.387');
+        # older fromisoformat wants exactly 3/6 — truncate to whole seconds.
+        wm_clean = re.sub(r"\.\d+", "", wm).replace("Z", "+00:00")
+        since = (datetime.fromisoformat(wm_clean)
+                 - timedelta(days=2)).strftime("%Y-%m-%dT%H:%M:%SZ")
+        print(f"changed bills since {since} (watermark {wm})...", flush=True)
+        bills = fetch_all("KNS_Bill", {
+            "$filter": f"KnessetNum eq {kn} and LastUpdatedDate gt {since}",
+            "$select": BILL_SELECT,
+            "$orderby": "Id",
+        }, label="changed bills")
+    else:
+        print("all bills...", flush=True)
+        bills = fetch_all("KNS_Bill", {
+            "$filter": f"KnessetNum eq {kn}",
+            "$select": BILL_SELECT,
+            "$orderby": "Id",
+        }, label="bills")
     bill_ids = [b["Id"] for b in bills]
-    bill_set = set(bill_ids)
+    bill_set = set(old_bills) | set(bill_ids)
 
     print("initiators...", flush=True)
     inits = fetch_in("KNS_BillInitiator", "BillID", bill_ids, "",
@@ -251,12 +295,26 @@ def main():
             tally[int(vid)] = c
         print(f"tallies from {vr_path.name}: {len(tally)} votes", flush=True)
 
-    print("all plenum votes of the era...", flush=True)
-    votes = fetch_all("KNS_PlenumVote", {
-        "$filter": f"VoteDateTime gt {ERA_START[kn]}",
-        "$select": "Id,VoteDateTime,ItemID,VoteTitle,ForOptionDesc,IsNoConfidenceInGov,SessionID",
-        "$orderby": "VoteDateTime",
-    }, label="votes")
+    if incremental and old_votes:
+        # Vote headers are immutable once published; refetch only a 7-day
+        # overlap window (late corrections) and merge by id.
+        from datetime import datetime, timedelta
+        last_date = max((v.get("date") or "" for v in old_votes), default="")
+        since = (datetime.fromisoformat(last_date) - timedelta(days=7)
+                 ).strftime("%Y-%m-%dT00:00:00Z") if last_date else ERA_START[kn]
+        print(f"plenum votes since {since} (merge over {len(old_votes)} existing)...", flush=True)
+        votes = fetch_all("KNS_PlenumVote", {
+            "$filter": f"VoteDateTime gt {since}",
+            "$select": "Id,VoteDateTime,ItemID,VoteTitle,ForOptionDesc,IsNoConfidenceInGov,SessionID",
+            "$orderby": "VoteDateTime",
+        }, label="recent votes")
+    else:
+        print("all plenum votes of the era...", flush=True)
+        votes = fetch_all("KNS_PlenumVote", {
+            "$filter": f"VoteDateTime gt {ERA_START[kn]}",
+            "$select": "Id,VoteDateTime,ItemID,VoteTitle,ForOptionDesc,IsNoConfidenceInGov,SessionID",
+            "$orderby": "VoteDateTime",
+        }, label="votes")
     READING = {"pre1": 0, "reading1": 1, "reading2": 2, "reading3": 3}
     votes_by_bill = defaultdict(list)
     out_votes = []
@@ -286,10 +344,38 @@ def main():
                 if rec["for"] is not None and rec["against"] is not None else None,
             })
 
-    out_bills = []
+    if incremental and old_votes:
+        fresh_ids = {v["id"] for v in out_votes}
+        kept = 0
+        for rec in old_votes:
+            if rec["id"] in fresh_ids:
+                continue
+            t = tally.get(rec["id"])  # tallies may have been harvested since
+            if t:
+                rec = {**rec, "for": t["for"], "against": t["against"],
+                       "abstain": t["abstain"]}
+            out_votes.append(rec)
+            kept += 1
+        out_votes.sort(key=lambda v: (v.get("date") or "", v["id"]))
+        # votes_by_bill was built from the fresh slice only — rebuild it
+        # from the merged set so unchanged bills keep their vote linkage.
+        votes_by_bill = defaultdict(list)
+        for rec in out_votes:
+            if rec.get("item_id") in bill_set and rec.get("kind") in READING:
+                votes_by_bill[rec["item_id"]].append({
+                    "vote_id": rec["id"], "date": rec["date"],
+                    "reading": READING[rec["kind"]],
+                    "for": rec["for"], "against": rec["against"],
+                    "abstain": rec["abstain"],
+                    "accepted": (1 if rec["for"] > rec["against"] else 0)
+                    if rec["for"] is not None and rec["against"] is not None else None,
+                })
+        print(f"votes merged: {kept} carried over, {len(out_votes)} total", flush=True)
+
+    fresh_records = {}
     for b in bills:
         kb = enrich.get(b["Id"], [])
-        out_bills.append({
+        fresh_records[b["Id"]] = {
             "id": b["Id"], "name": b["Name"], "type": b.get("SubTypeDesc"),
             "status_id": b.get("StatusID"), "status": smap.get(b.get("StatusID")),
             "committee_id": b.get("CommitteeID"),
@@ -313,11 +399,33 @@ def main():
                  if x.get("doc_url")), None),
             "votes": sorted(votes_by_bill.get(b["Id"], []),
                             key=lambda x: x["date"] or ""),
-        })
+        }
 
-    pb = DATA / f"k{kn}_bills.json"
-    pv = DATA / f"k{kn}_votes.json"
-    pd_ = DATA / f"k{kn}_bill_docs.json"
+    # Merge: fresh records win; unchanged bills carry over with their
+    # vote linkage recomputed from the merged vote set.
+    out_bills = []
+    for bid in sorted(bill_set):
+        if bid in fresh_records:
+            out_bills.append(fresh_records[bid])
+        else:
+            rec = dict(old_bills[bid])
+            rec["votes"] = sorted(votes_by_bill.get(bid, []),
+                                  key=lambda x: x["date"] or "")
+            out_bills.append(rec)
+    if incremental:
+        merged_docs = {k: v for k, v in old_docs.items()
+                       if int(k) not in fresh_records}
+        merged_docs.update({str(k): v for k, v in bill_docs.items()})
+        bill_docs = merged_docs
+
+    # Watermark for the next incremental run: the newest LastUpdatedDate
+    # ever seen (full precision — the per-bill "updated" field is day-only).
+    new_wm = max([meta.get("bills_watermark") or ""] +
+                 [b.get("LastUpdatedDate") or "" for b in bills])
+    meta_path.write_text(json.dumps(
+        {"knesset": kn, "bills_watermark": new_wm}, ensure_ascii=False),
+        "utf-8")
+
     pb.write_text(json.dumps(out_bills, ensure_ascii=False), "utf-8")
     pv.write_text(json.dumps(out_votes, ensure_ascii=False), "utf-8")
     pd_.write_text(json.dumps(bill_docs, ensure_ascii=False), "utf-8")
