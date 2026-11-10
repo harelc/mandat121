@@ -730,7 +730,10 @@ function mkRolesHTML(name){
   <div class="rows" style="margin:.5rem -.9rem 0">${roles.map(r=>`<div class="row" style="cursor:default"><span class="flex"><b>${esc(r.role||'')}</b>${r.gov?` <span class="dim small">· ממשלה ${r.gov}</span>`:''}${r.faction?` <span class="dim small">· ${esc(shortF(r.faction))}</span>`:''}<br><span class="dim small">${r.from?fmtDate(r.from):''}${r.to?` – ${fmtDate(r.to)}`:' – היום'}</span></span>${!r.to?'<span class="chip for">מכהן/ת כיום</span>':''}</div>`).join('')}</div></div>`;
 }
 function billDocsHTML(b){
-  const docs=(BILL_DOCS&&BILL_DOCS[String(b.id)])||[];
+  // The primary נוסח already has its own button at the top of the bill
+  // page (b.doc_url) — listing it here too was a second/third link to the
+  // same PDF. This card is only for the *other* versions and documents.
+  const docs=((BILL_DOCS&&BILL_DOCS[String(b.id)])||[]).filter(d=>!b.doc_url||d.url!==b.doc_url);
   if(!docs.length) return '';
   // Supporting material (חומר רקע וכו׳) can run to 100+ unnamed files on a
   // government bill — one row per file would bury the נוסח versions. Stage
@@ -738,8 +741,8 @@ function billDocsHTML(b){
   // into one expandable row of numbered documents.
   const groups=[]; const byGroup={};
   for(const d of docs){ const k=d.group_id??d.group; if(!byGroup[k]){ byGroup[k]={label:d.group||'מסמך',items:[]}; groups.push(byGroup[k]) } byGroup[k].items.push(d) }
-  const row=(d,extra='')=>`<a class="row" href="${esc(d.url)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span class="flex">${esc(extra||d.group||'מסמך')}${b.doc_url&&d.url===b.doc_url?' <span class="chip acc">הנוסח הראשי למעלה</span>':''}</span>${d.format?`<span class="chip">${esc(d.format)}</span>`:''}<span class="chip acc">פתיחה ↗</span></a>`;
-  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> מסמכי ההצעה (${docs.length}) <small class="dim">כל הנוסחים והמסמכים הרשמיים באתר הכנסת, לפי שלב</small></h3>
+  const row=(d,extra='')=>`<a class="row" href="${esc(d.url)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span class="flex">${esc(extra||d.group||'מסמך')}</span>${d.format?`<span class="chip">${esc(d.format)}</span>`:''}<span class="chip acc">פתיחה ↗</span></a>`;
+  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> גרסאות ומסמכים נוספים (${docs.length}) <small class="dim">מעבר לנוסח הראשי שלמעלה — שאר הנוסחים והמסמכים הרשמיים באתר הכנסת, לפי שלב</small></h3>
   <div class="rows" style="margin:.5rem -.9rem 0">${groups.map(g=>g.items.length===1?row(g.items[0]):`<details><summary class="row" style="cursor:pointer"><span class="flex">${esc(g.label)} <span class="dim small">${g.items.length} מסמכים — הצגה</span></span><span class="chip acc">▾</span></summary>${g.items.map((d,i)=>row(d,`${g.label} ${i+1}`)).join('')}</details>`).join('')}</div></div>`;
 }
 
@@ -1745,7 +1748,6 @@ function renderBillLite(){
       ${b.doc_url?`<a class="btn" href="${esc(b.doc_url)}" target="_blank" rel="noopener"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> נוסח ההצעה ↗</a>`:''}
     </div>
   </article>
-  ${b.doc_url&&String(b.doc_url).toLowerCase().includes('.pdf')?`<div class="card pad" style="margin-top:.85rem"><div style="display:flex;gap:.6rem;align-items:center"><h3 style="flex:1"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> נוסח ההצעה — לקריאה כאן</h3><button class="btn" id="pdfbtn" onclick="togglePdf('${b.id}')">הצגת הנוסח</button></div><div id="pdfbox" style="margin-top:.6rem"></div></div>`:''}
   ${billHistoryHTML(b)}
   ${billDocsHTML(b)}
   ${billCmtHTML({bill_id:b.id})}
@@ -1894,7 +1896,6 @@ function renderVote(){
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem">
       ${b.lite?`<button class="btn primary" onclick="openBillAll('${b.lite.id}')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> לדף הצעת החוק — מסע החוק, סטטוס ויוזמים ←</button>`:''}
-      ${b.doc_url?`<a class="btn" href="${esc(b.doc_url)}" target="_blank" rel="noopener"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> נוסח ההצעה</a>`:''}
       ${b.bill_id?`<a class="btn" href="https://main.knesset.gov.il/Activity/Legislation/Laws/Pages/LawBill.aspx?t=lawsuggestionssearch&lawitemid=${b.bill_id}" target="_blank" rel="noopener">דף ההצעה בכנסת ↗</a>`:''}
       <a class="btn" href="https://knesset.gov.il/vote/heb/Vote_Res_Map.asp?vote_id_t=${b.id}" target="_blank" rel="noopener">דף ההצבעה הרשמי ↗</a>
       ${plnSess?`<button class="btn" onclick="openPlenum('${plnSess.sid}')">📜 דברי הכנסת של הישיבה (מס׳ ${plnSess.number}) ←</button>`:''}
@@ -2013,7 +2014,7 @@ async function togglePdf(billId){
     box.innerHTML=`<embed src="${local}" type="application/pdf" style="width:100%;height:620px;border:1px solid var(--line);border-radius:14px;background:#fff">`;
     box.dataset.open='1'; btn.textContent='סגירת הנוסח';
   }catch(e){
-    box.innerHTML='<div class="small muted">אין עותק מקומי למסמך הזה, והטמעה ישירה משרת הכנסת חסומה (X-Frame-Options). אפשר לפתוח את ה־PDF בחלון נפרד בכפתור למעלה. בבנייה מלאה נוריד עותק לכל חוק, כמו שנעשה כבר ל־681 חוקים.</div>';
+    box.innerHTML='<div class="small muted">אין עותק מקומי למסמך הזה, והטמעה ישירה משרת הכנסת חסומה (X-Frame-Options) — פתחו אותו בכפתור ״פתיחה ב־PDF ↗״ שבכרטיס זה.</div>';
   }
 }
 
