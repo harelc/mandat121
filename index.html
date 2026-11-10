@@ -500,14 +500,14 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
 'use strict';
 /* ============ state ============ */
 const LS='mandat121.v2';
-let KN=25; // active Knesset instance: 25 = full coverage, 26 = building up
+let KN=26; // active Knesset instance: 26 = current (official roster published 2026-11-10), 25 = full-coverage archive
 const freshState=()=>({myVotes:{},followBills:[],followMks:[],followTopics:[],followCommittees:[],lastSeen:null});
 let STORE={'25':freshState(),'26':freshState()};
 try{ const raw=JSON.parse(localStorage.getItem(LS)||localStorage.getItem('openknesset25.v1')||'{}');
   if(raw.myVotes) STORE['25']=Object.assign(freshState(),raw); // migrate v1 (K25-only)
   else for(const k of ['25','26']) if(raw[k]) STORE[k]=Object.assign(freshState(),raw[k]);
 }catch(e){}
-let S=STORE['25'];
+let S=STORE['26'];
 let prevSeen=S.lastSeen;
 function save(){S.lastSeen=new Date().toISOString().slice(0,10);localStorage.setItem(LS,JSON.stringify(STORE))}
 function switchKnesset(n){ KN=n; S=STORE[String(n)]; prevSeen=S.lastSeen; save(); renderKSwitch(); buildTabs(); render(); window.scrollTo({top:0}); toast(n===26?'כנסת 26 — מתמלאת ככל שנתונים מתפרסמים':'כנסת 25 — כיסוי מלא') }
