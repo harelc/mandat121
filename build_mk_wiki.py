@@ -32,6 +32,7 @@ Stdlib only.
 """
 import json
 import re
+import time
 import urllib.parse
 import urllib.request
 from datetime import datetime, timezone
@@ -61,10 +62,24 @@ ALIASES = {
 
 
 def get_json(base, params):
+    """GET JSON with retries on transient failures (5xx / network). Returns
+    {} after exhaustion instead of raising: Wikipedia/Wikidata are an
+    enrichment layer, and a 502 there must never kill the daily build
+    (run 42841048758 died exactly this way). Callers already tolerate
+    empty results; the regression guard in main() stops a bad day from
+    overwriting good cached abstracts."""
     url = base + "?" + urllib.parse.urlencode(params)
     req = urllib.request.Request(url, headers=UA)
-    with urllib.request.urlopen(req, timeout=60) as r:
-        return json.loads(r.read().decode("utf-8"))
+    for attempt, delay in enumerate((0, 3, 10, 30)):
+        if delay:
+            time.sleep(delay)
+        try:
+            with urllib.request.urlopen(req, timeout=60) as r:
+                return json.loads(r.read().decode("utf-8"))
+        except Exception as e:  # noqa: BLE001 - transient upstream, retry then degrade
+            print(f"  wiki fetch attempt {attempt + 1} failed ({e}); "
+                  f"{'retrying' if attempt < 3 else 'giving up on this call'}")
+    return {}
 
 
 def norm(s):
@@ -280,6 +295,20 @@ def main():
         },
         "by_name": out,
     }
+    # Regression guard: never overwrite a good cache with a bad day's haul
+    # (e.g. Wikipedia down -> most fetches empty -> `out` nearly empty).
+    # Keep the previous file and exit 0 with a loud warning — abstracts are
+    # enrichment; yesterday's are better than none, and the daily job must
+    # still commit its core data.
+    if OUT.exists():
+        try:
+            prev_n = len(json.loads(OUT.read_text(encoding="utf-8")).get("by_name", {}))
+        except Exception:  # noqa: BLE001 - unreadable cache: just overwrite
+            prev_n = 0
+        if prev_n and len(out) < 0.9 * prev_n:
+            print(f"WARNING: only {len(out)} abstracts resolved vs {prev_n} cached — "
+                  f"upstream likely failing; keeping previous {OUT}, not overwriting.")
+            return
     OUT.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
     print(f"DONE {OUT} — abstracts {payload['_meta']['with_abstract']}/{len(universe)} universe "
           f"({payload['_meta']['by_resolution']}), "

@@ -155,6 +155,12 @@ now queued for refetch).
    the watermark is current and daily deltas are a handful of bills.
    Still full-rescan daily (next targets): `build_odata_extras.py`
    (~13 min) and `build_committees.py` + protocols (~7 min).
+   **Wiki cadence (2026-11-10):** run 42841048758 failed when
+   `build_mk_wiki.py` hit a Wikipedia 502 and `bash -e` aborted the whole
+   job before the data commit. Abstracts/handles barely change, so the
+   wiki build now runs weekly (Sundays; always on manual dispatch) and is
+   non-fatal in the workflow; the builder itself retries transient errors
+   and never overwrites the cached abstracts with a >10% regression.
    **Push race (2026-11-10):** the scheduled run's bare `git push` was
    rejected non-fast-forward after main moved during its hour-long build
    (run 42819693977 — the lost commit predated the K26 alias fix, so
