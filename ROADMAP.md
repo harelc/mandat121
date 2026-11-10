@@ -61,7 +61,11 @@ Per MK it returns `IsPresent` (in the building *right now*), plus official
 **B. Protocols** (`build_protocols_search.py`, committees tab):
 
 - Global full-text-ish search across all 268 parsed committee protocols
-  (~3M words): word/prefix match ranked by mentions, deep-links to session
+  (~3M words): word/prefix match ranked by mentions, deep-links to session.
+  Since 2026-11-10 the index is a sharded inverted index
+  (`data/search_c/`, `data/search_p/` — every content word → sittings,
+  sharded by first two chars, fetched on demand per query); the previous
+  top-120-words-per-sitting index silently missed rarer words.
 - ~~Word clouds (global + per-protocol)~~ — REMOVED 2026-11-10, owner
   call: frequency clouds were noise, not insight. UI, builder output
   (`protocol_cloud.json`, `top_words`) and fetch all deleted; the

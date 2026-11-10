@@ -2520,25 +2520,103 @@ function graphSVG(){
   <svg viewBox="0 0 920 640" style="width:100%;height:auto;background:radial-gradient(ellipse at 50% 42%,#141a33,#0b0e1a 75%);border-radius:14px" role="img" aria-label="גרף קשרי הצבעה בין חברי הכנסת">${lines}${nodes}</svg></div>`;
 }
 
+/* Protocol-search matching. The builders emit a sharded inverted index
+   (data/search_c/, data/search_p/): every content word -> delta-encoded
+   postings, sharded by the word's first two characters. The old top-120-per-
+   sitting index made any rarer word unfindable; a single all-words file
+   would be tens of MB, so the browser fetches only the shards a query's
+   prefixes can start with. Index keys are single raw tokens with Hebrew
+   prefix particles (ה/ב/ל/…) left attached — so a bare `w===q` missed
+   "התקציב" for "תקציב", and a multi-word query could never match a
+   single-token key at all. Split the query into terms, strip punctuation,
+   and try each term with Hebrew prefix particles added (see below). */
+function protoTerms(q){ return String(q||'').toLowerCase().trim().split(/\s+/).map(t=>t.replace(/^["'״׳.,;:!?()\[\]{}]+|["'״׳.,;:!?()\[\]{}]+$/g,'')).filter(t=>t.length>=2) }
+/* Match by ADDING prefixes to the (possibly de-prefixed) term, never by
+   stripping the indexed word: stripping ש/כ merges roots — שכירות (rent)
+   collapsed onto שירות (service) and returned 70 false hits. */
+function protoWordHit(w,term){
+  const bases=new Set([term]);
+  let s=term;
+  for(let i=0;i<2;i++){ if(s.length>3&&'והבלמכש'.includes(s[0])){ s=s.slice(1); bases.add(s) } else break }
+  for(const b of bases){
+    if(w.length>=3&&b.startsWith(w)) return true; // query carries a suffix form (תקציבים) of the indexed word
+    // De-prefixed bases match bare only: re-adding a prefix to them
+    // re-parses other roots (שכירות → כירות/ירות → ש+ירות = שירות).
+    const prefixes=b===term?['','ה','ב','ל','מ','ו','כ','ש','וה','וב','ול','וש','בה','לה'] : [''];
+    for(const p of prefixes) if(w.startsWith(p+b)) return true;
+  }
+  return false;
+}
+/* --- sharded inverted-index search (async; shards cached per session) --- */
+const _shardCache={};
+function fetchShard(corpus,bigram){ // bigram: the word's first 2 chars
+  const key=corpus+':'+bigram;
+  if(!_shardCache[key]) _shardCache[key]=_fetchJson(`data/search_${corpus}/${bigram.charCodeAt(0)}_${bigram.charCodeAt(1)}.json`).then(j=>j||{});
+  return _shardCache[key];
+}
+function protoCandidates(term){ // every string an indexed word matching `term` can start with
+  const out=new Set([term]);
+  let s=term; const bases=[term];
+  for(let i=0;i<2;i++){ if(s.length>3&&'והבלמכש'.includes(s[0])){ s=s.slice(1); bases.push(s) } else break }
+  for(const b of bases){
+    if(b===term) for(const p of ['ה','ב','ל','מ','ו','כ','ש','וה','וב','ול','וש','בה','לה']) out.add(p+b);
+    else out.add(b); // de-prefixed base matches bare only (see protoWordHit)
+  }
+  return [...out];
+}
+async function searchCorpus(corpus,terms){
+  const bigrams=new Set();
+  for(const t of terms) for(const cand of protoCandidates(t)) if(cand.length>=2) bigrams.add(cand.slice(0,2));
+  const shards=await Promise.all([...bigrams].map(b=>fetchShard(corpus,b)));
+  const bySid=new Map();
+  for(const shard of shards) for(const [w,enc] of Object.entries(shard)){
+    for(const t of terms){ if(!protoWordHit(w,t)) continue;
+      // Postings are delta-encoded "sid:count,delta:count,…" (encode_postings in build_protocols_search.py).
+      let sid=0;
+      for(const part of String(enc).split(',')){ const i=part.indexOf(':'); sid+=+part.slice(0,i); const c=+part.slice(i+1);
+        const key=String(sid); const e=bySid.get(key)||{sid:key,score:0,hits:[],matched:new Set()}; e.score+=c; e.hits.push([w,c]); e.matched.add(t); bySid.set(key,e) }
+      break;
+    }
+  }
+  // Multi-word queries are AND: every term must appear (in some prefixed
+  // form), otherwise "חוק הגיוס" returns every sitting that said חוק.
+  return [...bySid.values()].filter(e=>!terms.length||e.matched.size===terms.length)
+    .map(e=>({...e,hits:e.hits.sort((a,b)=>b[1]-a[1]).slice(0,3)})).sort((a,b)=>b.score-a.score);
+}
+function rerenderKeepingFocus(){
+  const a=document.activeElement, key=a&&a.dataset?a.dataset.keep:null, pos=a?a.selectionStart:null;
+  renderCommittees();
+  if(key){ const n=document.querySelector(`input[data-keep="${key}"]`); if(n){ n.focus(); try{ n.setSelectionRange(pos,pos) }catch(e){} } }
+}
+/* Protocol search box: results are computed async (shard fetches), cached
+   per exact query, and painted into #protoResults without a full
+   re-render, so typing never loses focus or flickers the committee list. */
+let protoResultsFor='', protoResultsHTML='', _protoBusyFor='', _protoTimer=null;
+function scheduleProtoSearch(){
+  const q=protoQuery.trim();
+  if(!q||protoResultsFor===q||_protoBusyFor===q) return;
+  _protoBusyFor=q; clearTimeout(_protoTimer);
+  _protoTimer=setTimeout(async()=>{
+    await Promise.all([ensureProtoSearch(),ensurePlenumSearch()]);
+    if(protoQuery.trim()!==q){ _protoBusyFor=''; scheduleProtoSearch(); return }
+    const terms=protoTerms(q);
+    const [cmt,pln]=await Promise.all([searchCorpus('c',terms),searchCorpus('p',terms)]);
+    const cmtHTML=cmt.length?`<div class="small" style="font-weight:800;margin-top:.7rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ועדות (${cmt.length})</div><div class="rows" style="margin:.3rem -.9rem 0">${cmt.slice(0,15).map(({sid,score,hits})=>{const p=PROTO_SEARCH[sid]||{}; return `<div class="row" onclick="openSession('${sid}')"><span class="chip acc">${fmtDate(p.date)}</span><span class="flex">${esc(p.committee||'')}<br><span class="dim small">${hits.map(([w,c])=>`${esc(w)} ×${c}`).join(' · ')}</span></span><b>${score}</b><span class="chip acc">לפרוטוקול ←</span></div>`}).join('')}</div>`:'';
+    const plnHTML=pln.length?`<div class="small" style="font-weight:800;margin-top:.7rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> מליאה — דברי הכנסת (${pln.length})</div><div class="rows" style="margin:.3rem -.9rem 0">${pln.slice(0,15).map(({sid,score,hits})=>{const p=PLENUM_SEARCH[sid]||{}; return `<div class="row" onclick="openPlenum('${sid}')"><span class="chip acc">${fmtDate(p.date)}</span><span class="flex">ישיבת מליאה מס׳ ${p.number}<br><span class="dim small">${hits.map(([w,c])=>`${esc(w)} ×${c}`).join(' · ')}</span></span><b>${score}</b><span class="chip acc">לישיבה ולקריאה ←</span></div>`}).join('')}</div>`:'';
+    protoResultsHTML=(cmtHTML||plnHTML)?cmtHTML+plnHTML:'<p class="muted small" style="margin-top:.4rem">לא נמצא בפרוטוקולים שנסרקו. נסו מילה אחרת או תחילית (למשל: תקציב, גיוס, דיור).</p>';
+    protoResultsFor=q; _protoBusyFor='';
+    const box=document.querySelector('#protoResults'); if(box) box.innerHTML=protoResultsHTML;
+    if(protoQuery.trim()!==q) scheduleProtoSearch();
+  },180);
+}
+
 function protoSearchHTML(){
   const q=protoQuery.trim();
-  let results='';
-  if(q&&(Object.keys(PROTO_SEARCH).length||Object.keys(PLENUM_SEARCH).length)){
-    const scoreIdx=(idx)=>{ const scored=[];
-      for(const [sid,p] of Object.entries(idx)){
-        let score=0, hits=[];
-        for(const [w,c] of Object.entries(p.words)) if(w===q||w.startsWith(q)){ score+=c; hits.push([w,c]) }
-        if(score) scored.push({sid,p,score,hits:hits.sort((a,b)=>b[1]-a[1]).slice(0,3)});
-      }
-      return scored.sort((a,b)=>b.score-a.score) };
-    const cmt=scoreIdx(PROTO_SEARCH), pln=scoreIdx(PLENUM_SEARCH);
-    const cmtHTML=cmt.length?`<div class="small" style="font-weight:800;margin-top:.7rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ועדות (${cmt.length})</div><div class="rows" style="margin:.3rem -.9rem 0">${cmt.slice(0,15).map(({sid,p,score,hits})=>`<div class="row" onclick="openSession('${sid}')"><span class="chip acc">${fmtDate(p.date)}</span><span class="flex">${esc(p.committee)}<br><span class="dim small">${hits.map(([w,c])=>`${esc(w)} ×${c}`).join(' · ')}</span></span><b>${score}</b><span class="chip acc">לפרוטוקול ←</span></div>`).join('')}</div>`:'';
-    const plnHTML=pln.length?`<div class="small" style="font-weight:800;margin-top:.7rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> מליאה — דברי הכנסת (${pln.length})</div><div class="rows" style="margin:.3rem -.9rem 0">${pln.slice(0,15).map(({sid,p,score,hits})=>`<div class="row" onclick="openPlenum('${sid}')"><span class="chip acc">${fmtDate(p.date)}</span><span class="flex">ישיבת מליאה מס׳ ${p.number}<br><span class="dim small">${hits.map(([w,c])=>`${esc(w)} ×${c}`).join(' · ')}</span></span><b>${score}</b><span class="chip acc">לישיבה ולקריאה ←</span></div>`).join('')}</div>`:'';
-    results=(cmtHTML||plnHTML)?cmtHTML+plnHTML:'<p class="muted small" style="margin-top:.4rem">לא נמצא בפרוטוקולים שנסרקו. נסו מילה אחרת או תחילית (למשל: תקציב, גיוס, דיור).</p>';
-  }
-  return `<div class="card pad" style="margin-bottom:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg> חיפוש בפרוטוקולים <small class="dim">${Object.keys(PROTO_SEARCH).length||268} פרוטוקולי ועדות · ${Object.keys(PLENUM_SEARCH).length||418} ישיבות מליאה (דברי הכנסת)</small></h3>
+  if(q) scheduleProtoSearch();
+  const results=protoResultsFor===q?protoResultsHTML:'<p class="muted small" style="margin-top:.4rem">מחפש בפרוטוקולים…</p>';
+  return `<div class="card pad" style="margin-bottom:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg> חיפוש בפרוטוקולים <small class="dim">${Object.keys(PROTO_SEARCH).length||268} פרוטוקולי ועדות · ${Object.keys(PLENUM_SEARCH).length||418} ישיבות מליאה (דברי הכנסת) · כל מילה, לא רק השכיחות</small></h3>
   <input type="search" data-keep="protoQ" placeholder="מילה או תחילית — למשל: תקציב, גיוס, שכירות…" value="${esc(protoQuery)}" style="width:100%;margin-top:.55rem" oninput="protoQuery=this.value;keepSearchFocus(this,renderCommittees)">
-  ${results}</div>`;
+  <div id="protoResults">${q?results:''}</div></div>`;
 }
 
 /* ============ FACTIONS ============ */
@@ -2659,12 +2737,31 @@ function renderCommitteesKeep(inp){ keepSearchFocus(inp,renderCommittees) }
 function plenumEntries(){ return Object.entries(PLENUM_SEARCH).map(([sid,p])=>({sid,...p})).sort((a,b)=>b.number-a.number) }
 function plenumForDate(date){ const hit=Object.entries(PLENUM_SEARCH).find(([,p])=>p.date===date); return hit?{sid:hit[0],...hit[1]}:null }
 const cmtSegHTML=()=>`<div class="chips" role="group" aria-label="ועדות, מליאה או שדלנים" style="margin-bottom:.9rem"><button class="chip ${cmtSeg==='committees'?'on':''}" onclick="cmtSeg='committees';renderCommittees()">ועדות</button><button class="chip ${cmtSeg==='plenum'?'on':''}" onclick="cmtSeg='plenum';plenumFilter.limit=30;renderCommittees()">מליאה · דברי הכנסת (${Object.keys(PLENUM_SEARCH).length||418} ישיבות)</button><button class="chip ${cmtSeg==='lobbyists'?'on':''}" onclick="cmtSeg='lobbyists';lobbyFilter.limit=40;renderCommittees()">🕴️ שדלנים · מרשם עדכני${EXTRAS?.lobbyists?` (${EXTRAS.lobbyists.length.toLocaleString('he-IL')})`:''}</button></div>`;
+/* Plenum-browser search also runs on the shards (async, cached per query);
+   on completion it re-renders with focus restored to the search box. */
+let plenumHitsFor='', plenumHits=null, _plenumBusyFor='', _plenumTimer=null;
+function schedulePlenumSearch(){
+  const q=plenumFilter.q.trim();
+  if(!q||plenumHitsFor===q||_plenumBusyFor===q) return;
+  _plenumBusyFor=q; clearTimeout(_plenumTimer);
+  _plenumTimer=setTimeout(async()=>{
+    await ensurePlenumSearch();
+    if(plenumFilter.q.trim()!==q){ _plenumBusyFor=''; schedulePlenumSearch(); return }
+    const scored=await searchCorpus('p',protoTerms(q));
+    plenumHits={}; for(const e of scored) plenumHits[e.sid]={score:e.score,hits:e.hits};
+    plenumHitsFor=q; _plenumBusyFor='';
+    if(view==='committees'&&cmtSeg==='plenum') rerenderKeepingFocus();
+    if(plenumFilter.q.trim()!==q) schedulePlenumSearch();
+  },180);
+}
 function plenumBrowserHTML(){
   const vc={}; VOTES_ALL.forEach(v=>vc[v.date]=(vc[v.date]||0)+1);
   const q=plenumFilter.q.trim();
+  if(q) schedulePlenumSearch();
   let list=plenumEntries().map(e=>({...e,score:0,hits:[],votesThatDay:vc[e.date]||0}));
-  if(q){ for(const e of list){ for(const [w,c] of Object.entries(e.words)) if(w===q||w.startsWith(q)){ e.score+=c; e.hits.push([w,c]) } e.hits.sort((a,b)=>b[1]-a[1]); e.hits=e.hits.slice(0,3) }
+  if(q&&plenumHitsFor===q&&plenumHits){ for(const e of list){ const h=plenumHits[e.sid]; if(h){ e.score=h.score; e.hits=h.hits } }
     list=list.filter(e=>e.score>0||String(e.number)===q).sort((a,b)=>b.score-a.score||b.number-a.number) }
+  else if(q){ return `<input type="search" data-keep="plenumQ" placeholder="חיפוש בדברי הכנסת — מילה, או מספר ישיבה…" value="${esc(plenumFilter.q)}" style="width:100%;margin-bottom:.7rem" oninput="plenumFilter.q=this.value;plenumFilter.limit=30;keepSearchFocus(this,renderCommittees)"><div class="card empty">מחפש בדברי הכנסת…</div>` }
   const shown=list.slice(0,plenumFilter.limit);
   return `<input type="search" data-keep="plenumQ" placeholder="חיפוש בדברי הכנסת — מילה, או מספר ישיבה…" value="${esc(plenumFilter.q)}" style="width:100%;margin-bottom:.7rem" oninput="plenumFilter.q=this.value;plenumFilter.limit=30;keepSearchFocus(this,renderCommittees)">
   <div class="small dim" style="margin-bottom:.6rem">${q?`${list.length.toLocaleString('he-IL')} ישיבות נמצאו`:`${list.length.toLocaleString('he-IL')} ישיבות מליאה בכנסת 25 · מהאחרונה לראשונה`} · לחיצה על ישיבה: ההצבעות של אותו היום והמסמך הרשמי</div>
@@ -2714,6 +2811,10 @@ function renderCommittees(){
   ensureCmem();
   if(cmtSeg==='plenum'){ ensureProtoSearch(); ensurePlenumSearch(); $('#app').innerHTML=`<div class="sec-title">מליאה <small>דברי הכנסת · כל ישיבות כנסת 25</small></div>${cmtSegHTML()}${protoSearchHTML()}${plenumBrowserHTML()}`; return }
   if(cmtSeg==='lobbyists'){ ensureExtras(); $('#app').innerHTML=`<div class="sec-title">שדלנים <small>המרשם הרשמי של הכנסת · מי מייצג את מי מול הכנסת</small></div>${cmtSegHTML()}${lobbyBrowserHTML()}`; return }
+  // The committees segment renders protoSearchHTML() below, but (unlike the
+  // plenum segment) never loaded its indexes — PROTO_SEARCH/PLENUM_SEARCH
+  // stayed {} so typing silently produced no results at all.
+  ensureProtoSearch(); ensurePlenumSearch();
   if(!CMT){ $('#app').innerHTML=`<div class="sec-title">ועדות</div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>נתוני הוועדות לא נטענו.</div>`; return }
   const recentCount={}; CMT.recent_sessions.forEach(s=>recentCount[s.committee_id]=(recentCount[s.committee_id]||0)+1);
   const byTier={perm:[],sub:[],special:[],joint:[]};

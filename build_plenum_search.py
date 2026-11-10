@@ -12,13 +12,16 @@ Source: KNS_PlenumSession + KNS_DocumentPlenumSession (GroupTypeID=28,
 files that are really docx, same as committee protocols.
 
 Output:
-  data/plenum_search.json — {session_id: {number, date, doc, words}}
-  words = top-N content-word counts (shared tokenizer/stopwords with
-  build_protocols_search.py), TOC/speaker-header lines excluded.
+  data/plenum_search.json — {session_id: {number, date, doc}} metadata.
+  data/search_p/<c0>_<c1>.json — sharded inverted index
+      {word: "sid:count,delta:count,…"} for EVERY content word (shared
+      tokenizer/stopwords + shard writer with build_protocols_search.py),
+      TOC/speaker-header lines excluded. Replaces the old top-120-words
+      index, which made any rarer word unfindable.
 
-Incremental: sessions already in the output are skipped (transcripts of
-past sessions are immutable), so the daily workflow only downloads new
-sessions. Pass --force to rebuild from scratch.
+Incremental: sessions listed in data/search_p/manifest.json are skipped
+(transcripts of past sessions are immutable), so the daily workflow only
+downloads new sessions. Pass --force to rebuild from scratch.
 """
 import json
 import sys
@@ -29,11 +32,13 @@ from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
 from build_protocols import docx_text
-from build_protocols_search import TOP_N, words_of
+from build_protocols_search import (SEARCH_P_DIR, add_counts_to_shards,
+                                    flush_shards, words_of)
 
 BASE = "https://knesset.gov.il/OdataV4/ParliamentInfo/"
 HDR = {"User-Agent": "Mozilla/5.0 mandat121-build", "Accept": "application/json"}
 OUT = Path("data/plenum_search.json")
+MANIFEST = SEARCH_P_DIR / "manifest.json"
 KNESSET = 25
 
 
@@ -75,17 +80,29 @@ def session_words(url):
 
 def main():
     force = "--force" in sys.argv
-    index = {}
-    if OUT.exists() and not force:
-        index = json.loads(OUT.read_text(encoding="utf-8"))
+    index, done_sids = {}, set()
+    if force:
+        import shutil
+        if SEARCH_P_DIR.exists():
+            shutil.rmtree(SEARCH_P_DIR)
+    else:
+        if OUT.exists():
+            index = json.loads(OUT.read_text(encoding="utf-8"))
+            # Pre-shard files carry a truncated `words` map per session;
+            # those sessions are NOT in the shards yet and must be redone.
+            index = {sid: {k: v for k, v in e.items() if k != "words"}
+                     for sid, e in index.items()}
+        if MANIFEST.exists():
+            done_sids = set(json.loads(
+                MANIFEST.read_text(encoding="utf-8")).get("sessions", []))
     sessions = paged(
         "KNS_PlenumSession",
         f"$filter=KnessetNum%20eq%20{KNESSET}&$orderby=StartDate"
         "&$select=Id,Number,StartDate")
     print(f"{len(sessions)} K{KNESSET} plenum sessions", flush=True)
 
-    todo = [s for s in sessions if str(s["Id"]) not in index]
-    print(f"{len(todo)} new to index ({len(index)} cached)", flush=True)
+    todo = [s for s in sessions if str(s["Id"]) not in done_sids]
+    print(f"{len(todo)} new to index ({len(done_sids)} cached)", flush=True)
     if todo:
         docs = {}  # session id -> [docx urls]
         ids = [s["Id"] for s in todo]
@@ -104,28 +121,37 @@ def main():
             counts = Counter()
             for u in urls:  # a session may have several parts — merge
                 counts.update(session_words(u))
-            return s, {"number": s["Number"],
-                       "date": (s.get("StartDate") or "")[:10],
-                       "doc": urls[0],
-                       "words": dict(counts.most_common(TOP_N))}
+            return s, counts, {"number": s["Number"],
+                               "date": (s.get("StartDate") or "")[:10],
+                               "doc": urls[0]}
 
         done, failed = 0, []
+        cache, dirty = {}, set()
         with ThreadPoolExecutor(max_workers=6) as ex:
             futs = {ex.submit(work, j): j[0]["Id"] for j in jobs}
             for fut in as_completed(futs):
                 sid = futs[fut]
                 try:
-                    s, entry = fut.result()
+                    s, counts, entry = fut.result()
+                    add_counts_to_shards(SEARCH_P_DIR, str(s["Id"]), counts,
+                                         cache, dirty)
                     index[str(s["Id"])] = entry
+                    done_sids.add(str(s["Id"]))
                 except Exception as e:
                     failed.append((sid, str(e)[:80]))
                 done += 1
                 if done % 40 == 0:
                     print(f"{done}/{len(jobs)} done, {len(failed)} failed", flush=True)
+        flush_shards(SEARCH_P_DIR, cache, dirty)
+        print(f"wrote {len(dirty)} shard files", flush=True)
         if failed:
             print(f"FAILED: {failed[:8]}", flush=True)
     OUT.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
-    print(f"DONE {len(index)} plenum sessions indexed -> {OUT}")
+    SEARCH_P_DIR.mkdir(parents=True, exist_ok=True)
+    MANIFEST.write_text(json.dumps(
+        {"sessions": sorted(done_sids, key=int)}, ensure_ascii=False),
+        encoding="utf-8")
+    print(f"DONE {len(index)} plenum sessions indexed -> {OUT} (+{SEARCH_P_DIR})")
 
 
 if __name__ == "__main__":
