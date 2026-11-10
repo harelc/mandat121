@@ -116,13 +116,26 @@ cannot fetch transcripts itself. Builder is incremental (cached
 sessions skipped), wired into `knesset-daily.yml`.
 
 ### P1. OData gaps — what we are not using yet
-From the live `$metadata` inventory, unused entities worth harvesting:
-`KNS_Query` (שאילתות) + `KNS_DocumentQuery`, `KNS_Agenda` (הצעות לסדר),
-`KNS_IsraelLaw*` (bill → enacted law, completes Bill Journey),
-`KNS_BillUnion`/`KNS_BillSplit`/`KNS_BillName`, `KNS_SecondaryLaw*`
-(חקיקת משנה), `KNS_BroadcastCommitteSession`
-(session video), `V_Lobbyist`/`V_LobbyistsClient` (who lobbies whom),
-`KNS_GovMinistry`, `KNS_JointCommittee`.
+✅ DONE 2026-11-10: **`build_odata_extras.py` → `data/k25_extras.json`**
+(wired into `knesset-daily.yml`, ~5 min run), surfaced in the UI:
+`KNS_Query`+`KNS_DocumentQuery` (שאילתות per MK, with answer-doc links),
+`KNS_Agenda` (הצעות לסדר per MK) → MK page cards; `KNS_BillUnion`/
+`KNS_BillSplit`/`KNS_BillName` (מיזוגים/פיצולים/שמות לפי קריאה, 1,763
+bills) + `KNS_IsraelLaw` name-match + `MagazineNumber`/`PageNumber`
+רשומות citations (573 bills) → bill-page "שושלת ההצעה ופרסומה" card;
+`KNS_SecondaryLaw` (2,847 items, 44 committees) + `KNS_JointCommittee`
+(21 mappings) → committee page; `KNS_BroadcastCommitteSession`
+(7,054 archive URLs — recent sessions have none yet; older agenda-shard
+sessions do) → session-page 📺 button. Notes: `KNS_IsraelLawBinding`
+is sparse/empty per-law — the bill→law link is a name match, not the
+binding table. Lobbyists are NOT in the ParliamentInfo container
+(404 there despite `$metadata`); they live on the sibling service
+`OdataV4/Lobbyist/` (`V_Lobbyists` 830 + `V_LobbyistsClients` 2,515)
+→ "שדלנים" segment in the committees tab, labelled as a current
+register snapshot. **Privacy: the feed carries ת"ז/ח"פ
+(`IdentityNumber`/`CorpNumber`) — the builder whitelists fields and
+never stores them (CWE-359).** `KNS_GovMinistry`/`KNS_Status` are used
+inside the builder as id→name lookups.
 
 ### P2. Rich topic / keyword topology
 Today's topics are a small closed typology (owner noted: starring a topic
