@@ -2298,11 +2298,18 @@ function renderMkDetail(){
   if(KN===26){ const e=k26Entry(name); const rec=IDX25[name];
     if(!e){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצא/ה ברשימת הנבחרים לכנסת 26.</div>'; return }
     location.hash='mk='+encodeURIComponent(name);
+    /* The party card lists the party's actual MKs, not the first `seats`
+       candidates: after pre-swearing resignations the elected are not a
+       prefix of the list (ש״ס: ranks 2,3,4,5,8,9), so slicing by seats
+       showed non-MKs and hid real ones. Once the serving roster exists it
+       wins — Norwegian-law replacements are beyond the elected cut. */
+    const srv26=e.party.candidates.filter(n=>(K26_TENURE[n]||[]).some(x=>!x[1]));
+    const partyMks26=srv26.length?srv26:e.party.candidates.filter(n=>(e.party.elected||[]).includes(n));
     app.innerHTML=`<button class="btn ghost" onclick="go('mks')">› כל הנבחרים</button>
     <div class="card pad rise" style="margin-top:.6rem"><div style="display:flex;gap:1rem;align-items:center">${avatar(name,e.party.name,84)}
       <div style="flex:1"><h1 style="font-size:1.5rem">${esc(disp(name))} ${followedMk(name)?'★':''}</h1>
       <button class="chip" style="color:${e.party.color||fcol(e.party.name)};font-weight:700" onclick="openFaction('${jsq(e.party.name)}')">${esc(e.party.name)} · כנסת 26 ←</button>
-      <div class="small dim">${e.rank?`מקום ${e.rank} ברשימת ${esc(e.party.name)} · `:''}${e.serving?'מכהן/ת בפועל · סגל רשמי':e.elected?'נבחר/ה לכנסת ה־26':'מועמד/ת ברשימה — מחוץ למנדטים כרגע'}</div>
+      <div class="small dim">${e.rank?`מקום ${e.rank} ברשימת ${esc(e.party.name)} · `:''}${e.serving?'מכהן/ת בפועל · סגל רשמי':e.elected?'נבחר/ה לכנסת ה־26':'מועמד/ת ברשימה — לא נכנס/ה לכנסת ה־26'}</div>
       <span class="chip acc" style="margin-top:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> היסטוריית ההצבעות תתחיל עם הצבעות כנסת 26 הראשונות</span></div>${starBtn('mk',name,name)}</div>
     ${rec?`<div style="margin-top:1rem"><h3>בכנסת 25</h3><div class="small muted" style="line-height:1.9">${rec.votes.length} הצבעות מתועדות · סיעה אז: ${esc(shortF(rec.faction))} · <span style="color:var(--for)">${rec.votes.filter(v=>v.result===1).length} בעד</span> / <span style="color:var(--against)">${rec.votes.filter(v=>v.result===2).length} נגד</span> / <span style="color:var(--abstain)">${rec.votes.filter(v=>v.result===3).length} נמנע</span><br>איך הצביע/ה על ביטחון, כלכלה, זכויות — הכל שמור בכרטיס של כנסת 25.</div>
     <button class="btn primary" style="margin-top:.6rem" onclick="switchKnesset(25);openMk('${jsq(name)}')">לכל ההצבעות בכנסת 25 ←</button></div>`:'<p class="muted small" style="margin-top:1rem">לא כיהן/ה בכנסת 25 — זהו/זו ח״כ חדש/ה. הכרטיס יתמלא מההצבעה הראשונה.</p>'}
@@ -2313,7 +2320,7 @@ function renderMkDetail(){
     ${mkInitiatedHTML(name,true)}
     ${mkRolesHTML(name)}
     ${mkCommitteesHTML(name)}
-    <div class="card pad" style="margin-top:.85rem"><h3>${esc(e.party.name)} — סדר הרשימה</h3><div class="rows" style="margin:.5rem -.9rem 0">${e.party.candidates.slice(0,Math.max(e.party.seats, e.rank||0)).map((n,i)=>{const has=k26HasPage(n), srv=(K26_TENURE[n]||[]).some(x=>!x[1]); return `<div class="row" style="cursor:${has?'pointer':'default'};${i===e.rank-1?'background:var(--surface2)':''}" ${has?`onclick="openMk('${jsq(n)}')"`:''}><b style="width:1.6rem;color:${(e.party.elected||[]).includes(n)?'var(--accent)':'var(--dim)'}">${i+1}</b><span class="flex">${esc(disp(n))} ${n===name?'← כאן':''}</span>${srv?'<span class="chip for">מכהן/ת</span>':(e.party.elected||[]).includes(n)?'<span class="chip for">נבחר/ה</span>':'<span class="dim small">מחוץ למנדטים</span>'}</div>`}).join('')}</div></div>`;
+    <div class="card pad" style="margin-top:.85rem"><h3>${esc(e.party.name)} — חברי הכנסת של הסיעה (${partyMks26.length})</h3><div class="rows" style="margin:.5rem -.9rem 0">${partyMks26.map(n=>{const r=e.party.candidates.indexOf(n)+1, srv=(K26_TENURE[n]||[]).some(x=>!x[1]); return `<div class="row" style="cursor:pointer;${n===name?'background:var(--surface2)':''}" onclick="openMk('${jsq(n)}')"><b style="width:1.6rem;color:var(--accent)">${r}</b><span class="flex">${esc(disp(n))} ${n===name?'← כאן':''}</span><span class="chip for">${srv?'מכהן/ת':'נבחר/ה'}</span></div>`}).join('')}</div>${partyMks26.some((n,i)=>e.party.candidates.indexOf(n)!==i)?'<p class="small dim" style="margin-top:.6rem">המספר הוא המקום ברשימת המועמדים המקורית; מקומות שדולגו הם מועמדים שפרשו לפני ההשבעה, והבאים אחריהם נכנסו במקומם.</p>':''}</div>`;
     window.scrollTo(0,0); return }
   const m=mkIndex[name]; if(!m){app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצאו הצבעות מתועדות לח״כ הזה/זו באתר — לא בכנסת 25 ולא בכנסת 26.</div>';return}
   const pfaction=realFaction(MKP[name]?.faction||m.faction||FACTION25[name]||'');
