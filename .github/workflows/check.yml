@@ -1,0 +1,44 @@
+# Site sanity check — המנדט ה־121
+#
+# There is no build step: Netlify publishes the repo as-is, so a JS syntax
+# error or a corrupt data file would ship silently. This catches the two
+# cheap, high-value failure modes on every push/PR:
+#   1. inline <script> syntax in the single-file apps (node --check)
+#   2. malformed JSON anywhere under data/
+name: check
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  check:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+
+      - name: Inline JS syntax
+        run: python3 scripts/check_inline_js.py
+
+      - name: data/*.json parses
+        run: |
+          python3 - <<'EOF'
+          import glob, json, sys
+          bad = []
+          for f in sorted(glob.glob("data/**/*.json", recursive=True)):
+              try:
+                  json.load(open(f, encoding="utf-8"))
+              except Exception as e:
+                  bad.append(f"{f}: {e}")
+          if bad:
+              print("\n".join(bad)); sys.exit(1)
+          print(f"all JSON ok")
+          EOF

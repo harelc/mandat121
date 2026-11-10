@@ -20,6 +20,8 @@
 }
 *{margin:0;padding:0;box-sizing:border-box}
 html{scroll-behavior:smooth}
+html,body{overflow-x:clip} /* safety net: nothing may give the page horizontal scroll; overflow:clip (not hidden) keeps position:sticky working */
+@supports not (overflow:clip){body{overflow-x:hidden}}
 body{font-family:'Heebo',system-ui,sans-serif;background:var(--bg);color:var(--text);line-height:1.55;min-height:100dvh;
   background-image:radial-gradient(900px 420px at 85% -80px, rgba(71,107,158,.10), transparent 60%),radial-gradient(700px 380px at 8% -60px, rgba(185,143,31,.10), transparent 60%);}
 h1,h2,h3,.rubik{font-family:'Rubik','Heebo',sans-serif}
@@ -89,7 +91,10 @@ svg.icn{width:1.05em;height:1.05em;flex:none;fill:none;stroke:currentColor;strok
 .sec-title{font-size:1.28rem;font-weight:800;margin:1.6rem 0 .7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
 .sec-title::before{content:'';width:.5rem;height:.5rem;flex-shrink:0;background:#b98f1f;transform:rotate(45deg)}
 .sec-title small{font-family:'Heebo';font-size:.8rem;color:var(--dim);font-weight:500}
-.chip{display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;font-weight:700;padding:.24rem .6rem;border-radius:999px;background:var(--surface2);color:var(--mid);border:1px solid var(--line);white-space:nowrap}
+.chip{display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;font-weight:700;padding:.24rem .6rem;border-radius:999px;background:var(--surface2);color:var(--mid);border:1px solid var(--line);white-space:nowrap;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
+/* chips inside horizontal scroll rows must keep their natural width —
+   the row scrolls, the chip must not shrink/truncate instead */
+.chips .chip{flex:none}
 /* long committee names must never widen a card/column: truncate, full name in tooltip */
 .chip.cmt{max-width:15rem;overflow:hidden;text-overflow:ellipsis;min-width:0}
 .card-top .chip{min-width:0}
@@ -436,6 +441,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
   /* month counts are hover-only on desktop; on touch there is no hover
      before the tap navigates away, so always show them, smaller */
   .months.all .month b{opacity:1;font-size:.62rem}
+  .months{overflow:hidden}
   .hemi-tip{max-width:92vw}
   .toast{white-space:normal;text-align:center;max-width:92vw}
   select{max-width:100%}
@@ -1155,7 +1161,7 @@ function committeeFeedHTML(limit=8){
   if(!CMT) return '';
   const sess=CMT.recent_sessions.slice(0,limit);
   return `<div class="sec-title">בוועדות מאז הפוגה המליאה <small>${CMT.recent_sessions.length} ישיבות מאז ${fmtDate(CMT.recent_since)} — העבודה נמשכת גם בלי הצבעות</small></div>
-  <div class="grid c2">${sess.map(s=>`<div class="card pad" style="cursor:pointer" onclick="openSession('${s.id}')"><div class="card-top"><span class="chip acc">${esc(s.committee||'')}</span><span class="chip">${esc(s.type||'')}</span><span class="date">${fmtDate((s.start||'').slice(0,10))}</span></div>
+  <div class="grid c2">${sess.map(s=>`<div class="card pad" style="cursor:pointer" onclick="openSession('${s.id}')"><div class="card-top"><span class="chip acc cmt" title="${esc(s.committee||'')}">${esc(s.committee||'')}</span><span class="chip">${esc(s.type||'')}</span><span class="date">${fmtDate((s.start||'').slice(0,10))}</span></div>
   ${s.items.length?s.items.slice(0,3).map(it=>`<div class="small" style="padding:.28rem 0;border-top:1px solid var(--line)">${it.in_dataset?`<a href="#" onclick="event.preventDefault();event.stopPropagation();openBillPage('${it.item_id}')">${esc(it.name)}</a>`:esc(it.name)}${it.status?`<br><span class="dim">${esc(it.status)}</span>`:''}</div>`).join(''):'<div class="small muted">סדר היום טרם פורסם</div>'}
   ${s.docs.length?`<div style="margin-top:.45rem" onclick="event.stopPropagation()">${s.docs.slice(0,3).map(d=>`<a class="chip" href="${esc(d.path)}" target="_blank" rel="noopener"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> ${esc(d.group)}</a>`).join(' ')}</div>`:''}</div>`).join('')}</div>`;
 }
@@ -1704,7 +1710,7 @@ function absentSummaryHTML(absent){
   const by={}; absent.forEach(s=>{const f=shortF(s.faction||''); by[f]=(by[f]||0)+1});
   const groups=Object.entries(by).sort((a,b)=>b[1]-a[1]);
   return `<details style="margin-top:.7rem">
-    <summary style="cursor:pointer;list-style:none"><span class="chip"><span class="pdot" style="background:var(--dim)"></span> לא השתתפו ${absent.length} ח״כים — ${groups.map(([f,n])=>`${esc(f)} ${n}`).join(' · ')}</span> <span class="small" style="color:var(--accent)">לרשימה המלאה ▾</span></summary>
+    <summary style="cursor:pointer;list-style:none"><span class="chip" style="white-space:normal;line-height:1.5;text-align:start"><span class="pdot" style="background:var(--dim)"></span> לא השתתפו ${absent.length} ח״כים — ${groups.map(([f,n])=>`${esc(f)} ${n}`).join(' · ')}</span> <span class="small" style="color:var(--accent)">לרשימה המלאה ▾</span></summary>
     <div class="rows" style="margin:.5rem -.9rem 0">${absent.map(s=>`<div class="row" ${MKP[s.name]||mkIndex[s.name]?`onclick="openMk('${jsq(s.name)}')"`:''}>${avatar(s.name,s.faction,30)}<span class="flex">${esc(disp(s.name))}<br><span class="dim small">${esc(shortF(s.faction))}</span></span><span class="vchip n">נעדר/ה</span></div>`).join('')}</div>
   </details>`;
 }
@@ -1954,7 +1960,10 @@ function mkCommitteesHTML(name){
   const rank=r=>r.role==='chair'?0:r.role==='member'?1:2;
   const cur=list.filter(x=>!x.to).sort((a,b)=>rank(a)-rank(b));
   const past=list.filter(x=>x.to);
-  const dedup=arr=>{ const seen={}; return arr.filter(x=>{const k=x.committee_id+x.role; if(seen[k])return false; seen[k]=1; return true}) };
+  // The official roster gives a chair two concurrent stints in the same
+  // committee (chair + member). Dedup by committee only — `cur` is sorted
+  // chair-first, so the chair stint wins and the person appears once.
+  const dedup=arr=>{ const seen={}; return arr.filter(x=>{const k=x.committee_id; if(seen[k])return false; seen[k]=1; return true}) };
   const curD=dedup(cur);
   return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ועדות בכנסת 25</h3>
   ${curD.length?`<div class="chips" style="margin-top:.45rem">${curD.map(x=>`<button class="chip ${x.role==='chair'?'acc':''}" onclick="openCommittee('${x.committee_id}')">${x.role==='chair'?'★ ':''}${esc(x.committee||cmtName(x.committee_id))} · ${roleLbl[x.role]} ←</button>`).join('')}</div>`:'<p class="muted small" style="margin-top:.35rem">לא חבר/ה כיום באף ועדה.</p>'}
@@ -1966,7 +1975,10 @@ function committeeMembersHTML(c){
   const roleLbl={chair:'יו״ר',member:'חבר/ה',substitute:'מ״מ'};
   const rank=r=>r.role==='chair'?0:r.role==='member'?1:2;
   const cur=all.filter(x=>!x.to).sort((a,b)=>rank(a)-rank(b)||disp(a.name).localeCompare(disp(b.name),'he'));
-  const seen=new Set(), curD=cur.filter(x=>{const k=x.name+x.role; if(seen.has(k))return false; seen.add(k); return true});
+  // Same dual-stint issue as on MK pages: a current chair also carries an
+  // open member stint. Dedup by person only — `cur` is sorted chair-first,
+  // so they appear once, as chair.
+  const seen=new Set(), curD=cur.filter(x=>{const k=x.name; if(seen.has(k))return false; seen.add(k); return true});
   const pastN=new Set(all.filter(x=>x.to).map(x=>x.name)).size;
   return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> חברי הוועדה כיום (${curD.length})</h3>
   ${curD.length?`<div class="rows" style="margin:.5rem -.9rem 0">${curD.map(x=>`<div class="row" onclick="openMk('${jsq(x.name)}')">${avatar(x.name,(MKP[x.name]||mkIndex[x.name]||{}).faction||'',32)}<span class="flex">${esc(disp(x.name))}<br><span class="dim small">${esc(shortF((MKP[x.name]||mkIndex[x.name]||{}).faction||''))}</span></span>${x.role==='chair'?'<span class="chip acc">★ יו״ר</span>':x.role==='substitute'?'<span class="chip">מ״מ</span>':'<span class="chip acc">לכרטיס ←</span>'}</div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.35rem">אין חברים נוכחיים במאגר.</p>'}
