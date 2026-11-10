@@ -119,6 +119,7 @@ button.chip{transition:.15s}button.chip.on{background:var(--accent);color:#fdfbf
 /* protocol dialogue */
 .proto-turn{display:flex;gap:.65rem;padding:.55rem .6rem;border-radius:12px;margin-bottom:.3rem}
 mark{background:var(--abstain);color:#241a02;border-radius:4px;padding:0 .14em;font-weight:700}
+mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);outline-offset:1px}
 .proto-turn:hover{background:var(--surface2)}
 .proto-turn.chair{background:rgba(185,143,31,.10);border:1px solid rgba(185,143,31,.35)}
 .proto-turn.inter{padding:.2rem .6rem;font-style:italic}
@@ -1151,7 +1152,20 @@ function openFaction(name){ navTo('faction='+encodeURIComponent(name),()=>{viewA
    first, exactly like the switchKnesset(25);openMk(…) pattern for people. */
 function openFactionIn(kn,name){ if(KN!==kn) switchKnesset(kn); openFaction(name) }
 function openCommittee(id){ navTo('committee='+id,()=>{viewArg=String(id); view='committee'; buildTabs(); renderCommitteeDetail(); window.scrollTo({top:0})}) }
-function openPlenum(sid){ navTo('plenum='+sid,()=>{viewArg=String(sid); view='plenumSession'; buildTabs(); renderPlenumSession(); window.scrollTo({top:0})}) }
+/* Search terms carried into a sitting page: when the click came from a
+   דברי הכנסת / protocol search result, the reader opens with those
+   words highlighted in the full protocol (see protoTurnsHTML hlOnly).
+   PLENUM_HL_BY_SID is filled by the cross-corpus protocol search; the
+   plenum tab's own hits live in plenumHits. Both are only honoured
+   while their query is still the one in the box — never stale. */
+let PLENUM_HL=[], PLENUM_HL_Q='', PLENUM_HL_BY_SID={};
+function openPlenum(sid){
+  const id=String(sid); let hl=[], q='';
+  if(view==='plenum'&&plenumHitsFor&&plenumHitsFor===plenumFilter.q.trim()&&plenumHits&&plenumHits[id]){ hl=plenumHits[id].hits.map(h=>h[0]); q=plenumHitsFor }
+  else if(view==='committees'&&protoResultsFor&&protoResultsFor===protoQuery.trim()&&PLENUM_HL_BY_SID[id]){ hl=PLENUM_HL_BY_SID[id]; q=protoResultsFor }
+  PLENUM_HL=hl; PLENUM_HL_Q=q;
+  navTo('plenum='+sid,()=>{viewArg=String(sid); view='plenumSession'; buildTabs(); renderPlenumSession(); window.scrollTo({top:0})})
+}
 
 /* ============ global grouped autocomplete ============
    One index over the objects already in memory — MKs, factions/lists,
@@ -1313,39 +1327,54 @@ async function toggleProtocol(id){
 }
 /* Highlight query matches inside protocol text. Works on the RAW string
    and escapes segment by segment, so neither the transcript nor the
-   query can inject markup into the page. */
+   query can inject markup into the page. `q` may be one term or a list
+   (the actual indexed words a search hit on) — earliest match wins,
+   longest at the same spot. */
 function hlText(text,q){
-  const s=String(text??''), needle=String(q||'');
-  if(!needle) return esc(s);
+  const s=String(text??'');
+  const terms=(Array.isArray(q)?q:[q]).map(x=>String(x||'')).filter(Boolean).sort((a,b)=>b.length-a.length);
+  if(!terms.length) return esc(s);
   let out='', i=0;
-  for(;;){ const j=s.indexOf(needle,i); if(j<0){ out+=esc(s.slice(i)); break } out+=esc(s.slice(i,j))+'<mark>'+esc(s.slice(j,j+needle.length))+'</mark>'; i=j+needle.length }
+  for(;;){ let best=-1, bl=0;
+    for(const t of terms){ const j=s.indexOf(t,i); if(j>=0&&(best<0||j<best||(j===best&&t.length>bl))){ best=j; bl=t.length } }
+    if(best<0){ out+=esc(s.slice(i)); break }
+    out+=esc(s.slice(i,best))+'<mark>'+esc(s.slice(best,best+bl))+'</mark>'; i=best+bl }
   return out;
 }
 function protoOccurrences(doc,q){
-  if(!q) return 0;
-  let n=0;
-  for(const t of doc.turns){ for(const s of [t.text,t.speaker||'']){ let i=0; for(;;){ const j=s.indexOf(q,i); if(j<0) break; n++; i=j+q.length } } }
+  const terms=(Array.isArray(q)?q:[q]).map(x=>String(x||'')).filter(Boolean).sort((a,b)=>b.length-a.length);
+  if(!terms.length) return 0;
+  let n=0; // same earliest/longest scan as hlText, so תקציב inside התקציב counts once
+  for(const t of doc.turns){ for(const s of [t.text,t.speaker||'']){ let i=0;
+    for(;;){ let best=-1, bl=0;
+      for(const term of terms){ const j=s.indexOf(term,i); if(j>=0&&(best<0||j<best||(j===best&&term.length>bl))){ best=j; bl=term.length } }
+      if(best<0) break; n++; i=best+bl } } }
   return n;
 }
 function protoTurnsHTML(doc=PROTO_CUR, filter=protoFilter){
+  // filter.hlOnly: q highlights in place and never drops a turn — the
+  // whole protocol stays on screen, matches marked inside it (the
+  // plenum reader arriving from a search). Without it, q is the old
+  // committee behaviour: keep only turns containing q.
+  const HL=filter.hl&&filter.hl.length?filter.hl:filter.q;
   const turns=[]; let lastTopic='';
   for(const t of doc.turns){
     if(t.role==='topic'){ if(t.text===lastTopic) continue; lastTopic=t.text }
     if(filter.speaker&&t.speaker!==filter.speaker) continue;
-    if(filter.q&&!t.text.includes(filter.q)&&!t.speaker.includes(filter.q)) continue;
+    if(filter.q&&!filter.hlOnly&&!t.text.includes(filter.q)&&!t.speaker.includes(filter.q)) continue;
     turns.push(t);
   }
   return turns.map(t=>{
-    if(t.role==='topic') return `<div class="proto-topic"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h11V21L12 17.2 6.5 21z"/></svg> ${hlText(t.text,filter.q)}</div>`;
+    if(t.role==='topic') return `<div class="proto-topic"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h11V21L12 17.2 6.5 21z"/></svg> ${hlText(t.text,HL)}</div>`;
     const col=protoColor(t.speaker,t.faction_hint); const key=protoSpeakerKey(t.speaker);
     const ini=t.speaker.split(/\s+/).map(w=>w[0]).slice(0,2).join('');
-    if(t.role==='interjection') return `<div class="proto-turn inter"><span class="small" style="color:${col};font-weight:700">${hlText(t.speaker,filter.q)}:</span><span class="small muted">${hlText(t.text,filter.q)}</span></div>`;
+    if(t.role==='interjection') return `<div class="proto-turn inter"><span class="small" style="color:${col};font-weight:700">${hlText(t.speaker,HL)}:</span><span class="small muted">${hlText(t.text,HL)}</span></div>`;
     return `<div class="proto-turn ${t.role==='chair'?'chair':''}">
       <div class="proto-av" style="background:${col}">${esc(ini)}</div>
       <div style="flex:1;min-width:0"><div style="display:flex;gap:.45rem;align-items:center;flex-wrap:wrap">
-        ${key?`<a href="#" onclick="event.preventDefault();openMk('${jsq(key)}')" style="color:${col};font-weight:800">${hlText(t.speaker,filter.q)}</a>`:`<b style="color:${col}">${hlText(t.speaker,filter.q)}</b>`}
+        ${key?`<a href="#" onclick="event.preventDefault();openMk('${jsq(key)}')" style="color:${col};font-weight:800">${hlText(t.speaker,HL)}</a>`:`<b style="color:${col}">${hlText(t.speaker,HL)}</b>`}
         ${t.role==='chair'?'<span class="chip" style="color:#96700f;border-color:#dcc175">יו״ר</span>':t.role==='guest'?'<span class="chip">אורח/ת</span>':t.faction_hint?`<span class="small dim">${esc(t.faction_hint)}</span>`:''}
-      </div><p style="margin-top:.25rem;line-height:1.65">${hlText(t.text,filter.q)}</p></div></div>`;
+      </div><p style="margin-top:.25rem;line-height:1.65">${hlText(t.text,HL)}</p></div></div>`;
   }).join('')||'<p class="muted small">אין תורות בסינון הזה.</p>';
 }
 function renderProtocol(){
@@ -1363,7 +1392,16 @@ function renderProtocol(){
    418 sittings would bloat the repo); same turn shape + renderer as
    committee protocols. On the local static server the function does not
    exist — the fallback points at the official document instead. */
-let PLENUM_CUR=null, plenumProtoFilter={speaker:'',q:''};
+let PLENUM_CUR=null, plenumProtoFilter={speaker:'',q:'',hl:[],hlOnly:true};
+let _markI=-1; // current <mark> in the plenum reader (search-hit navigation)
+function plenumMarkNav(dir){
+  const ms=[...document.querySelectorAll('#plenumTurns mark')];
+  if(!ms.length) return;
+  _markI=((_markI+dir)%ms.length+ms.length)%ms.length;
+  ms.forEach((m,i)=>m.classList.toggle('cur',i===_markI));
+  ms[_markI].scrollIntoView({block:'center',behavior:'smooth'});
+  const el=$('#plenumMarkPos'); if(el) el.textContent=`${_markI+1} / ${ms.length}`;
+}
 async function togglePlenumProtocol(sid){
   const box=$('#plenumProtoBox'); if(!box) return;
   const btn=$('#plenumReadBtn');
@@ -1372,18 +1410,26 @@ async function togglePlenumProtocol(sid){
   try{
     const r=await fetch(`/.netlify/functions/plenum?id=${encodeURIComponent(sid)}`);
     if(!r.ok) throw 0;
-    PLENUM_CUR=await r.json(); PLENUM_CUR.id=String(sid); plenumProtoFilter={speaker:'',q:''}; renderPlenumProtocol();
+    PLENUM_CUR=await r.json(); PLENUM_CUR.id=String(sid);
+    // Arriving from a search: highlight its words in the WHOLE protocol
+    // (hlOnly — no turn is filtered out), and land on the first hit.
+    plenumProtoFilter={speaker:'',q:PLENUM_HL_Q,hl:[...PLENUM_HL],hlOnly:true};
+    renderPlenumProtocol();
     if(btn) btn.textContent='✕ סגירה';
+    if(PLENUM_HL.length){ _markI=-1; requestAnimationFrame(()=>plenumMarkNav(1)) }
   }catch(e){ box.innerHTML='<p class="muted small">הקורא זמין באתר החי — כאן אפשר לפתוח את המסמך הרשמי למעלה.</p>' }
 }
 function renderPlenumProtocol(){
   const box=$('#plenumProtoBox'); if(!box||!PLENUM_CUR) return;
   const spk=Object.entries(PLENUM_CUR.speakers).sort((a,b)=>b[1].words-a[1].words);
+  const HL=plenumProtoFilter.hl.length?plenumProtoFilter.hl:plenumProtoFilter.q;
+  const occ=HL?protoOccurrences(PLENUM_CUR,HL):0;
   box.innerHTML=`
   <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,16).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${plenumProtoFilter.speaker&&plenumProtoFilter.speaker!==n?'off':''}" onclick="plenumProtoFilter.speaker=plenumProtoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderPlenumProtocol()" title="${s.turns} תורות · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
   ${plenumProtoFilter.speaker?`<button class="chip" onclick="plenumProtoFilter.speaker='';renderPlenumProtocol()">✕ כל הדוברים</button>`:''}</div>
-  <input type="search" placeholder="חיפוש בפרוטוקול…" value="${esc(plenumProtoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="plenumProtoFilter.q=this.value;$('#plenumTurns').innerHTML=protoTurnsHTML(PLENUM_CUR,plenumProtoFilter)">
-  <div class="small dim" style="margin-bottom:.5rem">${PLENUM_CUR.turns.filter(t=>t.role!=='topic').length} תורות · ${spk.length} דוברים${plenumProtoFilter.q?` · ${protoOccurrences(PLENUM_CUR,plenumProtoFilter.q)} אזכורים מודגשים`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו</div>
+  <input type="search" placeholder="חיפוש בפרוטוקול…" value="${esc(plenumProtoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="plenumProtoFilter.q=this.value;plenumProtoFilter.hl=this.value.trim()?[this.value.trim()]:[];_markI=-1;$('#plenumTurns').innerHTML=protoTurnsHTML(PLENUM_CUR,plenumProtoFilter);const o=$('#plenumOcc');if(o)o.textContent=plenumProtoFilter.hl.length?protoOccurrences(PLENUM_CUR,plenumProtoFilter.hl):'';const n=$('#plenumMarkNav');if(n)n.style.display=plenumProtoFilter.hl.length&&document.querySelector('#plenumTurns mark')?'':'none'">
+  <div class="small dim" style="margin-bottom:.5rem">${PLENUM_CUR.turns.filter(t=>t.role!=='topic').length} תורות · ${spk.length} דוברים${HL?` · <span id="plenumOcc">${occ}</span> אזכורים מודגשים בכל הפרוטוקול`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו
+  <span id="plenumMarkNav" style="display:${occ?'':'none'};white-space:nowrap"> · <button class="chip" onclick="plenumMarkNav(-1)">› הקודם</button> <span id="plenumMarkPos"></span> <button class="chip" onclick="plenumMarkNav(1)">הבא ‹</button></span></div>
   <div id="plenumTurns">${protoTurnsHTML(PLENUM_CUR,plenumProtoFilter)}</div>`;
 }
 /* Home hero info pills — ONE set for both Knesset homes, same slots in the
@@ -2660,6 +2706,7 @@ function scheduleProtoSearch(){
     if(protoQuery.trim()!==q){ _protoBusyFor=''; scheduleProtoSearch(); return }
     const terms=protoTerms(q);
     const [cmt,pln]=await Promise.all([searchCorpus('c',terms),searchCorpus('p',terms)]);
+    PLENUM_HL_BY_SID={}; for(const e of pln) PLENUM_HL_BY_SID[e.sid]=e.hits.map(h=>h[0]); // openPlenum highlights these in the reader
     const cmtHTML=cmt.length?`<div class="small" style="font-weight:800;margin-top:.7rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ועדות (${cmt.length})</div><div class="rows" style="margin:.3rem -.9rem 0">${cmt.slice(0,15).map(({sid,score,hits})=>{const p=PROTO_SEARCH[sid]||{}; return `<div class="row" onclick="openSession('${sid}')"><span class="chip acc">${fmtDate(p.date)}</span><span class="flex">${esc(p.committee||'')}<br><span class="dim small">${hits.map(([w,c])=>`${esc(w)} ×${c}`).join(' · ')}</span></span><b>${score}</b><span class="chip acc">לפרוטוקול ←</span></div>`}).join('')}</div>`:'';
     const plnHTML=pln.length?`<div class="small" style="font-weight:800;margin-top:.7rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> מליאה — דברי הכנסת (${pln.length})</div><div class="rows" style="margin:.3rem -.9rem 0">${pln.slice(0,15).map(({sid,score,hits})=>{const p=PLENUM_SEARCH[sid]||{}; return `<div class="row" onclick="openPlenum('${sid}')"><span class="chip acc">${fmtDate(p.date)}</span><span class="flex">ישיבת מליאה מס׳ ${p.number}<br><span class="dim small">${hits.map(([w,c])=>`${esc(w)} ×${c}`).join(' · ')}</span></span><b>${score}</b><span class="chip acc">לישיבה ולקריאה ←</span></div>`}).join('')}</div>`:'';
     protoResultsHTML=(cmtHTML||plnHTML)?cmtHTML+plnHTML:'<p class="muted small" style="margin-top:.4rem">לא נמצא בפרוטוקולים שנסרקו. נסו מילה אחרת או תחילית (למשל: תקציב, גיוס, דיור).</p>';
@@ -2831,8 +2878,8 @@ function plenumBrowserHTML(){
 }
 function renderPlenum(){
   if(KN===26){ $('#app').innerHTML=`<div class="sec-title">דברי הכנסת <small>מליאה · כנסת 26</small></div><div class="card empty"><div class="big">${icon('plenum')}</div>דברי הכנסת של כנסת 26 עוד לא פורסמו.<br><span class="small">כשתתכנס הכנסת ויתפרסמו ישיבות המליאה הראשונות, יופיעו כאן כל הישיבות עם חיפוש מלא בפרוטוקולים — כמו בכנסת 25.</span><br><button class="btn primary" style="margin-top:.8rem" onclick="switchKnesset(25)">לדברי הכנסת של כנסת 25 ←</button></div>`; return }
-  ensureProtoSearch(); ensurePlenumSearch();
-  $('#app').innerHTML=`<div class="sec-title">דברי הכנסת <small>מליאה · כל ישיבות כנסת 25 · ${Object.keys(PLENUM_SEARCH).length||418} ישיבות</small></div>${protoSearchHTML()}${plenumBrowserHTML()}`;
+  ensurePlenumSearch(); // one search only in this tab (plenumBrowserHTML); the cross-corpus חיפוש בפרוטוקולים lives in the committees tab
+  $('#app').innerHTML=`<div class="sec-title">דברי הכנסת <small>מליאה · כל ישיבות כנסת 25 · ${Object.keys(PLENUM_SEARCH).length||418} ישיבות</small></div>${plenumBrowserHTML()}`;
 }
 function renderPlenumSession(){
   ensurePlenumSearch();
@@ -2853,12 +2900,20 @@ function renderPlenumSession(){
       ${older?`<button class="btn" onclick="openPlenum('${older.sid}')">› ישיבה ${older.number} (הקודמת)</button>`:''}
       ${newer?`<button class="btn" onclick="openPlenum('${newer.sid}')">ישיבה ${newer.number} (הבאה) ‹</button>`:''}
     </div>
+    ${PLENUM_HL.length?`<div class="small" style="margin-top:.6rem"><span class="chip acc">מהחיפוש: «${esc(PLENUM_HL_Q)}»</span> <span class="dim">ההתאמות יודגשו בפרוטוקול המלא למטה</span></div>`:''}
     <div id="plenumProtoBox" style="margin-top:.7rem"></div>
   </article>
   <div class="sec-title">🗳️ ההצבעות ביום הישיבה <small>${votes.length} הצבעות · ${fmtDate(p.date)}</small></div>
   ${votes.length?`<div class="card rows">${votes.map(v=>`<div class="row" onclick="openVote('${v.id}')"><span class="chip acc">${esc(v.kind_label||'')}</span><span class="flex">${esc(v.title||v.desc||'')}<br><span class="dim small">${v.for!=null?`${v.for}–${v.against} · ${v.for>v.against?'עברה':v.against>v.for?'נדחתה':'תיקו'}`:''}</span></span><span class="chip acc">להצבעה ←</span></div>`).join('')}</div>`
   :'<div class="card pad"><p class="muted small">לא נערכו הצבעות מליאה בתאריך הזה (ישיבה חגיגית, או שההצבעות נרשמו אחרי חצות בתאריך הבא).</p></div>'}`;
   window.scrollTo({top:0});
+  // Arriving from a search: open the reader on the highlighted protocol
+  // instead of making the user hunt for the button (and never toggle an
+  // already-open reader shut — just re-apply the highlight).
+  if(PLENUM_HL.length){
+    if(PLENUM_CUR&&PLENUM_CUR.id===String(viewArg)){ plenumProtoFilter={speaker:'',q:PLENUM_HL_Q,hl:[...PLENUM_HL],hlOnly:true}; renderPlenumProtocol(); const b=$('#plenumReadBtn'); if(b) b.textContent='✕ סגירה'; _markI=-1; requestAnimationFrame(()=>plenumMarkNav(1)) }
+    else togglePlenumProtocol(String(viewArg));
+  }
 }
 /* Four strata, four type scales — the OData `type` field is the tier:
    ועדה ראשית / ועדת הכנסת = permanent (in the Rules of Procedure, live the
