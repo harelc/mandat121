@@ -599,7 +599,28 @@ let FACTION_STINTS={}; // name -> [[from,to,faction],...] — faction on any giv
 function factionOn(name,date){ const st=FACTION_STINTS[name]; if(st&&date){ for(const [f,t,fac] of st) if(date>=f&&(!t||date<=t)) return fac } return FACTION25[name]||'' }
 function mkVotesFor(voteId,date){ const rows=VOTE_RES.votes[String(voteId)]||[]; return rows.map(([i,c])=>({mk_name:VOTE_RES.names[i],result:c,faction:factionOn(VOTE_RES.names[i],date)})) }
 let VOTE_TENURE={}; // fallback: first/last vote dates seen
-const wasMkOn=(n,date)=>{ const st=TENURE[n]; if(st) return st.some(([f,t])=>date>=f&&(!t||date<=t)); const t=VOTE_TENURE[n]; if(t) return date>=t.from&&date<=t.to; return !!MKP[n] };
+/* Was this person an MK on `date`? TENURE is authoritative — but only while
+   it is consistent with the person's own voting record. The 2026-11-10 daily
+   refresh republished k25_tenure.json from an OData feed whose KnessetNum=25
+   stints had been overwritten by the incoming Knesset (stints starting
+   2026-11-03, after K25's last vote): every MK whose only "K25" stint no
+   longer overlapped a single vote they cast in failed wasMkOn for the whole
+   era, and vote-page hemicycles collapsed to the participants alone (42 of
+   120 seats on early votes — most visible on a fresh mobile load, while
+   desktops still held the pre-corruption file in cache). A tenure entry
+   that overlaps none of the person's recorded votes is therefore ignored,
+   and the seat falls back to the vote record / current roster. With a sane
+   tenure file every serving MK's stints overlap their votes, the guard
+   never fires, and real Norwegian-law gaps stay gaps. */
+const wasMkOn=(n,date)=>{
+  const st=TENURE[n], t=VOTE_TENURE[n];
+  if(st&&st.some(([f,to])=>date>=f&&(!to||date<=to))) return true;
+  const tenureContradictsVotes=!!(st&&t&&!st.some(([f,to])=>f<=t.to&&(!to||to>=t.from)));
+  if(tenureContradictsVotes) return (date>=t.from&&date<=t.to)||!!MKP[n];
+  if(st) return false; // tenure exists and is consistent: a real gap / before entry / after exit
+  if(t) return date>=t.from&&date<=t.to;
+  return !!MKP[n];
+};
 let allFilter={q:'',status:'',committee:'',type:'',limit:30,sort:'new'};
 let view='now', viewArg=null;
 let eraFilter={q:'',kind:'',topic:'',limit:30,from:'',to:'',sort:'new'};

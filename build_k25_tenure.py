@@ -181,6 +181,33 @@ def main():
         v.sort(key=lambda s: s[0] or "")
     print(f"faction rows: {len(fpos)}, mapped: {len(factions)}", file=sys.stderr)
 
+    # Sanity guard — never republish a tenure file that contradicts the
+    # Knesset's own vote era. On 2026-11-10 the OData KnessetNum=25 stints
+    # came back overwritten by the incoming Knesset (single stints starting
+    # 2026-11-03, after K25's last vote in 2026-07): the daily refresh
+    # committed that file, and vote-page hemicycles collapsed to just the
+    # participants because wasMkOn trusted tenure absolutely. A build in
+    # which >10% of matched MKs have no stint overlapping the era spanned
+    # by k{kn}_votes.json is an upstream feed failure, not data: keep the
+    # previous file and exit 0 (the no-op contract the daily workflow
+    # relies on) instead of writing it.
+    try:
+        vote_dates = sorted(v["date"] for v in json.load(
+            open(DATA / f"k{kn}_votes.json", encoding="utf-8")) if v.get("date"))
+    except Exception:
+        vote_dates = []
+    if vote_dates:
+        era_lo, era_hi = vote_dates[0], vote_dates[-1]
+        no_overlap = [k for k, periods in tenure.items()
+                      if not any((p[0] or "9999-99-99") <= era_hi
+                                 and (not p[1] or p[1] >= era_lo) for p in periods)]
+        if len(no_overlap) > max(5, len(tenure) * 0.10):
+            print(f"K{kn}: REFUSING to write tenure — {len(no_overlap)}/{len(tenure)} "
+                  f"matched MKs have no stint overlapping the vote era "
+                  f"{era_lo}..{era_hi} (upstream feed failure?); "
+                  f"keeping previous k{kn}_tenure.json", file=sys.stderr)
+            return
+
     json.dump({"_note": f"MK tenure stints [from,to] (to=null = still serving) from KNS_PersonToPosition KnessetNum={kn} PositionID=43/61; factions + faction_stints [from,to,faction] from PositionID=54, fetched at build time.",
                "tenure": {k: sorted(v) for k, v in tenure.items()}, "factions": factions,
                "faction_stints": faction_stints},
