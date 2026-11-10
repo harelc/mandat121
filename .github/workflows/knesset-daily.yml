@@ -127,7 +127,27 @@ jobs:
           git add data/
           if git diff --cached --quiet; then
             echo "No data changes."
-          else
-            git commit -m "data: daily OData refresh ($(date -u +%Y-%m-%d))"
-            git push
+            exit 0
           fi
+          git commit -m "data: daily OData refresh ($(date -u +%Y-%m-%d))"
+          # The build takes ~an hour; main can move under us (human pushes).
+          # A bare push then dies non-fast-forward and loses the whole run's
+          # data (happened 2026-11-10, run 42819693977). Rebase our data-only
+          # commit onto the latest main and retry; a rebase *conflict* still
+          # fails loudly — never silently overwrite a human data change with
+          # a build snapshot.
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if ! git rebase origin/main; then
+              git rebase --abort
+              echo "::error::Rebase of the data commit onto latest main conflicted (attempt $attempt) — refusing to force it; tomorrow's run will rebuild on top."
+              exit 1
+            fi
+            if git push origin main; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push rejected (main moved again), retrying…"
+          done
+          echo "::error::Could not push after 3 attempts — main kept moving."
+          exit 1
