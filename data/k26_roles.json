@@ -1,0 +1,403 @@
+{
+ "_note": "Leadership/government roles from KNS_PersonToPosition KnessetNum=26 (PositionIDs [29, 30, 31, 39, 40, 45, 48, 50, 51, 57, 59, 65, 70, 71, 73, 122, 123, 130, 131, 285078, 285079], named via KNS_Position/DutyDesc), fetched at build time.",
+ "by_mk": {
+  "כץ אופיר": [
+   {
+    "role": "יו\"ר סיעה",
+    "kind": "faction",
+    "ministry": null,
+    "faction": "הליכוד עם בנימין נתניהו לראשות הממשלה",
+    "gov": null,
+    "from": "2026-11-10",
+    "to": null
+   }
+  ],
+  "אזולאי ינון": [
+   {
+    "role": "יו\"ר סיעה",
+    "kind": "faction",
+    "ministry": null,
+    "faction": "התאחדות הספרדים העולמית שומרי תורה",
+    "gov": null,
+    "from": "2026-11-10",
+    "to": null
+   }
+  ],
+  "פינדרוס יצחק": [
+   {
+    "role": "יו\"ר סיעה",
+    "kind": "faction",
+    "ministry": null,
+    "faction": "יהדות התורה והשבת אגודת ישראל - דגל התורה",
+    "gov": null,
+    "from": "2026-11-10",
+    "to": null
+   }
+  ],
+  "פורר עודד": [
+   {
+    "role": "יו\"ר סיעה",
+    "kind": "faction",
+    "ministry": null,
+    "faction": "ישראל ביתנו",
+    "gov": null,
+    "from": "2026-11-10",
+    "to": null
+   }
+  ],
+  "טאהא ווליד": [
+   {
+    "role": "יו\"ר סיעה",
+    "kind": "faction",
+    "ministry": null,
+    "faction": "רע\"מ",
+    "gov": null,
+    "from": "2026-11-10",
+    "to": null
+   }
+  ],
+  "נתניהו בנימין": [
+   {
+    "role": "ראש הממשלה",
+    "kind": "gov",
+    "ministry": "משרד ראש הממשלה",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "לוין יריב": [
+   {
+    "role": "שר ירושלים ומסורת ישראל",
+    "kind": "gov",
+    "ministry": "משרד ירושלים ומסורת ישראל",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   },
+   {
+    "role": "שר העבודה",
+    "kind": "gov",
+    "ministry": "משרד העבודה",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   },
+   {
+    "role": "שר המשפטים",
+    "kind": "gov",
+    "ministry": "משרד המשפטים",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   },
+   {
+    "role": "השר לשירותי דת",
+    "kind": "gov",
+    "ministry": "המשרד לשירותי דת",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   },
+   {
+    "role": "סגן ראש הממשלה",
+    "kind": "gov",
+    "ministry": "משרד ראש הממשלה",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "זוהר מכלוף מיקי": [
+   {
+    "role": "שר התרבות והספורט",
+    "kind": "gov",
+    "ministry": "משרד התרבות והספורט",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "קרעי שלמה": [
+   {
+    "role": "שר התקשורת",
+    "kind": "gov",
+    "ministry": "משרד התקשורת",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "שיקלי עמיחי": [
+   {
+    "role": "שר התפוצות והמאבק באנטישמיות",
+    "kind": "gov",
+    "ministry": "משרד התפוצות והמאבק באנטישמיות",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "כץ חיים": [
+   {
+    "role": "שר התיירות",
+    "kind": "gov",
+    "ministry": "משרד התיירות",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   },
+   {
+    "role": "שר הרווחה והביטחון החברתי",
+    "kind": "gov",
+    "ministry": "משרד הרווחה והביטחון החברתי",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   },
+   {
+    "role": "שר הבריאות",
+    "kind": "gov",
+    "ministry": "משרד הבריאות",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   },
+   {
+    "role": "שר הבינוי והשיכון",
+    "kind": "gov",
+    "ministry": "משרד הבינוי והשיכון",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "אמסלם דוד": [
+   {
+    "role": "השר המקשר בין הממשלה לבין הכנסת",
+    "kind": "gov",
+    "ministry": "משרד הקשר בין הממשלה לכנסת",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   },
+   {
+    "role": "שר נוסף במשרד המשפטים",
+    "kind": "gov",
+    "ministry": "משרד המשפטים",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   },
+   {
+    "role": "השר לשיתוף פעולה אזורי",
+    "kind": "gov",
+    "ministry": "המשרד לשיתוף פעולה אזורי",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "וסרלאוף יצחק שמעון": [
+   {
+    "role": "שר הנגב, הגליל והחוסן הלאומי",
+    "kind": "gov",
+    "ministry": "משרד הנגב, הגליל והחוסן הלאומי",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "אליהו עמיחי": [
+   {
+    "role": "שר המורשת",
+    "kind": "gov",
+    "ministry": "משרד המורשת",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "ברקת ניר": [
+   {
+    "role": "שר הכלכלה והתעשייה",
+    "kind": "gov",
+    "ministry": "משרד הכלכלה והתעשייה",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "קיש יואב": [
+   {
+    "role": "שר החינוך",
+    "kind": "gov",
+    "ministry": "משרד החינוך",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "סער גדעון": [
+   {
+    "role": "שר החוץ",
+    "kind": "gov",
+    "ministry": "משרד החוץ",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "סמוטריץ' בצלאל": [
+   {
+    "role": "שר נוסף במשרד הביטחון",
+    "kind": "gov",
+    "ministry": "משרד הביטחון",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   },
+   {
+    "role": "שר האוצר",
+    "kind": "gov",
+    "ministry": "משרד האוצר",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "כץ ישראל": [
+   {
+    "role": "שר הביטחון",
+    "kind": "gov",
+    "ministry": "משרד הביטחון",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "כהן אלי": [
+   {
+    "role": "שר האנרגיה והתשתיות",
+    "kind": "gov",
+    "ministry": "משרד האנרגיה והתשתיות",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "אלקין זאב": [
+   {
+    "role": "שר נוסף במשרד האוצר",
+    "kind": "gov",
+    "ministry": "משרד האוצר",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "בן גביר איתמר": [
+   {
+    "role": "השר לביטחון לאומי",
+    "kind": "gov",
+    "ministry": "המשרד לביטחון לאומי",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "כהן אלמוג": [
+   {
+    "role": "סגן שר במשרד ראש הממשלה",
+    "kind": "gov",
+    "ministry": "משרד ראש הממשלה",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-10",
+    "to": null
+   }
+  ],
+  "רגב מירי מרים": [
+   {
+    "role": "שרת התחבורה והבטיחות בדרכים",
+    "kind": "gov",
+    "ministry": "משרד התחבורה והבטיחות בדרכים",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "גמליאל גילה": [
+   {
+    "role": "שרת החדשנות, המדע והטכנולוגיה ",
+    "kind": "gov",
+    "ministry": "משרד החדשנות, המדע והטכנולוגיה",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "סטרוק אורית מלכה": [
+   {
+    "role": "שרת ההתיישבות והמשימות הלאומיות",
+    "kind": "gov",
+    "ministry": "משרד ההתיישבות והמשימות הלאומיות",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "סילמן עידית": [
+   {
+    "role": "השרה להגנת הסביבה",
+    "kind": "gov",
+    "ministry": "המשרד להגנת הסביבה",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-03",
+    "to": null
+   }
+  ],
+  "אוחנה אמיר": [
+   {
+    "role": "יושב–ראש הכנסת",
+    "kind": "knesset",
+    "ministry": null,
+    "faction": null,
+    "gov": null,
+    "from": "2026-11-10",
+    "to": null
+   }
+  ]
+ }
+}

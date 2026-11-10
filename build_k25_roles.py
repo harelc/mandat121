@@ -21,6 +21,32 @@ V4 = "https://knesset.gov.il/OdataV4/ParliamentInfo/"
 SVC = "https://knesset.gov.il/Odata/ParliamentInfo.svc/"  # V4 400s on KNS_Person; svc serves it
 HDR = {"Accept": "application/json", "User-Agent": "biapia-research/1.0 (roles build)"}
 
+# K26 CEC candidate-list spelling -> the spelling OData (KNS_Person) and
+# our K25 datasets use. Mirrors NAME_CANON in index.html and
+# K26_NAME_ALIAS in build_k25_tenure.py — keep in sync.
+K26_NAME_ALIAS = {
+    "סון הר-מלך לימור": "סון הר מלך לימור", "אל הואשלה ואליד": "אלהואשלה ואליד",
+    "ביסמוט בעז": "ביסמוט בועז", "איזנקוט גד": "איזנקוט גדי",
+    "כהן אליהו": "כהן אלי", "לוין יריב גדעון": "לוין יריב",
+    "רגב מרים": "רגב מירי מרים", "סער גדעון משה": "סער גדעון",
+    "זוהר מכלוף": "זוהר מכלוף מיקי", "עטייה חוה": "עטייה חוה אתי",
+    "גמליאל דמרי גילה": "גמליאל גילה", "טרופר יחיאל משה": "טרופר חילי",
+    "גולדקנופ יצחק יששכר": "גולדקנופ יצחק", "מלינובסקי קונין יוליה": "מלינובסקי יוליה",
+    "גוטליב רויטל טלי": "גוטליב טלי", "מלכיאלי מיכאל משה": "מלכיאלי מיכאל",
+    "סמוטריץ בצלאל יואל": "סמוטריץ' בצלאל", "רוטמן שמחה דן": "רוטמן שמחה",
+    "מושיאשוילי סימיון": "מושיאשוילי סימון",
+    "טרנר אייל קרן": "טרנר קרן", "הירש נגרי מיכל טליה": "נגרי מיכל",
+    "פינק יאיר": "פינק יאיא (יאיר)", "לסקי שוץ גבריאלה": "לסקי גבי",
+    "גואילי טלי": "גואילי טליק", "שטארק אלי": "שטארק אליקים",
+    "הרוש גיטי עינבר": "הרוש גיטי ענבר", "יחזקאלי בליליוס ענבר": "יחזקאלי ענבר",
+    "מסרי עבד אל כרים": "מסרי עבד אלכרים",
+    "איפרגן תאיר סולי": "איפרגן תאיר", "פולקמן רועי שמואל": "פולקמן רועי",
+    "תיבון נעם משה": "תיבון נעם", "רוזנטל משה עזריאל": "רוזנטל משה",
+    "וויספיש יהודה לייב": "וויספיש יהודה", "דורפמן חנמאל שיראי": "דורפמן חנמאל",
+    "בוסו אוריאל מנחם": "בוסו אוריאל", "פייגלין משה זלמן": "פייגלין משה",
+    "איתם איתמר מרדכי": "איתם איתמר",
+}
+
 # Leadership positions (KNS_Position), by family. MK/faction-membership and
 # committee positions are deliberately excluded — other builders own them.
 ROLE_POSITIONS = {
@@ -59,6 +85,8 @@ def wanted_names(kn):
             prev = json.load(open(DATA / "k26_preview.json", encoding="utf-8"))
             for p in prev.get("parties", []):
                 wanted.update(p.get("candidates", []))
+            wanted.update(K26_NAME_ALIAS[n] for n in list(wanted)
+                          if n in K26_NAME_ALIAS)
         except Exception:
             pass
     try:

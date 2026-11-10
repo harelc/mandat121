@@ -21,6 +21,33 @@ from pathlib import Path
 BASE = "https://knesset.gov.il/Odata/ParliamentInfo.svc/"
 DATA = Path(__file__).parent / "data"
 
+# K26 CEC candidate-list spelling -> the spelling OData (KNS_Person) and
+# our K25 datasets use. Mirrors NAME_CANON in index.html — keep in sync.
+# Without these, 19 of the 120 serving K26 MKs (ביסמוט בועז, איזנקוט גדי…)
+# match no preview candidate and drop out of the serving roster entirely.
+K26_NAME_ALIAS = {
+    "סון הר-מלך לימור": "סון הר מלך לימור", "אל הואשלה ואליד": "אלהואשלה ואליד",
+    "ביסמוט בעז": "ביסמוט בועז", "איזנקוט גד": "איזנקוט גדי",
+    "כהן אליהו": "כהן אלי", "לוין יריב גדעון": "לוין יריב",
+    "רגב מרים": "רגב מירי מרים", "סער גדעון משה": "סער גדעון",
+    "זוהר מכלוף": "זוהר מכלוף מיקי", "עטייה חוה": "עטייה חוה אתי",
+    "גמליאל דמרי גילה": "גמליאל גילה", "טרופר יחיאל משה": "טרופר חילי",
+    "גולדקנופ יצחק יששכר": "גולדקנופ יצחק", "מלינובסקי קונין יוליה": "מלינובסקי יוליה",
+    "גוטליב רויטל טלי": "גוטליב טלי", "מלכיאלי מיכאל משה": "מלכיאלי מיכאל",
+    "סמוטריץ בצלאל יואל": "סמוטריץ' בצלאל", "רוטמן שמחה דן": "רוטמן שמחה",
+    "מושיאשוילי סימיון": "מושיאשוילי סימון",
+    "טרנר אייל קרן": "טרנר קרן", "הירש נגרי מיכל טליה": "נגרי מיכל",
+    "פינק יאיר": "פינק יאיא (יאיר)", "לסקי שוץ גבריאלה": "לסקי גבי",
+    "גואילי טלי": "גואילי טליק", "שטארק אלי": "שטארק אליקים",
+    "הרוש גיטי עינבר": "הרוש גיטי ענבר", "יחזקאלי בליליוס ענבר": "יחזקאלי ענבר",
+    "מסרי עבד אל כרים": "מסרי עבד אלכרים",
+    "איפרגן תאיר סולי": "איפרגן תאיר", "פולקמן רועי שמואל": "פולקמן רועי",
+    "תיבון נעם משה": "תיבון נעם", "רוזנטל משה עזריאל": "רוזנטל משה",
+    "וויספיש יהודה לייב": "וויספיש יהודה", "דורפמן חנמאל שיראי": "דורפמן חנמאל",
+    "בוסו אוריאל מנחם": "בוסו אוריאל", "פייגלין משה זלמן": "פייגלין משה",
+    "איתם איתמר מרדכי": "איתם איתמר",
+}
+
 def get(entity, filt):
     rows, skip = [], 0
     while True:  # service caps pages at 100 rows regardless of $top
@@ -49,6 +76,10 @@ def wanted_names(kn):
             prev = json.load(open(DATA / "k26_preview.json", encoding="utf-8"))
             for p in prev.get("parties", []):
                 wanted.update(p.get("candidates", []))
+            # OData spells these MKs differently than the CEC lists do;
+            # offer the canonical spelling too so resolve() can match it.
+            wanted.update(K26_NAME_ALIAS[n] for n in list(wanted)
+                          if n in K26_NAME_ALIAS)
         except Exception:
             pass
     try:

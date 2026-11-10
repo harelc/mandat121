@@ -1,0 +1,290 @@
+{
+ "_note": "Official Knesset portraits for K26 MKs absent from the K25 photo files (MkLobby GetMkLobbyData120 ImagePath, fs.knesset.gov.il), fetched at build time.",
+ "photos": {
+  "אבו רוקן כמיל": {
+   "mk_site_id": 1136,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1136/1_1136_3_21838.jpeg",
+   "file": "data/photos/mk_a3a2b732.jpg"
+  },
+  "אבישר בן חורין לירן": {
+   "mk_site_id": 1137,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1137/1_1137_3_21843.jpeg",
+   "file": "data/photos/mk_8452cb74.jpg"
+  },
+  "אוחנה טל": {
+   "mk_site_id": 1138,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1138/1_1138_3_21849.jpeg",
+   "file": "data/photos/mk_e216d780.jpg"
+  },
+  "איפרגן תאיר": {
+   "mk_site_id": 1139,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1139/1_1139_3_21854.jpeg",
+   "file": "data/photos/mk_aa2c885b.jpg"
+  },
+  "איתם איתמר": {
+   "mk_site_id": 1140,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1140/1_1140_3_21859.jpeg",
+   "file": "data/photos/mk_1f332591.jpg"
+  },
+  "אל טורי איברהים": {
+   "mk_site_id": 1141,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1141/1_1141_3_21892.jpeg",
+   "file": "data/photos/mk_da2e0c36.jpg"
+  },
+  "אלטשולר עדי": {
+   "mk_site_id": 1142,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1142/1_1142_3_21864.jpeg",
+   "file": "data/photos/mk_0d7382fa.jpg"
+  },
+  "אלנסאסרה חסן": {
+   "mk_site_id": 1143,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1143/1_1143_3_22068.jpeg",
+   "file": "data/photos/mk_655ec4b3.jpg"
+  },
+  "בכר דבורה": {
+   "mk_site_id": 1144,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1144/1_1144_3_21869.jpeg",
+   "file": "data/photos/mk_3dd0f936.jpg"
+  },
+  "בן שטרית רפאל": {
+   "mk_site_id": 1145,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1145/1_1145_3_21874.jpeg",
+   "file": "data/photos/mk_a11183c7.jpg"
+  },
+  "בנט נפתלי": {
+   "mk_site_id": 864,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/864/1_864_3_2094.jpeg",
+   "file": "data/photos/mk_c3ce4710.jpg"
+  },
+  "ברדוגו יעקב": {
+   "mk_site_id": 1146,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1146/1_1146_3_21879.jpeg",
+   "file": "data/photos/mk_e826b282.jpg"
+  },
+  "ג'בארין יוסף": {
+   "mk_site_id": 919,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/919/1_919_3_2413.jpeg",
+   "file": "data/photos/mk_b4e4485c.jpg"
+  },
+  "גואילי טליק": {
+   "mk_site_id": 1147,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1147/1_1147_3_21884.jpeg",
+   "file": "data/photos/mk_0cdc9749.jpg"
+  },
+  "גולדשמידט אלי": {
+   "mk_site_id": 33,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/33/1_33_3_87.jpeg",
+   "file": "data/photos/mk_56fa66b6.jpg"
+  },
+  "גולן יאיר": {
+   "mk_site_id": 1027,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1027/1_1027_3_13536.jpeg",
+   "file": "data/photos/mk_42313a51.jpg"
+  },
+  "גטאס פאתן": {
+   "mk_site_id": 1149,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1149/1_1149_3_21902.jpeg",
+   "file": "data/photos/mk_37290033.jpg"
+  },
+  "גני גונן אושרת": {
+   "mk_site_id": 1150,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1150/1_1150_3_21907.jpeg",
+   "file": "data/photos/mk_b0350bf2.jpg"
+  },
+  "דורפמן חנמאל": {
+   "mk_site_id": 1151,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1151/1_1151_3_21912.jpeg",
+   "file": "data/photos/mk_f50c43d1.jpg"
+  },
+  "דראושה אחמד": {
+   "mk_site_id": 1152,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1152/1_1152_3_21917.jpeg",
+   "file": "data/photos/mk_137f121e.jpg"
+  },
+  "הרוש גיטי ענבר": {
+   "mk_site_id": 1154,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1154/1_1154_3_22053.jpeg",
+   "file": "data/photos/mk_4157461c.jpg"
+  },
+  "וויספיש יהודה": {
+   "mk_site_id": 1155,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1155/1_1155_3_22058.jpeg",
+   "file": "data/photos/mk_293e9ee9.jpg"
+  },
+  "ושאחי נהאיה": {
+   "mk_site_id": 1156,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1156/1_1156_3_21952.jpeg",
+   "file": "data/photos/mk_dbb69596.jpg"
+  },
+  "זחאלקה האיתם": {
+   "mk_site_id": 1157,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1157/1_1157_3_21957.jpeg",
+   "file": "data/photos/mk_59632e2b.jpg"
+  },
+  "זרי ישראל": {
+   "mk_site_id": 1158,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1158/1_1158_3_21966.jpeg",
+   "file": "data/photos/mk_8e2960aa.jpg"
+  },
+  "טבג'ה יפה": {
+   "mk_site_id": 1159,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1159/1_1159_3_21998.jpeg",
+   "file": "data/photos/mk_26231e76.jpg"
+  },
+  "טרנר קרן": {
+   "mk_site_id": 1160,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1160/1_1160_3_22063.jpeg",
+   "file": "data/photos/mk_aec8a5ce.jpg"
+  },
+  "יחזקאלי ענבר": {
+   "mk_site_id": 1161,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1161/1_1161_3_22003.jpeg",
+   "file": "data/photos/mk_f3ee36ab.jpg"
+  },
+  "כהן יורם": {
+   "mk_site_id": 1162,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1162/1_1162_3_22008.jpeg",
+   "file": "data/photos/mk_c1c4bc43.jpg"
+  },
+  "כרכבי סבאח מהא": {
+   "mk_site_id": 1163,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1163/1_1163_3_22037.jpeg",
+   "file": "data/photos/mk_661ef97e.jpg"
+  },
+  "לנקרי טליה": {
+   "mk_site_id": 1164,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1164/1_1164_3_22048.jpeg",
+   "file": "data/photos/mk_a8f69984.jpg"
+  },
+  "לסקי גבי": {
+   "mk_site_id": 1081,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1081/1_1081_3_17968.jpeg",
+   "file": "data/photos/mk_a7a738f9.jpg"
+  },
+  "מדן אלישע": {
+   "mk_site_id": 1165,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1165/1_1165_3_22043.jpeg",
+   "file": "data/photos/mk_730ed3f5.jpg"
+  },
+  "מור צבי": {
+   "mk_site_id": 1166,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1166/1_1166_3_22028.jpeg",
+   "file": "data/photos/mk_644ee27f.jpg"
+  },
+  "מסרי עבד אלכרים": {
+   "mk_site_id": 1167,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1167/1_1167_3_21897.png",
+   "file": "data/photos/mk_f3f5d9cd.jpg"
+  },
+  "מרידור שאול": {
+   "mk_site_id": 1168,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1168/1_1168_3_22033.jpeg",
+   "file": "data/photos/mk_bf1343d7.jpg"
+  },
+  "נגרי מיכל": {
+   "mk_site_id": 1153,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1153/1_1153_3_22023.jpeg",
+   "file": "data/photos/mk_64271308.jpg"
+  },
+  "נעים ארמן ברוריה": {
+   "mk_site_id": 1169,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1169/1_1169_3_22018.jpeg",
+   "file": "data/photos/mk_59cb9b7f.jpg"
+  },
+  "סגלוביץ' יואב": {
+   "mk_site_id": 995,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/995/1_995_3_11219.jpeg",
+   "file": "data/photos/mk_566fef7b.jpg"
+  },
+  "סטרוק אורית מלכה": {
+   "mk_site_id": 884,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/884/1_884_3_2213.jpeg",
+   "file": "data/photos/mk_3583cbfd.jpg"
+  },
+  "עואודה בכר": {
+   "mk_site_id": 1170,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1170/1_1170_3_22013.jpeg",
+   "file": "data/photos/mk_3f62534b.jpg"
+  },
+  "פולקמן רועי": {
+   "mk_site_id": 941,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/941/1_941_3_2555.jpeg",
+   "file": "data/photos/mk_e51a6c09.jpg"
+  },
+  "פטר דוד": {
+   "mk_site_id": 1172,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1172/1_1172_3_21992.jpeg",
+   "file": "data/photos/mk_f20137f3.jpg"
+  },
+  "פייגלין משה": {
+   "mk_site_id": 885,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/885/1_885_3_2217.jpeg",
+   "file": "data/photos/mk_e0592f52.jpg"
+  },
+  "פינדרוס יצחק": {
+   "mk_site_id": 1001,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1001/1_1001_3_11229.jpeg",
+   "file": "data/photos/mk_4b871cfd.jpg"
+  },
+  "פינק יאיא (יאיר)": {
+   "mk_site_id": 1173,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1173/1_1173_3_21987.jpeg",
+   "file": "data/photos/mk_632b8456.jpg"
+  },
+  "פרץ אליסף": {
+   "mk_site_id": 1174,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1174/1_1174_3_21982.jpeg",
+   "file": "data/photos/mk_1725e2b3.jpg"
+  },
+  "רוזין מיכל": {
+   "mk_site_id": 895,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/895/1_895_3_2264.jpeg",
+   "file": "data/photos/mk_45e808d3.jpg"
+  },
+  "רוזנטל משה": {
+   "mk_site_id": 1175,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1175/1_1175_3_21977.jpeg",
+   "file": "data/photos/mk_49d2d4e0.jpg"
+  },
+  "רונן עמרי": {
+   "mk_site_id": 1176,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1176/1_1176_3_21972.jpeg",
+   "file": "data/photos/mk_4fb4565d.jpg"
+  },
+  "ריף אלקס": {
+   "mk_site_id": 1177,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1177/1_1177_3_21962.jpeg",
+   "file": "data/photos/mk_5fb0ca85.jpg"
+  },
+  "שטארק אליקים": {
+   "mk_site_id": 1178,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1178/1_1178_3_21922.jpeg",
+   "file": "data/photos/mk_e0d5c865.jpg"
+  },
+  "שלו יונתן": {
+   "mk_site_id": 1179,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1179/1_1179_3_21937.jpeg",
+   "file": "data/photos/mk_ab2bb85a.jpg"
+  },
+  "שפירא שירה": {
+   "mk_site_id": 1180,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1180/1_1180_3_21942.jpeg",
+   "file": "data/photos/mk_c25428d0.jpg"
+  },
+  "שרעבי שרון": {
+   "mk_site_id": 1181,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1181/1_1181_3_21947.jpeg",
+   "file": "data/photos/mk_b9183fe7.jpg"
+  },
+  "תדמור ארז": {
+   "mk_site_id": 1182,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1182/1_1182_3_21932.jpeg",
+   "file": "data/photos/mk_de6e5838.jpg"
+  },
+  "תיבון נעם": {
+   "mk_site_id": 1183,
+   "source": "https://fs.knesset.gov.il/globaldocs/MK/1183/1_1183_3_21927.jpeg",
+   "file": "data/photos/mk_aa874054.jpg"
+  }
+ }
+}

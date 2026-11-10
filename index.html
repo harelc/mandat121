@@ -632,8 +632,12 @@ const NAME_CANON={'גנץ בני':'גנץ בנימין','סגלוביץ יואב
  // K26 CEC lists use full legal names (middle names, nicknames spelled out,
  // hyphen/joined particles) where every K25 source uses the short form —
  // without these, returning MKs read as "חדש/ה בכנסת" on their K26 card.
- 'סון הר-מלך לימור':'סון הר מלך לימור','אל הואשלה ואליד':'אלהואשלה ואליד','ביסמוט בעז':'ביסמוט בועז','איזנקוט גד':'איזנקוט גדי','כהן אליהו':'כהן אלי','לוין יריב גדעון':'לוין יריב','רגב מרים':'רגב מירי מרים','סער גדעון משה':'סער גדעון','זוהר מכלוף':'זוהר מכלוף מיקי','עטייה חוה':'עטייה חוה אתי','גמליאל דמרי גילה':'גמליאל גילה','טרופר יחיאל משה':'טרופר חילי','גולדקנופ יצחק יששכר':'גולדקנופ יצחק','מלינובסקי קונין יוליה':'מלינובסקי יוליה','גוטליב רויטל טלי':'גוטליב טלי','מלכיאלי מיכאל משה':'מלכיאלי מיכאל','סמוטריץ בצלאל יואל':"סמוטריץ' בצלאל",'רוטמן שמחה דן':'רוטמן שמחה','מושיאשוילי סימיון':'מושיאשוילי סימון'}; // sources disagree on spelling; canonical = the vote-harvest spelling
-const normName=n=>{ let s=String(n||'').replace(/\s+/g,' ').replace(/[׳\u05F3]/g,"'").replace(/[״\u05F4]/g,'"').trim(); return NAME_CANON[s]||s }; // one canonical spelling per person: geresh==apostrophe, plus the aliases above
+ 'סון הר-מלך לימור':'סון הר מלך לימור','אל הואשלה ואליד':'אלהואשלה ואליד','ביסמוט בעז':'ביסמוט בועז','איזנקוט גד':'איזנקוט גדי','כהן אליהו':'כהן אלי','לוין יריב גדעון':'לוין יריב','רגב מרים':'רגב מירי מרים','סער גדעון משה':'סער גדעון','זוהר מכלוף':'זוהר מכלוף מיקי','עטייה חוה':'עטייה חוה אתי','גמליאל דמרי גילה':'גמליאל גילה','טרופר יחיאל משה':'טרופר חילי','גולדקנופ יצחק יששכר':'גולדקנופ יצחק','מלינובסקי קונין יוליה':'מלינובסקי יוליה','גוטליב רויטל טלי':'גוטליב טלי','מלכיאלי מיכאל משה':'מלכיאלי מיכאל','סמוטריץ בצלאל יואל':"סמוטריץ' בצלאל",'רוטמן שמחה דן':'רוטמן שמחה','מושיאשוילי סימיון':'מושיאשוילי סימון',
+ // K26 OData (KNS_Person) spellings confirmed 2026-11-10 when the official
+ // serving roster published — CEC list spelling on the left, OData on the right.
+ 'טרנר אייל קרן':'טרנר קרן','הירש נגרי מיכל טליה':'נגרי מיכל','פינק יאיר':'פינק יאיא (יאיר)','לסקי שוץ גבריאלה':'לסקי גבי','גואילי טלי':'גואילי טליק','שטארק אלי':'שטארק אליקים','הרוש גיטי עינבר':'הרוש גיטי ענבר','יחזקאלי בליליוס ענבר':'יחזקאלי ענבר','מסרי עבד אל כרים':'מסרי עבד אלכרים',
+ 'איפרגן תאיר סולי':'איפרגן תאיר','פולקמן רועי שמואל':'פולקמן רועי','תיבון נעם משה':'תיבון נעם','רוזנטל משה עזריאל':'רוזנטל משה','וויספיש יהודה לייב':'וויספיש יהודה','דורפמן חנמאל שיראי':'דורפמן חנמאל','בוסו אוריאל מנחם':'בוסו אוריאל','פייגלין משה זלמן':'פייגלין משה','איתם איתמר מרדכי':'איתם איתמר'}; // sources disagree on spelling; canonical = the vote-harvest spelling
+const normName=n=>{ let s=String(n||'').replace(/\s+/g,' ').replace(/[׳\u05F3]/g,"'").replace(/[״\u05F4]/g,'"').replace(/[\u05B0-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7]/g,'').trim(); return NAME_CANON[s]||s }; // one canonical spelling per person: geresh==apostrophe, Hebrew combining marks stripped (the lobby feed ships 'פינק ַיאיא' with a stray hataf), plus the aliases above
 function realFaction(full){ const s=String(full||'').trim(); return s.startsWith('חה"כ')?'סיעת יחיד':s } // OData labels one-person factions 'חה"כ <name>' — a single-member faction, not "no faction"
 const dedupeNames=names=>[...new Map(names.map(n=>[normName(n),normName(n)])).values()]; // one entry per person, however a source spelled the name
 function isCurrentMk(n){ // on the official 120 roster (mk_contacts) => current; the mk_photos snapshot predates late-term Norwegian-law swaps (e.g. מלול ארז, back since 2026-05-19)
@@ -772,7 +776,7 @@ function billDocsHTML(b){
 /* ============ load ============ */
 async function load(){
   const vrP=fetch('data/k25_vote_results.json').then(r=>r.ok?r.json():null).catch(()=>null); // started now, awaited before the MK index is built
-  const [pr,kr,cr,abr,avr,lor,tnr,oph,cor,t26,b26,v26,lo26,c26,cm26]=await Promise.all([fetch('data/mk_photos.json'),fetch('data/k26_preview.json').catch(()=>null),fetch('data/committees.json').catch(()=>null),fetch('data/k25_bills.json').catch(()=>null),fetch('data/k25_votes.json').catch(()=>null),fetch('data/k25_list_order.json').catch(()=>null),fetch('data/k25_tenure.json').catch(()=>null),fetch('data/k25_official_photos.json').catch(()=>null),fetch('data/mk_contacts.json').catch(()=>null),fetch('data/k26_tenure.json').catch(()=>null),fetch('data/k26_bills.json').catch(()=>null),fetch('data/k26_votes.json').catch(()=>null),fetch('data/k26_list_order.json').catch(()=>null),fetch('data/k26_committees.json').catch(()=>null),fetch('data/k26_committee_members.json').catch(()=>null)]);
+  const [pr,kr,cr,abr,avr,lor,tnr,oph,cor,t26,b26,v26,lo26,c26,cm26,oph26]=await Promise.all([fetch('data/mk_photos.json'),fetch('data/k26_preview.json').catch(()=>null),fetch('data/committees.json').catch(()=>null),fetch('data/k25_bills.json').catch(()=>null),fetch('data/k25_votes.json').catch(()=>null),fetch('data/k25_list_order.json').catch(()=>null),fetch('data/k25_tenure.json').catch(()=>null),fetch('data/k25_official_photos.json').catch(()=>null),fetch('data/mk_contacts.json').catch(()=>null),fetch('data/k26_tenure.json').catch(()=>null),fetch('data/k26_bills.json').catch(()=>null),fetch('data/k26_votes.json').catch(()=>null),fetch('data/k26_list_order.json').catch(()=>null),fetch('data/k26_committees.json').catch(()=>null),fetch('data/k26_committee_members.json').catch(()=>null),fetch('data/k26_official_photos.json').catch(()=>null)]);
   // Name keys are canonicalised (whitespace-collapsed) at ingestion: some
   // builders emit 'גואטה  ששון ששי' / 'דיסטל אטבריאן  גלית' with a double
   // space, others the single-space form. Un-normalised, the same person
@@ -780,6 +784,7 @@ async function load(){
   // 120 came back as 122 (and lookups in TENURE/RANK/CMEM missed).
   const normKeys=o=>{ const r={}; for(const[k,v]of Object.entries(o||{})) r[normName(k)]=v; return r };
   if(oph&&oph.ok){ OFFICIAL_PHOTOS=normKeys((await oph.json()).photos||{}) }
+  if(oph26&&oph26.ok){ Object.assign(OFFICIAL_PHOTOS,normKeys((await oph26.json()).photos||{})) } // K26 portraits (build_k26_photos_official.py) — only names absent from the K25 files, so no K25 portrait is replaced
   // Secondary datasets are NOT fetched here — see the lazy loaders above.
   // Each view pulls what it needs via ensureAgenda()/ensureCmem()/…
   if(tnr&&tnr.ok){ const tj=await tnr.json(); TENURE=normKeys(tj.tenure); FACTION_STINTS=normKeys(tj.faction_stints); for(const[k,v]of Object.entries(tj.factions||{})) FACTION25[normName(k)]=String(v).trim() }
@@ -1471,7 +1476,14 @@ function k26ServingSeats(){
   const names=Object.entries(K26_TENURE).filter(([,st])=>(st||[]).some(x=>!x[1])).map(([n])=>n);
   if(!names.length) return null;
   const partyOf=n=>{ if(!K26) return null; for(const p of K26.parties){ const i=(p.candidates||[]).indexOf(n); if(i>=0) return {party:p,rank:i+1} } return null };
-  return names.map(n=>{ const hit=partyOf(n); const faction=K26_FACTIONS[n]||hit?.party.name||'';
+  // Faction label = the CEC party name when the MK is on a candidate list:
+  // OData's FactionName is the long registered form ('הליכוד עם בנימין
+  // נתניהו לראשות הממשלה'), which matches neither ARC_ORDER_K26, fcol nor
+  // the legend — the arc would scramble and labels truncate. The official
+  // faction (K26_FACTIONS) stays the fallback for serving MKs who are on
+  // no preview list (Norwegian-law replacements resolve via candidates,
+  // so this is rare).
+  return names.map(n=>{ const hit=partyOf(n); const faction=hit?.party.name||K26_FACTIONS[n]||'';
     return {name:n,faction,result:0,color:hit?.party.color||fcol(faction),rank:hit?.rank,listN:hit?.party.candidates.length,serving:true} })
     .sort((a,b)=>partyRank(a.faction,26)-partyRank(b.faction,26)||(a.rank??999)-(b.rank??999)||disp(a.name).localeCompare(disp(b.name),'he'));
 }
@@ -1503,7 +1515,7 @@ function renderNow26(){
   <div class="sec-title">מה כבר יש, ומה יגיע</div>
   <div class="grid c2">
     <div class="card pad"><h3>✓ כבר כאן</h3><div class="small muted" style="line-height:2">תוצאות הבחירות הרשמיות ומנדטים<br>רשימות המועמדים בסדר הרשמי (466)<br>120 הנבחרים וצבעי הסיעות של כנסת 26<br>${serving?'הסגל המכהן הרשמי — מי באמת בכנסת עכשיו, מעל המפה<br>':''}קישור מהנבחרים להיסטוריית ההצבעות שלהם בכנסת 25</div></div>
-    <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> יגיע בהמשך — מעצמו</h3><div class="small muted" style="line-height:2">${serving?'':'רשימת הח״כים הרשמית של הכנסת ה־26<br>'}הצעות החוק הראשונות<br>ישיבות הוועדות הראשונות<br>ההצבעות הראשונות במליאה — ומהן גם ״אני הייתי מצביע״ ו״מי מצביע כמוני״<br><span class="dim">הכנסת החדשה עוד לא פרסמה כלום. ברגע שתתחיל — זה יופיע כאן לבד.</span></div></div>
+    <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> יגיע בהמשך — מעצמו</h3><div class="small muted" style="line-height:2">${serving?'':'רשימת הח״כים הרשמית של הכנסת ה־26<br>'}הצעות החוק הראשונות<br>ישיבות הוועדות הראשונות<br>ההצבעות הראשונות במליאה — ומהן גם ״אני הייתי מצביע״ ו״מי מצביע כמוני״<br><span class="dim">${serving?'הסגל והתפקידים כבר רשמיים (פורסמו עם ישיבת הפתיחה, 10 בנובמבר 2026); חוקים, ועדות והצבעות עוד לא פורסמו. ברגע שיתפרסמו — הם יופיעו כאן לבד.':'הכנסת החדשה עוד לא פרסמה כלום. ברגע שתתחיל — זה יופיע כאן לבד.'}</span></div></div>
   </div>
   <div style="text-align:center;margin-top:1.1rem"><button class="btn" onclick="switchKnesset(25)">לראות איך זה נראה עם נתונים מלאים — כנסת 25 ←</button></div>`;
   if(K26) setTimeout(()=>{document.querySelectorAll('#k26plenum .seat').forEach((el,i)=>el.addEventListener('click',()=>openMk(seats[i].name)))},0);

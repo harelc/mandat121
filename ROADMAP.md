@@ -14,6 +14,48 @@ source of truth — no duplication in git). Verified locally: dist
 assembles to ~20MB and loads. This takes effect on the next push to
 `main` — which, per the owner rule below, happens only on owner's say-so.
 
+## K26 roster published — 2026-11-10, 16:00 swearing-in
+
+The Knesset site + OData flipped at the inaugural session (`KNS_PlenumSession`
+#1, 2026-11-10 16:00). Verified live with `probe_knesset.py`: `IsCurrent` is
+now 26; roster layer ✅ (120 × `PositionID=54`, 11 factions), plenum sessions
+✅ (the inaugural sitting); bills / committees / committee sessions still 0.
+Built + verified locally (not pushed, per owner rule):
+
+- `data/k26_tenure.json` — 120/120 serving MKs matched, faction seat counts
+  exactly the official results (27/21/12/11/8/8/7/7/7/6/6). This required a
+  name-spelling fix: OData `KNS_Person` spells 19 serving MKs differently
+  than the CEC lists (ביסמוט בועז vs בעז, איזנקוט גדי vs גד…); without it
+  only 101/120 seated and the other 19 silently vanished. `K26_NAME_ALIAS`
+  now lives in `build_k25_tenure.py` / `build_k25_roles.py` /
+  `build_k25_committee_members.py`, mirrored by `NAME_CANON` in `index.html`
+  (keep in sync), plus 9 short-form aliases (איתם איתמר מרדכי → איתם איתמר…)
+  that also lift live-presence matching to 120/120.
+- `data/k26_roles.json` — 43 role rows, 28 MKs (PM, Speaker, ministers,
+  faction chairs as published so far). The 4 unmatched persons are
+  non-MK ministers — correctly excluded.
+- `index.html`: `k26ServingSeats()` now prefers the CEC party name over
+  OData's long registered `FactionName` (`הליכוד עם בנימין נתניהו…`), which
+  matched neither `ARC_ORDER_K26` nor the colours — the arc/legend would
+  have scrambled the moment the serving roster landed. Browser-verified:
+  120 seats, legend sums to 120, live presence reads from the lobby feed.
+- `data/k26_official_photos.json` + 57 portraits in `data/photos/`
+  (`build_k26_photos_official.py`, wired into the daily workflow): 57 of
+  the 120 serving MKs — exactly the new faces — had no photo anywhere
+  (initials avatars). The same 16:00 refresh put an `ImagePath` per MK in
+  the lobby feed (`?v=20261110`); the builder downloads only MKs missing
+  from both K25 photo files, so no K25 portrait is replaced. Coverage is
+  now 120/120. The UI merges the K26 manifest over the K25 one in `load()`.
+- `mk_contacts.json` deliberately **not** refreshed: the lobby feed now
+  returns the K26 120 (49-name overlap with K25), and the UI uses that file
+  as the K25 current roster (`ROSTER25`). The daily workflow's
+  `build_mk_contacts.py` step is frozen with an explanatory comment until
+  contacts are split per-Knesset. K26 MK pages get presence live in-browser;
+  their contact cards still show the frozen K25 snapshot's data for
+  returning MKs only — split is the next step here.
+- Still unpublished by the Knesset, so still empty states (honest, not
+  backfilled): K26 bills, committees, committee memberships, votes.
+
 ## Presence — resolved (2026-11-10)
 
 There is **no presence entity in OData** (checked `$metadata`: 47 entity
