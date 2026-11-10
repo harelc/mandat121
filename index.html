@@ -948,7 +948,10 @@ function seatsPos(n,rows=6){
   return pos.sort((x,y)=>y.a-x.a).slice(0,n);
 }
 function initialsOf(name){
-  const parts=String(name||'').trim().split(/\s+/);
+  // Parenthesised nickname tokens ('פינק יאיא (יאיר)') must not supply an
+  // initial: '(' as an "initial" renders as a stray ')' in RTL and reads
+  // as punctuation, not a letter. Strip parens/quotes, keep letter-led tokens.
+  const parts=String(name||'').trim().split(/\s+/).map(t=>t.replace(/[()״"]/g,'')).filter(t=>/^[א-תA-Za-z]/.test(t));
   if(!parts.length||!parts[0]) return '';
   return parts.length>1 ? parts[parts.length-1][0]+parts[0][0] : parts[0].slice(0,2);
 }
@@ -1024,7 +1027,7 @@ function hemiCardHTML(s,ctx){
   const rows=[];
   if(ctx.mode==='k26'&&s.rank) rows.push(['מקום ברשימה',s.listN?`${s.rank} מתוך ${s.listN}`:`${s.rank}`]);
   else if(RANK25[s.name]) rows.push([fac&&fac!=='סיעת יחיד'&&fac!=='ללא סיעה'?`מקום ברשימת ${fac} לכנסת ה־25`:'מקום ברשימה לכנסת ה־25',RANK25[s.name]]);
-  if(ctx.mode==='k26'&&s.serving) rows.push(['סטטוס','מכהן/ת בפועל · סגל רשמי']);
+  if(ctx.mode==='k26'&&s.serving) rows.push(['סטטוס','מכהן/ת בפועל']);
   if(ctx.mode==='k26'&&s.present!==undefined) rows.push(['כעת במשכן הכנסת',s.present?'כן':'לא']);
   rows.push([ctx.mode==='k26'?(s.serving?'מכהנים מהסיעה במפה':'מנדטים לרשימה'):'מושבים לסיעה במפה',facN]);
   if(ctx.mode==='actual'){
@@ -1508,16 +1511,16 @@ function renderNow26(){
     <p>הבחירות הסתיימו, 120 המנדטים חולקו — ומעכשיו כל ישיבה, חוק והצבעה של הכנסת הזאת יופיעו כאן בדיוק כמו בכנסת 25, עם אותם ח״כים, סיעות וצבעים — של הכנסת הזאת.</p>
     ${homeKpisHTML({members:seats.length,factions:serving?legend.length:parties.length,bills:K26B.length,votes:K26V.length,detailed:K26V.filter(v=>v.for!=null).length,lastVote:K26V.length?fmtDate([...K26V].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date):''})}
   </section>
-  <div class="sec-title">${serving?'מליאת הכנסת ה־26':'המליאה הנכנסת'} <small>${serving?'מי מכהן/ת בפועל, לפי הסגל הרשמי של הכנסת — כולל כניסות ויציאות לפי החוק הנורווגי':'רחפו או לחצו על מושב — חלקם כיהנו גם בכנסת 25'}</small></div>
+  <div class="sec-title">${serving?'מליאת הכנסת ה־26':'המליאה הנכנסת'} <small>${serving?'מי מכהן/ת בפועל — כולל כניסות ויציאות לפי החוק הנורווגי':'רחפו או לחצו על מושב — חלקם כיהנו גם בכנסת 25'}</small></div>
   <div class="card pad plenum-wrap home rise"><div id="k26plenum">${K26?plenumSVG(seats,'k26',null):''}</div>
   <div class="legend">${legend.map(([f,v])=>`<span><i style="background:${v.color}"></i>${esc(f)} ${v.n}</span>`).join('')}</div>
-  <div class="small dim" style="margin-top:.4rem">${serving?'מקור: סגל מכהן רשמי (KNS_PersonToPosition, כנסת 26) — נבחרים שפרשו אינם מוצגים, ומחליפיהם כן.':'מקור: תוצאות הבחירות הרשמיות ורשימות המועמדים. ברגע שהכנסת תפרסם סגל מכהן רשמי, המפה תציג אותו — כולל שינויי החוק הנורווגי.'}</div>
+  <div class="small dim" style="margin-top:.4rem">${serving?'מקור: נתוני הכנסת (KNS_PersonToPosition, כנסת 26) — נבחרים שפרשו אינם מוצגים, ומחליפיהם כן.':'מקור: תוצאות הבחירות הרשמיות ורשימות המועמדים. ברגע שיתפרסם מי מכהן/ת בפועל, המפה תציג את המכהנים — כולל שינויי החוק הנורווגי.'}</div>
   ${presenceKnown?`<div class="small" style="margin-top:.35rem"><span class="pdot" style="background:var(--for)"></span> <b>${presentN} מתוך ${seats.length}</b> כעת במשכן הכנסת — מושב בטבעת ירוקה = במשכן, מושב כהה = לא במשכן · קריאה חיה מאפליקציית לובי הח״כים של הכנסת, נכון ל־${esc(presenceWhen)} · מתרענן כל כמה דקות</div>`:''}
   </div>
   <div class="sec-title">מה כבר יש, ומה יגיע</div>
   <div class="grid c2">
-    <div class="card pad"><h3>✓ כבר כאן</h3><div class="small muted" style="line-height:2">תוצאות הבחירות הרשמיות ומנדטים<br>רשימות המועמדים בסדר הרשמי (466)<br>120 הנבחרים וצבעי הסיעות של כנסת 26<br>${serving?'הסגל המכהן הרשמי — מי באמת בכנסת עכשיו, מעל המפה<br>':''}קישור מהנבחרים להיסטוריית ההצבעות שלהם בכנסת 25</div></div>
-    <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> יגיע בהמשך — מעצמו</h3><div class="small muted" style="line-height:2">${serving?'':'רשימת הח״כים הרשמית של הכנסת ה־26<br>'}הצעות החוק הראשונות<br>ישיבות הוועדות הראשונות<br>ההצבעות הראשונות במליאה — ומהן גם ״אני הייתי מצביע״ ו״מי מצביע כמוני״<br><span class="dim">${serving?'הסגל והתפקידים כבר רשמיים (פורסמו עם ישיבת הפתיחה, 10 בנובמבר 2026); חוקים, ועדות והצבעות עוד לא פורסמו. ברגע שיתפרסמו — הם יופיעו כאן לבד.':'הכנסת החדשה עוד לא פרסמה כלום. ברגע שתתחיל — זה יופיע כאן לבד.'}</span></div></div>
+    <div class="card pad"><h3>✓ כבר כאן</h3><div class="small muted" style="line-height:2">תוצאות הבחירות הרשמיות ומנדטים<br>רשימות המועמדים בסדר הרשמי (466)<br>120 הנבחרים וצבעי הסיעות של כנסת 26<br>${serving?'מי מכהן/ת בפועל — מעל המפה<br>':''}קישור מהנבחרים להיסטוריית ההצבעות שלהם בכנסת 25</div></div>
+    <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> יגיע בהמשך — מעצמו</h3><div class="small muted" style="line-height:2">${serving?'':'רשימת הח״כים הרשמית של הכנסת ה־26<br>'}הצעות החוק הראשונות<br>ישיבות הוועדות הראשונות<br>ההצבעות הראשונות במליאה — ומהן גם ״אני הייתי מצביע״ ו״מי מצביע כמוני״<br><span class="dim">${serving?'המכהנים והתפקידים כבר פורסמו (עם ישיבת הפתיחה, 10 בנובמבר 2026); חוקים, ועדות והצבעות עוד לא פורסמו. ברגע שיתפרסמו — הם יופיעו כאן לבד.':'הכנסת החדשה עוד לא פרסמה כלום. ברגע שתתחיל — זה יופיע כאן לבד.'}</span></div></div>
   </div>
   <div style="text-align:center;margin-top:1.1rem"><button class="btn" onclick="switchKnesset(25)">לראות איך זה נראה עם נתונים מלאים — כנסת 25 ←</button></div>`;
   if(K26) setTimeout(()=>{document.querySelectorAll('#k26plenum .seat').forEach((el,i)=>el.addEventListener('click',()=>openMk(seats[i].name)))},0);
@@ -2131,7 +2134,7 @@ async function togglePdf(billId){
 }
 
 /* ============ MKs ============ */
-let mkFilter={q:'',faction:'',sort:'votes',status:'current'}; // status: current | all | former (served and left)
+let mkFilter={q:'',faction:'',sort:'alpha',status:'current'}; // default sort: alphabetical by surname (both Knessets' MK views); status: current | all | former (served and left)
 function mkSortPillsHTML(){
   const hasMine=Object.keys(S.myVotes).length>0;
   // neutral orders → activity counts → personal match (last: disabled until the user votes)
@@ -2369,7 +2372,7 @@ function renderMkDetail(){
     <div class="card pad rise" style="margin-top:.6rem"><div style="display:flex;gap:1rem;align-items:center">${avatar(name,e.party.name,84)}
       <div style="flex:1"><h1 style="font-size:1.5rem">${esc(disp(name))} ${followedMk(name)?'★':''}</h1>
       <button class="chip" style="color:${e.party.color||fcol(e.party.name)};font-weight:700" onclick="openFaction('${jsq(e.party.name)}')">${esc(e.party.name)} · כנסת 26 ←</button>
-      <div class="small dim">${e.rank?`מקום ${e.rank} ברשימת ${esc(e.party.name)} · `:''}${e.serving?'מכהן/ת בפועל · סגל רשמי':e.elected?'נבחר/ה לכנסת ה־26':'מועמד/ת ברשימה — לא נכנס/ה לכנסת ה־26'}</div>
+      <div class="small dim">${e.rank?`מקום ${e.rank} ברשימת ${esc(e.party.name)} · `:''}${e.serving?'מכהן/ת בפועל':e.elected?'נבחר/ה לכנסת ה־26':'מועמד/ת ברשימה — לא נכנס/ה לכנסת ה־26'}</div>
       <span class="chip acc" style="margin-top:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> היסטוריית ההצבעות תתחיל עם הצבעות כנסת 26 הראשונות</span></div>${starBtn('mk',name,name)}</div>
     ${rec?`<div style="margin-top:1rem"><h3>בכנסת 25</h3><div class="small muted" style="line-height:1.9">${rec.votes.length} הצבעות מתועדות · סיעה אז: ${esc(shortF(rec.faction))} · <span style="color:var(--for)">${rec.votes.filter(v=>v.result===1).length} בעד</span> / <span style="color:var(--against)">${rec.votes.filter(v=>v.result===2).length} נגד</span> / <span style="color:var(--abstain)">${rec.votes.filter(v=>v.result===3).length} נמנע</span><br>איך הצביע/ה על ביטחון, כלכלה, זכויות — הכל שמור בכרטיס של כנסת 25.</div>
     <button class="btn primary" style="margin-top:.6rem" onclick="switchKnesset(25);openMk('${jsq(name)}')">לכל ההצבעות בכנסת 25 ←</button></div>`:'<p class="muted small" style="margin-top:1rem">לא כיהן/ה בכנסת 25 — זהו/זו ח״כ חדש/ה. הכרטיס יתמלא מההצבעה הראשונה.</p>'}
