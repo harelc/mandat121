@@ -8,6 +8,7 @@
 - **תוכנית ומפת דרכים**: `ROADMAP.md` · מסמך העיצוב: `OPEN_KNESSET.md` · מדריך ה־API: `KNESSET_APIS.md`
 - **בונים**: `build_*.py` (stdlib בלבד) קוראים את ה־OData הרשמי וכותבים snapshot־ים ל־`data/`
 - **הרצה מקומית**: `python3 -m http.server 8092` ולפתוח את `http://localhost:8092/`
+- **רישיון**: הקוד ברישיון MIT, תוכן האתר CC BY-NC-SA 4.0, נתוני צד־שלישי (הכנסת, ויקיפדיה, ויקינתונים) בתנאיהם — פירוט ב־`LICENSE`
 
 ## biapia
 

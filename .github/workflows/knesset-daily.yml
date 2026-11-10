@@ -51,6 +51,7 @@ jobs:
           python3 -u build_knesset.py --knesset 25
           python3 -u build_committees.py
           python3 -u build_protocols.py
+          python3 -u build_mk_contacts.py # roster first: tenure resolves factions against the current 120, incl. just-sworn-in MKs
           python3 -u build_k25_tenure.py
           python3 -u build_k25_committee_members.py
           python3 -u build_k25_list_order.py
@@ -63,9 +64,10 @@ jobs:
         if: ${{ inputs.target != 'k26-only' }}
         run: |
           python3 -u build_analytics.py          # correlation matrix, close ties, ranks
-          python3 -u build_mk_contacts.py        # official contact/social + IsPresent snapshot (MkLobby API)
           python3 -u build_mk_wiki.py            # Wikipedia abstracts (CC BY-SA) + Wikidata-discovered X handles (CC0)
-          python3 -u build_protocols_search.py   # protocol search index + word clouds
+          python3 -u build_protocols_search.py   # committee protocol search index
+          python3 -u build_plenum_search.py      # plenum (דברי הכנסת) search index — incremental, new sessions only
+          python3 -u build_agenda.py             # this-week agenda: plenum order of the day + committee sittings (windowed, recess-honest)
 
       - name: Build K26 (when OData publishes it)
         if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_ready == 'true' }}

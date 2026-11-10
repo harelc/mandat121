@@ -46,10 +46,24 @@ def main():
         wanted.update(json.load(open("data/k25_vote_results.json", encoding="utf-8"))["names"])
     except Exception:
         pass
+    # The current-120 roster (mk_contacts) is authoritative for who serves
+    # now: a newly sworn-in MK has no votes and no photo-snapshot entry yet,
+    # and without this they landed in the UI with no faction ("ללא סיעה").
+    try:
+        wanted.update(json.load(open("data/mk_contacts.json", encoding="utf-8"))["by_name"])
+    except Exception:
+        pass
 
     def norm_name(s):
         return " ".join(str(s).replace("'", "").replace("׳", "").split())
 
+    # Canonical name = the vote-harvest spelling; roster/photo spellings of
+    # the same person collapse onto it (mirrors NAME_CANON in index.html —
+    # keep the two in sync), else one person splits into two UI entries.
+    WANTED_ALIAS = {"גנץ בני": "גנץ בנימין", "סגלוביץ יואב": "סגלוביץ' יואב",
+                    "מלקו צגה צגנש": "מלקו צגה", "סטרוק אורית": "סטרוק אורית מלכה",
+                    "פינדרוס יצחק זאב": "פינדרוס יצחק"}
+    wanted = {WANTED_ALIAS.get(w, w) for w in wanted}
     orig_by_norm = {norm_name(w): w for w in wanted}
     wanted = set(orig_by_norm)
     NAME_ALIAS = {}  # canonical name = the vote-harvest spelling ("גנץ בנימין"); the UI's normName maps the roster's "גנץ בני" onto it
@@ -115,6 +129,10 @@ def main():
     missing = sorted(set(orig_by_norm.values()) - set(tenure))
     print(f"MATCHED {len(tenure)}/{len(wanted)} UI names; persons unmatched: {len(unmatched_persons)}")
     print("UI names without tenure:", missing)
+    # Every UI name must resolve to a faction — the UI renders a missing one
+    # as "ללא סיעה", which is never true for a serving/former K25 MK.
+    no_faction = sorted(set(orig_by_norm.values()) - set(factions))
+    print("UI names without faction:", no_faction)
     print("persons without UI name:", unmatched_persons[:20])
 
 if __name__ == "__main__":

@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Global protocol search index + word-cloud data (Sprint 1B).
+"""Global protocol search index (Sprint 1B).
 
 Reads the parsed committee protocols (data/protocols/*.json, 15M+ chars —
 too much to ship/search raw in the browser) and emits:
@@ -10,8 +10,11 @@ too much to ship/search raw in the browser) and emits:
                               matches a query word against these keys
                               (exact or prefix) and ranks by count.
   protocols_index.json      — enriched in place per sid with
-                              {top_words:[[word,count],...], speakers, mks}
-                              for word clouds + richer session cards.
+                              {turns, speakers, committee, date}
+                              for richer session cards.
+
+(Word clouds were built on top of this in 1B and removed the same night —
+owner call: frequency clouds were noise, not insight. Do not re-add.)
 
 Hebrew notes: tokens are stripped of surrounding punctuation/quotes;
 prefix particles (ב/ל/מ/ה/ו/כ/ש) are NOT stemmed — prefix search in the UI
@@ -24,7 +27,6 @@ from pathlib import Path
 
 PROTO_DIR = Path("data/protocols")
 TOP_N = 120
-CLOUD_N = 30
 
 STOP = set("""של על אל עם כי אם או גם רק לא מה זה את אני הוא היא אנחנו הם הן
 יש אין היה היתה היו להיות אחד אחת שני כל כך אבל כאשר לפי אחר אחרי לפני תוך כדי
@@ -63,7 +65,6 @@ def main():
         index = json.load(open("data/protocols_index.json", encoding="utf-8"))
     except Exception:
         index = {}
-    global_words = Counter()
     files = sorted(PROTO_DIR.glob("*.json"))
     for f in files:
         doc = json.load(open(f, encoding="utf-8"))
@@ -73,23 +74,18 @@ def main():
             if t["role"] in ("speaker", "chair", "guest"):
                 counts.update(words_of(t["text"]))
         top = counts.most_common(TOP_N)
-        global_words.update(dict(counts.most_common(300)))
         search[sid] = {"committee": doc.get("committee", ""), "date": doc.get("date", ""),
                        "words": dict(top)}
         entry = index.get(sid, {})
+        entry.pop("top_words", None)  # word clouds removed — purge stale keys
         entry.update({"turns": len(doc["turns"]), "speakers": len(doc.get("speakers", {})),
-                      "top_words": top[:CLOUD_N],
                       "committee": doc.get("committee", ""), "date": doc.get("date", "")})
         index[sid] = entry
     Path("data/protocol_search.json").write_text(
         json.dumps(search, ensure_ascii=False), encoding="utf-8")
     Path("data/protocols_index.json").write_text(
         json.dumps(index, ensure_ascii=False), encoding="utf-8")
-    Path("data/protocol_cloud.json").write_text(
-        json.dumps({"global": global_words.most_common(80)}, ensure_ascii=False),
-        encoding="utf-8")
-    print(f"DONE {len(search)} protocols indexed; global cloud top: "
-          f"{[w for w, _ in global_words.most_common(8)]}")
+    print(f"DONE {len(search)} protocols indexed")
 
 
 if __name__ == "__main__":

@@ -62,8 +62,10 @@ Per MK it returns `IsPresent` (in the building *right now*), plus official
 
 - Global full-text-ish search across all 268 parsed committee protocols
   (~3M words): word/prefix match ranked by mentions, deep-links to session
-- Word clouds: global (all protocols) + per-protocol (click a word to
-  filter the reader)
+- ~~Word clouds (global + per-protocol)~~ — REMOVED 2026-11-10, owner
+  call: frequency clouds were noise, not insight. UI, builder output
+  (`protocol_cloud.json`, `top_words`) and fetch all deleted; the
+  protocol *search* above stays.
 
 **Also in sprint 1:** contact/social/presence card on every MK page
 (`build_mk_contacts.py`); harvester pagination bug fixed in
@@ -101,13 +103,24 @@ Especially the permanent committees (ועדות קבועות): richer hub — me
 chair, recent sessions, protocol search per committee, bills in progress,
 follow button prominence. Builds on committees + protocols + members (P0.2).
 
+✅ DONE 2026-11-10: plenum protocols — first-class.
+`build_plenum_search.py` → `data/plenum_search.json`: word/prefix search
+over **all 418 K25 plenum sessions' דברי הכנסת**
+(`KNS_DocumentPlenumSession`, GroupTypeID=28). Browsable sitting index
++ a page per sitting (that day's votes, prev/next navigation) +
+back-links from every vote page. Reader is parsed **on demand** by
+`netlify/functions/plenum.mjs` — the search-only call was reversed by
+the owner the same day; pre-parsing 418 × ~0.5MB docx (100MB+ in repo)
+stays rejected, and fs.knesset sends no CORS headers so the browser
+cannot fetch transcripts itself. Builder is incremental (cached
+sessions skipped), wired into `knesset-daily.yml`.
+
 ### P1. OData gaps — what we are not using yet
 From the live `$metadata` inventory, unused entities worth harvesting:
 `KNS_Query` (שאילתות) + `KNS_DocumentQuery`, `KNS_Agenda` (הצעות לסדר),
 `KNS_IsraelLaw*` (bill → enacted law, completes Bill Journey),
 `KNS_BillUnion`/`KNS_BillSplit`/`KNS_BillName`, `KNS_SecondaryLaw*`
-(חקיקת משנה), `KNS_DocumentPlenumSession` (דברי הכנסת — *plenary*
-protocols, searchable like committee ones), `KNS_BroadcastCommitteSession`
+(חקיקת משנה), `KNS_BroadcastCommitteSession`
 (session video), `V_Lobbyist`/`V_LobbyistsClient` (who lobbies whom),
 `KNS_GovMinistry`, `KNS_JointCommittee`.
 
@@ -118,8 +131,22 @@ from bill texts + protocol word data (already indexed) → topic pages with
 bills, MKs, votes, protocols per keyword; only then make topics followable.
 
 ### P2. Future schedule + follow-anything
-Upcoming plenum/committee sessions (`KNS_PlenumSession`/
-`KNS_CommitteeSession` future-dated) with follow per committee/MK/session.
+✅ DONE 2026-11-10 (schedule half): **📅 בכנסת — סדר היום** calendar on the
+home page — `build_agenda.py` → `data/agenda.json` (wired into
+`knesset-daily.yml`): plenum order of the day
+(`KNS_PlenumSession`+`KNS_PlmSessionItem`) and committee sittings
+(`KNS_CommitteeSession`+`KNS_CmtSessionItem`) in a **day / week / month**
+calendar (month grid clicks through to the day view; prev/next steps by the
+active mode; window = whole calendar months, 2 back / 1 ahead, padded to
+full weeks). Bill items
+deep-link to bill pages, sittings open in-app (agenda sessions resolve in
+`renderSessionDetail` too), followed committees are ★-highlighted, and
+prev/next-week navigation covers every published week in the window.
+Honest recess behaviour: OData creates session rows only when the Knesset
+publishes them (verified 2026-11-10: no rows at all for 8–14 Nov, last
+plenum 2026-07-28), so an unpublished week is labelled as such and the
+latest published week is shown instead — never backfilled.
+Still open: follow per MK/session (committee follows already exist).
 Follows stay local (localStorage) for now; "most followed" is impossible
 until a backend exists — see Deferred.
 
@@ -128,15 +155,36 @@ Explainer pages (how a bill becomes law, what a committee does…) —
 partly present in Bill Journey copy; formalise.
 ✅ DONE 2026-11-10 (abstracts + X discovery): `build_mk_wiki.py` →
 `data/mk_wiki_abstracts.json` — Hebrew Wikipedia lead abstracts for
-120/120 mapped MKs (CC BY-SA, attributed + linked in a 📖 card on the MK
-page), plus Wikidata P2002 X handles: 83 on Wikidata, **33 of them not
-published by the Knesset lobby** (e.g. @itamarbengvir, @gantzbe,
-@NirBarkat) — shown in the contact card only as a visibly separate
-"מויקינתונים" chip, never merged into `mk_contacts.json`. 2 mismatches
-vs the Knesset handle are reported by the builder (official wins in UI).
-Still open: abstracts for the ~29 former MKs with no `mk_wiki.json`
-mapping (needs new title mappings / search-based resolution), and the
-explainer pages themselves.
+**157/157** MKs who served in K25 (CC BY-SA, attributed + linked in a 📖
+card on the MK page). Resolution: 120 curated mapping + 5 name-variant
+aliases + 32 Wikipedia-search hits accepted only when Wikidata verifies
+P39=Knesset-member (Q4047513), or the abstract itself says חבר/ת הכנסת —
+0 unresolved. Plus Wikidata P2002 X handles: 104 MKs, **28 current-roster
+MKs have one on Wikidata that the Knesset lobby does not publish**
+(e.g. @itamarbengvir, @gantzbe, @NirBarkat) — shown only as a visibly
+separate "מויקינתונים" chip (a Wikidata-only card for former MKs), never
+merged into `mk_contacts.json`. Live spot-check 2026-11-10: 50/52 unique
+discovered handles returned 200 on x.com; the 2 dead ones (@Moshesolomonr,
+@KahanaMatan, both 404) are filtered via a dated denylist in the builder.
+2 handle mismatches vs the Knesset are reported (official wins in UI).
+Still open: the explainer pages themselves.
+Pre-public cleanup DONE 2026-11-10 (repo still private — flip is the
+owner's, in GitHub settings, after a skim of ROADMAP/OPEN_KNESSET as
+public reading): `.claude/settings.local.json` untracked + `.claude/`
+gitignored; local git identity switched to
+`harelc@users.noreply.github.com` (the 26 existing commits still carry
+the old work-email author metadata — public once flipped, accepted
+unless history is rewritten); `LICENSE` added (code MIT · content
+CC BY-NC-SA 4.0 · Knesset/Wikipedia/Wikidata data under their own
+terms), linked from README; secret scan of tree + full history clean
+(env values live only in Netlify; only env-var *names* in code).
+✅ DONE 2026-11-10 (about/impressum): `#tab=about` view linked from the
+footer (not a 9th tab) — mission, operator (הראל קין, independent,
+non-commercial, not an official Knesset site), GitHub-Issues contact /
+corrections channel (no postal address or personal email published, by
+design), sources & methodology, privacy (local-only follows, first-party
+daily-salted IP-hash counter), accuracy disclaimer, CC BY-NC-SA 4.0 +
+credits, plus a short English Impressum paragraph.
 
 ### P2. Popular votes
 "Votes everyone marked / closest / most rebel-heavy" on the votes tab —
@@ -158,7 +206,16 @@ default; never publish MK personal contact data — official channels only.
   complete; current faction-colour/plenum visual system is the identity.
 - Full Knesset-26 flip: gated on `probe_knesset.py` turning green.
 
-## Git-connecting mandat121 (prepared, not yet linked)
+## Git-connecting mandat121 — LINKED 2026-11-10
+
+Done on owner's "go" (commit `cd380cf`, pushed to `main`): mandat121 is
+git-linked to `harelc/mandat121@main` (repo renamed from `harelc/biapia` 2026-11-10; GitHub redirects the old slug, both Netlify sites repointed) (base = root, via Netlify API), and
+bia-pia builds from `biapia/`. Both sites deployed `ready` from that push
+and were live-verified (mandat121 = mandate app with full analytics;
+bia-pia = the game, data assembled by `build_site.sh`). From now on:
+push to `main` = deploy (each site built only when its `ignore` guard
+passes), and the daily workflow's data commits will auto-republish
+mandat121. The manual staging deploy below is retired (kept for reference).
 
 Prepared 2026-11-10: root `netlify.toml` (publish `.`, `ignore` skips
 builds when only `biapia/` changed; validated with `netlify build --dry`),
@@ -167,7 +224,7 @@ builds on mandat121-only/data-only pushes) — so a push to `main` builds
 each site only when its inputs changed, instead of always burning two
 deploys. To link when the owner says go: Netlify → mandat121 → Site
 configuration → Build & deploy → Link to Git repository →
-`harelc/biapia`, branch `main`, base directory empty, (build settings
+`harelc/mandat121`, branch `main`, base directory empty, (build settings
 come from the root `netlify.toml`). Equivalent via API using the same
 Netlify GitHub App installation as bia-pia. **Effect once linked:** every
 push builds mandat121 — including the daily workflow's `data:` commits,
@@ -199,15 +256,23 @@ netlify deploy --prod --dir=/tmp/mandat121_deploy --site=52559b29-fcc2-46e8-8794
 ## Legacy decoupling — DONE 2026-11-10
 
 המנדט ה־121 no longer reads the biapia game dataset (`data/bills.json`)
-at runtime. Curated vote records are built in `load()` from the project's
-own `k25_bills.json` (primary vote per bill) + per-MK rows joined from
-`k25_vote_results.json`, with faction-on-the-day from the new
-`faction_stints` in `k25_tenure.json` (PositionID=54 stints; 149 MKs, 40
-with >1 stint). The MK index now spans **all 7,451 era votes** (e.g. the
-busiest MK's page lists ~6,480 documented votes, not the old curated
-subset), and each history row opens its own vote page. Record id == bill
-id, so existing localStorage `myVotes` keys carry over. Verified: no
-`bills.json` request in the network log; 1,152 native curated records.
+at runtime. Per-MK rows are joined from `k25_vote_results.json`, with
+faction-on-the-day from the new `faction_stints` in `k25_tenure.json`
+(PositionID=54 stints; 149 MKs, 40 with >1 stint). The MK index spans
+**all era votes with per-MK results** (e.g. the busiest MK's page lists
+~6,480 documented votes), and each history row opens its own vote page.
+Verified: no `bills.json` request in the network log.
+
+**No "curated/primary vote" concept (removed 2026-11-10):** there is one
+kind of vote — a plenum vote, keyed everywhere (routes `#vote=<id>`,
+localStorage `myVotes`, MK histories) by its vote id, normalised by
+`voteModel()`. A vote may link to a bill (`item_id`); the bill layers on
+context (journey, topics, text, ☆ follow) but never a second identity.
+The old split keys (bill id for a bill's chosen vote, `__v<voteId>`
+otherwise) are migrated to vote ids in `migrateMyVotes()` at load —
+unambiguous because bill ids (1,038,990+) and vote ids (37,658–46,701)
+never overlap. Bill ☆-following stays: the star lives on the bill page,
+and on a vote page it stars that vote's bill.
 Remaining build-time couplings (not runtime): `build_knesset.py` merges
 topics/synopses/doc from the legacy file into `k25_bills.json`, and
 `build_committees.py` still reads it for its bill set — replace both with
@@ -217,14 +282,13 @@ topology). The biapia game now lives in `biapia/` (see Repo layout above) and is
 Vote linkage fixed 2026-11-10: `build_knesset.py` originally took each
 bill's `votes[]` from the legacy file (1,177 bills). It now links era
 votes natively (`ItemID` → bill, reading-family kinds) with tallies
-counted from `k25_vote_results.json`: **1,627 bills with votes, 1,597
-curated primary-vote records** in the app. Coverage reality check: of
+counted from `k25_vote_results.json`: **1,627 bills with votes**. Coverage reality check: of
 7,557 era votes, ~7,470 have per-MK results (all get an MK map on their
-era-vote page); they cover only 1,632 distinct bills because 3,076 are
+vote page); they cover only 1,632 distinct bills because 3,076 are
 reservation votes and many bills are voted on repeatedly — most of the
-7,491 bills (4,413) never reached a plenum vote at all. The votes tab
-therefore defaults to "כל הצבעות המליאה" (with maps); the per-bill
-primary-vote view is the secondary toggle.
+7,491 bills (4,413) never reached a plenum vote at all. The votes tab is
+the single list of all plenum votes, sortable by newest / closest /
+most voters.
 
 ## Working rules
 - Static site, builders in Python (stdlib), JSON snapshots in `data/`.

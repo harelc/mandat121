@@ -3,6 +3,9 @@
 # where biapia/netlify.toml governs its build instead.
 [build]
   publish = "."
+  # Traffic counter: netlify/functions/hit.mjs (Netlify Blobs, first-party).
+  # Set HIT_SALT and HIT_READ_TOKEN in this site's env vars; the full
+  # report is GET /.netlify/functions/hit with header x-hit-token.
   # Skip the mandat121 build when a push touches only the game folder
   # (Netlify: exit 0 from `ignore` = skip build). Saves deploy credits.
   ignore = "git diff --quiet HEAD^ HEAD -- . ':(exclude)biapia'"

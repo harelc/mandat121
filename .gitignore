@@ -10,6 +10,10 @@ dist/
 
 # Local Netlify folder
 .netlify
+node_modules/
+
+# Local agent/tool settings (machine-specific paths & permissions)
+.claude/
 
 # local test snapshots
 __search_test.html

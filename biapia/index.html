@@ -1364,7 +1364,7 @@
     &copy; הראל קין |
     <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank">CC BY-NC-SA 4.0</a> |
     מבוסס על נתוני <a href="https://main.knesset.gov.il/Activity/Info/Pages/Databases.aspx" target="_blank">הכנסת הפתוחה</a> |
-    <span class="visitor-counter">👁 <span id="visitor-count">—</span> מבקרים</span> |
+    <span class="visitor-counter" id="visit-line" hidden></span> |
     <span id="bmc-wrap" style="display:inline-flex;align-items:center;gap:0;vertical-align:middle;position:relative"><a href="https://www.buymeacoffee.com/harelc" target="_blank" rel="noopener" style="display:inline-flex;align-items:center;gap:5px;background:#FFDD00;color:#000;padding:5px 14px;border-radius:10px;font-weight:500;font-size:0.85rem;text-decoration:none;box-shadow:0 2px 8px rgba(255,221,0,0.3);transition:transform 0.15s,box-shadow 0.15s" onmouseover="this.style.transform='scale(1.05)';this.style.boxShadow='0 4px 14px rgba(255,221,0,0.5)'" onmouseout="this.style.transform='';this.style.boxShadow='0 2px 8px rgba(255,221,0,0.3)'"><img src="https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg" alt="" style="width:18px;height:18px">אהבתם? רוצים לתמוך בפיתוח? קנו לי קפה</a><button onclick="document.getElementById('bmc-wrap').remove()" style="position:absolute;top:-6px;right:-6px;background:#fff;border:1px solid #ddd;color:#999;width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:0.65rem;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,0.15)" title="סגור">&times;</button></span>
   </p>
 </footer>
@@ -2655,28 +2655,24 @@ async function fetchWikiBrief(mkName) {
 
 loadData();
 
-// Visitor counter using CountAPI
+// First-party traffic counter (netlify/functions/hit.mjs): one
+// pageview per load; uniques are counted server-side from
+// daily-salted IP hashes. Fire-and-forget, never blocks the page.
 (function loadVisitorCount() {
-    const STORAGE_KEY = 'biapia_visit_counted';
-    const API_NS = 'bia-pia';
-    const API_KEY = 'page-visits';
-
-    const alreadyCounted = sessionStorage.getItem(STORAGE_KEY);
-    const endpoint = alreadyCounted
-        ? 'https://api.counterapi.dev/v1/' + API_NS + '/' + API_KEY + '/'
-        : 'https://api.counterapi.dev/v1/' + API_NS + '/' + API_KEY + '/up';
-
-    fetch(endpoint)
-        .then(r => r.json())
-        .then(data => {
-            const count = data.count || data.value || 0;
-            if (count > 0) {
-                const el = document.getElementById('visitor-count');
-                if (el) el.textContent = count.toLocaleString('he-IL');
-                if (!alreadyCounted) sessionStorage.setItem(STORAGE_KEY, '1');
-            }
+    try {
+        if (navigator.sendBeacon) navigator.sendBeacon('/.netlify/functions/hit', new Blob([JSON.stringify({ p: location.pathname })], { type: 'application/json' }));
+    } catch (e) { /* analytics must never break the page */ }
+    const el = document.getElementById('visit-line');
+    if (!el) return;
+    fetch('/.netlify/functions/hit?summary=1', { cache: 'no-store' })
+        .then(r => r.ok ? r.json() : null)
+        .then(s => {
+            if (!s || !s.today) return;
+            const n = x => (x || 0).toLocaleString('he-IL');
+            el.textContent = `👁 היום באתר: ${n(s.today.pageviews)} צפיות · ${n(s.today.unique_ips)} מבקרים ייחודיים · בשעה האחרונה ${n(s.hour.pageviews)} צפיות`;
+            el.hidden = false;
         })
-        .catch(() => {});
+        .catch(() => { /* traffic line is decorative */ });
 })();
 </script>
 

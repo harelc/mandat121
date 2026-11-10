@@ -1,6 +1,9 @@
 [build]
   command = "bash build_site.sh"
   publish = "dist"
+  # Traffic counter: netlify/functions/hit.mjs (Netlify Blobs, first-party).
+  # Set HIT_SALT and HIT_READ_TOKEN in this site's env vars; the full
+  # report is GET /.netlify/functions/hit with header x-hit-token.
   # Skip rebuilding the game when a push changes neither the game nor the
   # shared data files it assembles (e.g. the daily mandat121 data commit).
   ignore = "git diff --quiet HEAD^ HEAD -- . ../data/bills.json ../data/mk_photos.json ../data/mk_wiki.json ../data/photos"
