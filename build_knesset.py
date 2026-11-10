@@ -5,7 +5,14 @@ Full-coverage per-Knesset builder for המנדט ה־121 (index.html).
 Unlike fetch_all_bills.py (vote-linked bills only), this builds:
   data/k{N}_bills.json — EVERY bill of the Knesset from KNS_Bill:
       status (+desc), committee, type, initiators (resolved to names),
-      publication info, merged with any known votes/synopsis/topics/doc.
+      publication info, postponement reason, the official bill text
+      (KNS_DocumentBill — the נוסח, with its דברי הסבר, exists from the
+      day the bill is tabled, long before any vote), merged with any
+      known votes/synopsis/topics.
+  data/k{N}_bill_docs.json — EVERY official document of every bill
+      (KNS_DocumentBill: all נוסח versions, חומר רקע, the published law…),
+      keyed by bill id for lazy loading on the bill page. k{N}_bills.json
+      keeps only the primary doc_url so the main payload stays lean.
   data/k{N}_votes.json — EVERY plenum vote header of the era, classified
       by kind (readings, reservations, no-confidence, transfers, agenda…)
       with tallies merged from the existing results dataset where known.
@@ -71,6 +78,65 @@ def fetch_in(entity, field, ids, extra, select, batch=50, label=""):
     return out
 
 
+# Official versions of a bill in KNS_DocumentBill, in the order the bill
+# page should offer them: the original proposal text first (GroupType 1,
+# "לדיון מוקדם" — it carries the דברי הסבר), then the first-reading and
+# 2nd–3rd-reading prints, then the published law. PDF beats DOC/DOCX of the
+# same version so the bill page can offer its in-page PDF reader.
+DOC_GROUP_PREF = (1, 2, 4, 9, 8)
+
+
+def pick_doc_url(docs):
+    if not docs:
+        return None
+    pdfs = [d for d in docs
+            if (d.get("ApplicationDesc") or "").upper() == "PDF"
+            or (d.get("FilePath") or "").lower().split("?")[0].endswith(".pdf")]
+    pool = pdfs or docs
+    rank = {g: i for i, g in enumerate(DOC_GROUP_PREF)}
+    pool.sort(key=lambda d: (rank.get(d.get("GroupTypeID"), 99), d.get("Id") or 0))
+    return (pool[0].get("FilePath") or "").replace("\\", "/") or None
+
+
+# Display order for a bill's full document list: the נוסח versions in
+# procedural order, then the published law, then supporting material
+# (חומר רקע, מסמכי ממ"מ, החלטות ממשלה…) — everything KNS_DocumentBill
+# attaches to the bill, as the Knesset site lists them.
+DOC_STAGE_ORDER = {1: 0, 51: 1, 2: 2, 3: 3, 4: 4, 5: 5, 46: 6, 139: 7,
+                   9: 8, 57: 9, 138: 10, 8: 11, 59: 20, 12: 21, 122: 22, 17: 23}
+
+
+def build_docs(docs):
+    """Deduped, stage-ordered [{group, format, url}] for one bill.
+
+    The same version is often published as DOC + PDF (and occasionally
+    as duplicate rows) — one entry per (document group, file stem),
+    PDF preferred, so the list reads as versions, not file formats.
+    """
+    by_key = {}
+    for d in docs or []:
+        url = (d.get("FilePath") or "").replace("\\", "/")
+        if not url:
+            continue
+        stem = url.rsplit(".", 1)[0].lower()
+        key = (d.get("GroupTypeID"), stem)
+        fmt = (d.get("ApplicationDesc") or "").upper()
+        cur = by_key.get(key)
+        if cur is None or (fmt == "PDF" and cur["format"] != "PDF"):
+            by_key[key] = {
+                "group": " ".join((d.get("GroupTypeDesc") or "").split()),
+                "group_id": d.get("GroupTypeID"),
+                "format": fmt,
+                "url": url,
+                "_id": d.get("Id") or 0,
+            }
+    out = sorted(by_key.values(),
+                 key=lambda x: (DOC_STAGE_ORDER.get(x["group_id"], 50), x["_id"]))
+    for x in out:
+        del x["_id"]
+    return out
+
+
 def classify(desc, title=""):
     s = desc or ""
     t = title or ""
@@ -125,8 +191,10 @@ def main():
     print("all bills...", flush=True)
     bills = fetch_all("KNS_Bill", {
         "$filter": f"KnessetNum eq {kn}",
-        "$select": ("Id,Name,SubTypeID,SubTypeDesc,StatusID,CommitteeID,"
-                    "PrivateNumber,Number,PublicationDate,SummaryLaw,LastUpdatedDate"),
+        "$select": ("Id,Name,TypeDesc,SubTypeID,SubTypeDesc,StatusID,CommitteeID,"
+                    "PrivateNumber,Number,PublicationDate,SummaryLaw,LastUpdatedDate,"
+                    "PostponementReasonDesc,IsContinuationBill,PublicationSeriesDesc,"
+                    "MagazineNumber,PageNumber"),
         "$orderby": "Id",
     }, label="bills")
     bill_ids = [b["Id"] for b in bills]
@@ -147,6 +215,17 @@ def main():
             "name": pname.get(i["PersonID"], str(i["PersonID"])),
             "initiator": bool(i["IsInitiator"]),
         })
+
+    print("documents...", flush=True)
+    docs = fetch_in("KNS_DocumentBill", "BillID", bill_ids, "",
+                    "BillID,FilePath,ApplicationDesc,GroupTypeID,GroupTypeDesc,Id",
+                    label="documents")
+    by_bill_doc = defaultdict(list)
+    for d in docs:
+        by_bill_doc[d["BillID"]].append(d)
+    doc_url = {bid: pick_doc_url(ds) for bid, ds in by_bill_doc.items()}
+    bill_docs = {bid: build_docs(ds) for bid, ds in by_bill_doc.items()}
+    bill_docs = {bid: ds for bid, ds in bill_docs.items() if ds}
 
     # Optional enrichment carried over from the earlier AI pipeline
     # (synopsis/topics/doc_url only — NOT vote data; vote linkage below is
@@ -217,23 +296,38 @@ def main():
             "committee": cmap.get(b.get("CommitteeID")),
             "private_number": b.get("PrivateNumber"), "number": b.get("Number"),
             "publication_date": (b.get("PublicationDate") or "")[:10] or None,
+            "publication_series": b.get("PublicationSeriesDesc") or None,
+            "magazine": b.get("MagazineNumber"),
+            "page": b.get("PageNumber"),
+            "postponement_reason": b.get("PostponementReasonDesc") or None,
+            "is_continuation": bool(b.get("IsContinuationBill")) or None,
             "summary": b.get("SummaryLaw") or None,
             "updated": (b.get("LastUpdatedDate") or "")[:10] or None,
             "initiators": by_bill_init.get(b["Id"], []),
             "synopsis": next((x["synopsis"] for x in kb if x.get("synopsis")), None),
             "topics": next((x["topics"] for x in kb if x.get("topics")), None),
-            "doc_url": next((x["doc_url"] for x in kb if x.get("doc_url")), None),
+            # Official נוסח from KNS_DocumentBill; the legacy pipeline's
+            # doc_url (vote-linked bills only) is just a fallback now.
+            "doc_url": doc_url.get(b["Id"]) or next(
+                ((x["doc_url"] or "").replace("\\", "/") for x in kb
+                 if x.get("doc_url")), None),
             "votes": sorted(votes_by_bill.get(b["Id"], []),
                             key=lambda x: x["date"] or ""),
         })
 
     pb = DATA / f"k{kn}_bills.json"
     pv = DATA / f"k{kn}_votes.json"
+    pd_ = DATA / f"k{kn}_bill_docs.json"
     pb.write_text(json.dumps(out_bills, ensure_ascii=False), "utf-8")
     pv.write_text(json.dumps(out_votes, ensure_ascii=False), "utf-8")
+    pd_.write_text(json.dumps(bill_docs, ensure_ascii=False), "utf-8")
+    print(f"wrote {pd_} ({pd_.stat().st_size/1e6:.1f} MB, "
+          f"{len(bill_docs)} bills with documents, "
+          f"{sum(len(v) for v in bill_docs.values())} documents)")
     from collections import Counter
     print(f"\nwrote {pb} ({pb.stat().st_size/1e6:.1f} MB, {len(out_bills)} bills, "
           f"{sum(1 for b in out_bills if b['initiators'])} with initiators, "
+          f"{sum(1 for b in out_bills if b['doc_url'])} with doc_url, "
           f"{sum(1 for b in out_bills if b['votes'])} with known votes)")
     print(f"wrote {pv} ({pv.stat().st_size/1e6:.1f} MB, {len(out_votes)} votes)")
     print("vote kinds:", Counter(v["kind"] for v in out_votes))

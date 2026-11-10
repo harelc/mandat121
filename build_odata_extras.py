@@ -3,7 +3,8 @@
 
 Entities the original plan listed but nothing read yet (ROADMAP P1):
   KNS_Query + KNS_DocumentQuery   שאילתות (per MK, ministry, answered?)
-  KNS_Agenda                      הצעות לסדר (per MK)
+  KNS_Agenda + KNS_DocumentAgenda הצעות לסדר (per MK, with their documents)
+  KNS_DocumentSecondaryLaw        documents of the secondary legislation
   KNS_IsraelLaw (+ bill fields)   enacted-law link + רשומות citation
   KNS_BillUnion / KNS_BillSplit / KNS_BillName
                                   merged/split lineage + names per reading
@@ -126,6 +127,11 @@ def main():
                 "submit": (q.get("SubmitDate") or "")[:10],
                 "reply": (q.get("ReplyMinisterDate") or "")[:10],
                 "docs": qdocs.get(q["Id"], [])})
+    adocs = defaultdict(list)
+    for d in in_batches(PI, "KNS_DocumentAgenda", "AgendaID",
+                        [a["Id"] for a in agendas], "AgendaID,GroupTypeDesc,FilePath"):
+        adocs[d["AgendaID"]].append({"group": d.get("GroupTypeDesc") or "",
+                                     "url": (d.get("FilePath") or "").replace("\\", "/")})
     agendas_by_mk = {}
     cmt_name = {c["id"]: c["name"] for c in committees["committees"]}
     for a in sorted(agendas, key=lambda x: x.get("LastUpdatedDate") or "", reverse=True):
@@ -141,7 +147,8 @@ def main():
                 "status": statuses.get(a.get("StatusID"), ""),
                 "committee": cmt_name.get(a.get("CommitteeID"), ""),
                 "gov": a.get("GovRecommendationDesc") or "",
-                "date": (a.get("LastUpdatedDate") or "")[:10]})
+                "date": (a.get("LastUpdatedDate") or "")[:10],
+                "docs": adocs.get(a["Id"], [])})
     print(f"queries: {len(queries)} ({len(queries_by_mk)} MKs), agendas: "
           f"{len(agendas)} ({len(agendas_by_mk)} MKs)", flush=True)
 
@@ -197,6 +204,11 @@ def main():
     secondary = paged(PI, "KNS_SecondaryLaw",
                       f"$filter=KnessetNum%20eq%20{KN}"
                       "&$select=Id,Name,StatusName,CompletionCauseDesc,CommitteeID,PublicationDate,CommitteeApprovalDate")
+    sdocs = defaultdict(list)
+    for d in in_batches(PI, "KNS_DocumentSecondaryLaw", "SecondaryLawId",
+                        [s["Id"] for s in secondary], "SecondaryLawId,GroupTypeDesc,FilePath"):
+        sdocs[d["SecondaryLawId"]].append({"group": d.get("GroupTypeDesc") or "",
+                                           "url": (d.get("FilePath") or "").replace("\\", "/")})
     secondary_by_committee = {}
     for s in sorted(secondary, key=lambda x: x.get("PublicationDate") or "", reverse=True):
         cid = s.get("CommitteeID")
@@ -207,7 +219,8 @@ def main():
         if len(e["items"]) < 10:
             e["items"].append({"name": s["Name"], "status": s.get("StatusName") or "",
                                "cause": s.get("CompletionCauseDesc") or "",
-                               "date": (s.get("PublicationDate") or s.get("CommitteeApprovalDate") or "")[:10]})
+                               "date": (s.get("PublicationDate") or s.get("CommitteeApprovalDate") or "")[:10],
+                               "docs": sdocs.get(s["Id"], [])})
     print(f"secondary: {len(secondary)} (in {len(secondary_by_committee)} committees)", flush=True)
 
     # ---- broadcasts + joint composition --------------------------------

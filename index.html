@@ -497,22 +497,24 @@ function toggleIn(arr,v){const i=arr.indexOf(v); i>=0?arr.splice(i,1):arr.push(v
 
 let MKP={}, K26=null, mkIndex={}, factionStats={};
 let K26_TENURE={}, K26_FACTIONS={}; // official K26 serving roster (build_k25_tenure.py --knesset 26 -> data/k26_tenure.json); empty until OData publishes KnessetNum=26 positions
-/* Live "in the building" for K26, read in the browser straight from the
-   Knesset MK-lobby API (the same IsPresent signal as the MK-page chip,
-   but live instead of the daily snapshot): one GET returns all 120 MKs
+/* Live "in the building", read in the browser straight from the Knesset
+   MK-lobby API (the IsPresent signal): one GET returns all 120 MKs
    (~62 KB, Access-Control-Allow-Origin: *). Cached 3 minutes so renders
-   and tab switches don't refetch; a failed fetch just leaves the plain
-   map. Only the boolean is used, matched by name against our own seats —
-   no API string ever reaches the DOM. Presence paints ONLY on the
-   official serving roster (k26_tenure seats): before that the live feed
-   still describes the outgoing Knesset's members, and painting it over
-   the elected preview would mislabel people who aren't K26 MKs yet. */
-let PRESENCE26={at:0,tryAt:0,map:null};
-function ensurePresence26(){
+   and page switches don't refetch; a failed fetch just leaves whatever
+   static fallback a surface has. Only the boolean is used, matched by
+   name against our own data — no API string ever reaches the DOM.
+   Consumers: the K26 Now hemicycle (which paints it ONLY on the official
+   serving roster — before that the live feed still describes the
+   outgoing Knesset's members) and the MK page's presence chip (which
+   falls back to the daily mk_contacts snapshot until the live read
+   lands, labelled as such). */
+let LIVE_PRESENCE={at:0,tryAt:0,map:null};
+const livePresenceOf=name=>LIVE_PRESENCE.map&&name in LIVE_PRESENCE.map?LIVE_PRESENCE.map[name]:undefined;
+function ensureLivePresence(){
   const now=Date.now();
-  if(PRESENCE26.map&&now-PRESENCE26.at<180000) return;
-  if(now-PRESENCE26.tryAt<60000) return; // in flight, or a recent failure — don't hammer
-  PRESENCE26.tryAt=now;
+  if(LIVE_PRESENCE.map&&now-LIVE_PRESENCE.at<180000) return;
+  if(now-LIVE_PRESENCE.tryAt<60000) return; // in flight, or a recent failure — don't hammer
+  LIVE_PRESENCE.tryAt=now;
   fetch('https://www.knesset.gov.il/WebSiteApi/knessetapi/MkLobby/GetMkLobbyData120?lang=he',{cache:'no-store'})
     .then(r=>r.ok?r.json():null)
     .then(j=>{
@@ -520,8 +522,9 @@ function ensurePresence26(){
       const map={};
       for(const m of j.mks){ const key=normName(`${m.Lastname||''} ${m.Firstname||''}`); if(key) map[key]=!!m.IsPresent }
       if(!Object.keys(map).length) return;
-      PRESENCE26={at:Date.now(),tryAt:PRESENCE26.tryAt,map};
+      LIVE_PRESENCE={at:Date.now(),tryAt:LIVE_PRESENCE.tryAt,map};
       if(view==='now'&&KN===26) renderNow26();
+      else if(view==='mk') renderMkDetail();
     }).catch(()=>{});
 }
 let K26B=[], K26V=[], K26CMT=null, K26CMEM={by_mk:{},by_committee:{}}; // K26 layers as the daily builders publish them (k26_bills/votes/committees/committee_members.json); empty until then, K26 views fall back to their "not yet" states
@@ -543,6 +546,9 @@ let ROSTER25=new Set(); // the official current-120 roster (CONTACTS names, whit
 let PROTO_SEARCH={}; // global protocol search index (build_protocols_search.py)
 let PLENUM_SEARCH={}; // plenum (דברי הכנסת) search index, all 418 sessions (build_plenum_search.py)
 let EXTRAS=null; // P1 OData extras (build_odata_extras.py): שאילתות, הצעות לסדר, שושלת חוקים, ספר החוקים, חקיקת משנה, שידורים, ועדות משותפות, מרשם השדלנים
+let BILL_DOCS=null; // bill id -> [{group,format,url}] every official document of the bill (build_knesset.py -> data/k{N}_bill_docs.json); k25_bills.json itself carries only the primary doc_url
+let ROLES=null; // surname-first name -> leadership/government roles (build_k25_roles.py -> data/k{N}_roles.json)
+let BILL_HISTORY=null; // bill id -> removed initiators/sponsors with reason (build_k25_bill_history.py -> data/k{N}_bill_history.json)
 let lobbyFilter={q:'',limit:40}; // lobbyist-register segment in the committees tab
 let protoQuery='';
 let pairState={a:'',b:'',show:'agreed',limit:80}; // matrix pair inspector
@@ -560,7 +566,7 @@ function protoColor(name,hint){
   return GUEST_PALETTE[h%GUEST_PALETTE.length];
 }
 const initiatedCount=n=>MK_INITIATED[n]||0;
-let RANK25={}; // surname-first name -> original 2022 list position (build_k25_list_order.py)
+let RANK25={}; // surname-first name -> position in own faction's list sequence for the 25th Knesset (build_k25_list_order.py; within-faction, not the joint submitted list for joint runs)
 const listRank25=n=>RANK25[n]??999;
 let TENURE={}; // name -> [[from,to|null],...] official MK stints (build_k25_tenure.py, KNS_PersonToPosition)
 let FACTION25={}; // name -> faction (official, latest stint) — fills leavers, whose vote rows carry no faction
@@ -708,6 +714,34 @@ function ensureProtoSearch(){ return _lazyOnce('protoSearch',async()=>{ const j=
 function ensurePlenumSearch(){ return _lazyOnce('plenumSearch',async()=>{ const j=await _fetchJson('data/plenum_search.json'); if(j){ PLENUM_SEARCH=j; if(view==='committees') renderCommittees(); else if(view==='vote') renderVote(); else if(view==='plenum') renderPlenumSession() } return PLENUM_SEARCH }) }
 function ensureWiki(){ return _lazyOnce('wiki',async()=>{ const j=await _fetchJson('data/mk_wiki_abstracts.json'); if(j){ WIKI=_normKeys(j.by_name); WIKI_META=j._meta||{}; if(view==='mk') renderMkDetail() } return WIKI }) }
 function ensureExtras(){ if(EXTRAS) return Promise.resolve(EXTRAS); return _lazyOnce('extras',async()=>{ const j=await _fetchJson('data/k25_extras.json'); if(j){ j.queries_by_mk=_normKeys(j.queries_by_mk); j.agendas_by_mk=_normKeys(j.agendas_by_mk); EXTRAS=j; if(view==='mk') renderMkDetail(); else if(view==='billAll') renderBillLite(); else if(view==='committee') renderCommitteeDetail(); else if(view==='session') renderSessionDetail(); else if(view==='committees') renderCommittees() } return EXTRAS }) }
+function ensureBillDocs(){ if(BILL_DOCS) return Promise.resolve(BILL_DOCS); return _lazyOnce('billDocs',async()=>{ const j=await _fetchJson(`data/k${KN}_bill_docs.json`); if(j){ BILL_DOCS=j; if(view==='billAll') renderBillLite(); else if(view==='vote') renderVote() } return BILL_DOCS }) }
+function ensureRoles(){ if(ROLES) return Promise.resolve(ROLES); return _lazyOnce('roles',async()=>{ const j=await _fetchJson(`data/k${KN}_roles.json`); if(j){ ROLES=j; if(view==='mk') renderMkDetail() } return ROLES }) }
+function ensureBillHistory(){ if(BILL_HISTORY) return Promise.resolve(BILL_HISTORY); return _lazyOnce('billHistory',async()=>{ const j=await _fetchJson(`data/k${KN}_bill_history.json`); if(j){ BILL_HISTORY=j; if(view==='billAll') renderBillLite() } return BILL_HISTORY }) }
+function billHistoryHTML(b){
+  const removed=(BILL_HISTORY&&BILL_HISTORY[String(b.id)])||[];
+  if(!removed.length) return '';
+  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="m16 8 5 5m0-5-5 5"/></svg> יוזמים ומצטרפים שהוסרו מההצעה (${removed.length}) <small class="dim">חתמו בעבר ואינם ברשימה הנוכחית · מהמאגר הרשמי</small></h3>
+  <div class="rows" style="margin:.5rem -.9rem 0">${removed.map(r=>`<div class="row" style="cursor:default"><span class="flex"><b>${esc(disp(r.name))}</b> <span class="dim small">${r.initiator?'יוזם/ת':'מצטרף/ת'}</span><br><span class="dim small">${r.reason?esc(r.reason):'הוסר/ה מההצעה'}${r.to?` · ${fmtDate(r.to)}`:''}</span></span></div>`).join('')}</div></div>`;
+}
+function mkRolesHTML(name){
+  const roles=(ROLES&&ROLES.by_mk&&ROLES.by_mk[name])||[];
+  if(!roles.length) return '';
+  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.5 5.3 5.8.7-4.3 4 1.1 5.7L12 15.9 6.9 18.7 8 13 3.7 9l5.8-.7z"/></svg> תפקידים בכנסת ובממשלה <small class="dim">מהמאגר הרשמי · לפי תקופות כהונה בתפקיד</small></h3>
+  <div class="rows" style="margin:.5rem -.9rem 0">${roles.map(r=>`<div class="row" style="cursor:default"><span class="flex"><b>${esc(r.role||'')}</b>${r.gov?` <span class="dim small">· ממשלה ${r.gov}</span>`:''}${r.faction?` <span class="dim small">· ${esc(shortF(r.faction))}</span>`:''}<br><span class="dim small">${r.from?fmtDate(r.from):''}${r.to?` – ${fmtDate(r.to)}`:' – היום'}</span></span>${!r.to?'<span class="chip for">מכהן/ת כיום</span>':''}</div>`).join('')}</div></div>`;
+}
+function billDocsHTML(b){
+  const docs=(BILL_DOCS&&BILL_DOCS[String(b.id)])||[];
+  if(!docs.length) return '';
+  // Supporting material (חומר רקע וכו׳) can run to 100+ unnamed files on a
+  // government bill — one row per file would bury the נוסח versions. Stage
+  // versions get their own row; any group with several files collapses
+  // into one expandable row of numbered documents.
+  const groups=[]; const byGroup={};
+  for(const d of docs){ const k=d.group_id??d.group; if(!byGroup[k]){ byGroup[k]={label:d.group||'מסמך',items:[]}; groups.push(byGroup[k]) } byGroup[k].items.push(d) }
+  const row=(d,extra='')=>`<a class="row" href="${esc(d.url)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span class="flex">${esc(extra||d.group||'מסמך')}${b.doc_url&&d.url===b.doc_url?' <span class="chip acc">הנוסח הראשי למעלה</span>':''}</span>${d.format?`<span class="chip">${esc(d.format)}</span>`:''}<span class="chip acc">פתיחה ↗</span></a>`;
+  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> מסמכי ההצעה (${docs.length}) <small class="dim">כל הנוסחים והמסמכים הרשמיים באתר הכנסת, לפי שלב</small></h3>
+  <div class="rows" style="margin:.5rem -.9rem 0">${groups.map(g=>g.items.length===1?row(g.items[0]):`<details><summary class="row" style="cursor:pointer"><span class="flex">${esc(g.label)} <span class="dim small">${g.items.length} מסמכים — הצגה</span></span><span class="chip acc">▾</span></summary>${g.items.map((d,i)=>row(d,`${g.label} ${i+1}`)).join('')}</details>`).join('')}</div></div>`;
+}
 
 /* ============ load ============ */
 async function load(){
@@ -838,7 +872,7 @@ function castMine(id,v,el){
 function matchStrip(b){ const mine=S.myVotes[String(b?.id)]; if(!mine||!b)return '';
   const mk=voteMkVotes(b);
   const same=mk.filter(v=>v.result===mine); const half=mk.filter(v=>v.result===3&&mine!==3);
-  return `<div class="small" style="margin-top:.6rem">הצבעת <b>${mine===1?'בעד':mine===2?'נגד':'נמנע'}</b> — ${same.length} ח״כים הצביעו כמוך${half.length?`, ${half.length} נמנעו`:''}. <a href="#" onclick="event.preventDefault();go('mine')">מי מצביע כמוני בכלל? ←</a></div>`;
+  return `<div class="small" style="margin-top:.6rem">הצבעת <b>${mine===1?'בעד':mine===2?'נגד':'נמנע'}</b> — ${same.length} ח״כים הצביעו כמוך${half.length?`, ${half.length} נמנעו`:''}. <a href="#" onclick="event.preventDefault();event.stopPropagation();go('mine')">מי מצביע כמוני בכלל? ←</a></div>`;
 }
 function voteCard(v){
   const b=voteModel(v.id); if(!b) return '';
@@ -923,7 +957,7 @@ function plenumSVG(seats,mode){
   const circles=seats.map((s,i)=>{const p=assigned[i]; if(!p)return'';
     // Encoding: fill = party colour. Ring = how they voted (for/against/
     // abstain). Absent MKs keep their party colour, dark-shaded, with no ring.
-    const label=esc(disp(s.name))+' · '+esc(shortF(s.faction||''))+(mode==='k26'&&s.rank?` · מקום ${s.rank} ברשימה`:'')+(RANK25[s.name]?` · מקום ${RANK25[s.name]} ברשימת 2022`:'')+(mode!=='k26'&&KN===25&&!MKP[s.name]?' · כיהן/ה אז, עזב/ה מאז':'')+(s.present===true?' · כעת במשכן הכנסת':s.present===false?' · לא במשכן כרגע':'')+(s.absent?' · לא השתתף/ה בהצבעה':s.result?' · '+({1:'בעד',2:'נגד',3:'נמנע'})[s.result]:'');
+    const label=esc(disp(s.name))+' · '+esc(shortF(s.faction||''))+(mode==='k26'&&s.rank?` · מקום ${s.rank} ברשימה`:'')+(RANK25[s.name]?(mode==='k26'?` · מקום ${RANK25[s.name]} ברשימה לכנסת ה־25`:` · מקום ${RANK25[s.name]} ברשימת ${esc(shortF(s.faction||''))} לכנסת ה־25`):'')+(mode!=='k26'&&KN===25&&!MKP[s.name]?' · כיהן/ה אז, עזב/ה מאז':'')+(s.present===true?' · כעת במשכן הכנסת':s.present===false?' · לא במשכן כרגע':'')+(s.absent?' · לא השתתף/ה בהצבעה':s.result?' · '+({1:'בעד',2:'נגד',3:'נמנע'})[s.result]:'');
     const ini=initialsOf(s.name);
     if(s.absent||s.present===false){ // not-in-building seats shade like vote-absent ones
       const dark=shade(s.color,0.32);
@@ -956,7 +990,7 @@ function hemiCardHTML(s,ctx){
   const rec=IDX25[s.name];
   const rows=[];
   if(ctx.mode==='k26'&&s.rank) rows.push(['מקום ברשימה',s.listN?`${s.rank} מתוך ${s.listN}`:`${s.rank}`]);
-  else if(RANK25[s.name]) rows.push(['מקום ברשימת 2022',RANK25[s.name]]);
+  else if(RANK25[s.name]) rows.push([fac&&fac!=='סיעת יחיד'&&fac!=='ללא סיעה'?`מקום ברשימת ${fac} לכנסת ה־25`:'מקום ברשימה לכנסת ה־25',RANK25[s.name]]);
   if(ctx.mode==='k26'&&s.serving) rows.push(['סטטוס','מכהן/ת בפועל · סגל רשמי']);
   if(ctx.mode==='k26'&&s.present!==undefined) rows.push(['כעת במשכן הכנסת',s.present?'כן':'לא']);
   rows.push([ctx.mode==='k26'?(s.serving?'מכהנים מהסיעה במפה':'מנדטים לרשימה'):'מושבים לסיעה במפה',facN]);
@@ -1366,16 +1400,16 @@ function k26ServingSeats(){
     .sort((a,b)=>partyRank(a.faction,26)-partyRank(b.faction,26)||(a.rank??999)-(b.rank??999)||disp(a.name).localeCompare(disp(b.name),'he'));
 }
 function renderNow26(){
-  ensurePresence26(); // live in-the-building overlay; re-renders when it lands
+  ensureLivePresence(); // live in-the-building overlay; re-renders when it lands
   const parties=K26?K26.parties.filter(p=>p.seats>0):[];
   const serving=k26ServingSeats();
   const seats=serving||[]; if(!serving&&K26){ const arc=[...K26.parties].sort((a,b)=>partyRank(a.name,26)-partyRank(b.name,26)); for(const p of arc) p.elected.forEach((name,i)=>seats.push({name,faction:p.name,color:p.color,result:0,rank:i+1,listN:p.candidates.length})) }
-  // Live presence overlay — official serving roster only (see PRESENCE26),
-  // and only when the feed actually covers this map.
-  const presenceKnown=!!(serving&&PRESENCE26.map&&seats.filter(s=>s.name in PRESENCE26.map).length>=Math.max(60,seats.length*0.5));
-  if(presenceKnown) seats.forEach(s=>{ if(s.name in PRESENCE26.map) s.present=PRESENCE26.map[s.name] });
+  // Live presence overlay — official serving roster only (see
+  // LIVE_PRESENCE), and only when the feed actually covers this map.
+  const presenceKnown=!!(serving&&LIVE_PRESENCE.map&&seats.filter(s=>s.name in LIVE_PRESENCE.map).length>=Math.max(60,seats.length*0.5));
+  if(presenceKnown) seats.forEach(s=>{ if(s.name in LIVE_PRESENCE.map) s.present=LIVE_PRESENCE.map[s.name] });
   const presentN=seats.filter(s=>s.present).length;
-  const presenceWhen=PRESENCE26.at?new Date(PRESENCE26.at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'';
+  const presenceWhen=LIVE_PRESENCE.at?new Date(LIVE_PRESENCE.at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'}):'';
   const legendMap={}; seats.forEach(s=>{ const f=shortF(s.faction); (legendMap[f]??={n:0,color:s.color}); legendMap[f].n++ });
   const legend=Object.entries(legendMap).sort((a,b)=>b[1].n-a[1].n||partyRank(a[0],26)-partyRank(b[0],26));
   $('#app').innerHTML=`
@@ -1683,7 +1717,7 @@ function openBillPage(billId){
   if(ALLB_BY_ID[billId]) openBillAll(billId);
 }
 function renderBillLite(){
-  ensureExtras();
+  ensureExtras(); ensureBillDocs(); ensureBillHistory();
   const b=ALLB_BY_ID[viewArg]; const app=$('#app'); if(!b){go('bills');return}
   location.hash='bill='+b.id;
   // This is the bill page: no single vote's plenum map or "אני הייתי מצביע" here —
@@ -1698,7 +1732,9 @@ function renderBillLite(){
     </div><div style="text-align:center">${starBtn('bill',b.id,b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.id)?'במעקב ★':'מעקב'}</div></div></div>
     <div class="small muted" style="margin-top:.5rem;line-height:1.9">
       סטטוס רשמי בכנסת: <b style="color:var(--text)">${esc(b.status||'—')}</b>${b.status_id===177?` — ״נעצרה״ הוא מונח־הגג של הכנסת להליך שהופסק: ${(b.votes||[]).some(v=>v.accepted===0)?'כאן ההצעה נדחתה בהצבעת מליאה':(b.votes||[]).length?'ההצעה עברה הצבעה במליאה, אך ההליך הופסק אחר כך':'ההליך הופסק בלי שההצעה הגיעה להצבעת מליאה'}`:''}<br>
-      ${b.publication_date?`פורסם בספר החוקים: ${fmtDate(b.publication_date)}<br>`:''}
+      ${b.postponement_reason?`סיבה רשמית לעצירת ההליך: <b style="color:var(--text)">${esc(b.postponement_reason)}</b><br>`:''}
+      ${b.is_continuation?`הצעה להחלת דין רציפות מהכנסת הקודמת<br>`:''}
+      ${b.publication_date?`פורסם בספר החוקים: ${fmtDate(b.publication_date)}${b.publication_series?` · ${esc(b.publication_series)}`:''}${b.magazine?` · רשומות ${esc(b.magazine)}`:''}${b.page?`, עמ׳ ${esc(b.page)}`:''}<br>`:''}
       ${b.private_number?`מספר פ׳: ${esc(b.private_number)}<br>`:''}
     </div>
     ${stepperHTML(b.id)}
@@ -1710,6 +1746,8 @@ function renderBillLite(){
     </div>
   </article>
   ${b.doc_url&&String(b.doc_url).toLowerCase().includes('.pdf')?`<div class="card pad" style="margin-top:.85rem"><div style="display:flex;gap:.6rem;align-items:center"><h3 style="flex:1"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> נוסח ההצעה — לקריאה כאן</h3><button class="btn" id="pdfbtn" onclick="togglePdf('${b.id}')">הצגת הנוסח</button></div><div id="pdfbox" style="margin-top:.6rem"></div></div>`:''}
+  ${billHistoryHTML(b)}
+  ${billDocsHTML(b)}
   ${billCmtHTML({bill_id:b.id})}
   ${billExtrasHTML(b)}
   <div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> כל אירועי המליאה על ההצעה (${eraVotes.length})</h3>
@@ -1791,6 +1829,8 @@ function renderVotesAll(){
     ${v.desc&&v.desc!==v.kind_label?`<div class="small muted" style="margin-top:.3rem">${esc(v.desc)}</div>`:''}
     ${v.for!=null&&tot?`<div class="scorebar" style="margin-top:.55rem"><i style="width:${v.for/tot*100}%;background:var(--for)"></i><i style="width:${(v.abstain||0)/tot*100}%;background:var(--abstain)"></i><i style="width:${v.against/tot*100}%;background:var(--against)"></i></div>
     <div class="small" style="margin-top:.3rem"><b style="color:var(--for)">${v.for} בעד</b> · <b style="color:var(--against)">${v.against} נגד</b>${v.abstain?` · <b style="color:var(--abstain)">${v.abstain} נמנע</b>`:''} · <b style="color:${v.for>v.against?'var(--for)':v.against>v.for?'var(--against)':'var(--abstain)'}">${v.for>v.against?'✓ עברה':v.against>v.for?'✕ נדחתה':'= תיקו'}</b></div>`:'<div class="small dim" style="margin-top:.4rem">התוצאה המספרית בתהליך איסוף</div>'}
+    <div style="margin-top:.65rem">${myVoteHTML(v)}</div>
+    <div data-matchhost>${matchStrip(voteModel(v.id))}</div>
   </article>`}).join('')}</div>
   ${list.length>shown.length?`<div style="text-align:center;margin-top:1rem"><button class="btn" onclick="eraFilter.limit+=30;renderVotes()">עוד ${Math.min(30,list.length-shown.length)} הצבעות</button></div>`:''}`
   :'<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg></div>לא נמצאו הצבעות בסינון הזה.</div>'}`;
@@ -2158,7 +2198,7 @@ function mkExtrasHTML(name){
   ${q.total>q.items.length?`<div class="small dim" style="margin-top:.45rem">מוצגות ${q.items.length} האחרונות מתוך ${q.total.toLocaleString('he-IL')}.</div>`:''}</div>`:'';
   const aHTML=a?`<div class="card pad" style="margin-top:.85rem"><h3>🗣️ הצעות לסדר היום <small class="dim">כנסת 25 · מהמאגר הרשמי</small></h3>
   <div class="small muted" style="margin-top:.35rem">יזם/ה <b>${a.total.toLocaleString('he-IL')}</b> הצעות לסדר היום בכנסת 25</div>
-  <div class="rows" style="margin:.5rem -.9rem 0">${a.items.map(it=>`<div class="row" style="cursor:default"><span class="flex">${esc(it.name)}<br><span class="dim small">${esc(it.cls||it.type||'')}${it.committee?` · ${esc(it.committee)}`:''}${it.gov?` · עמדת הממשלה: ${esc(it.gov)}`:''}${it.date?` · ${fmtDate(it.date)}`:''}</span></span>${it.status?`<span class="chip">${esc(it.status)}</span>`:''}</div>`).join('')}</div>
+  <div class="rows" style="margin:.5rem -.9rem 0">${a.items.map(it=>`<div class="row" style="cursor:default"><span class="flex">${esc(it.name)}<br><span class="dim small">${esc(it.cls||it.type||'')}${it.committee?` · ${esc(it.committee)}`:''}${it.gov?` · עמדת הממשלה: ${esc(it.gov)}`:''}${it.date?` · ${fmtDate(it.date)}`:''}</span></span>${it.status?`<span class="chip">${esc(it.status)}</span>`:''}${(it.docs||[]).map(d=>`<a class="chip" href="${esc(d.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(d.group||'מסמך')} ↗</a>`).join('')}</div>`).join('')}</div>
   ${a.total>a.items.length?`<div class="small dim" style="margin-top:.45rem">מוצגות ${a.items.length} האחרונות מתוך ${a.total.toLocaleString('he-IL')}.</div>`:''}</div>`:'';
   return qHTML+aHTML;
 }
@@ -2185,7 +2225,7 @@ function committeeExtrasHTML(c){
   return `<div class="card pad" style="margin-top:.85rem"><h3>⚖️ חקיקת משנה והרכב <small class="dim">מהמאגר הרשמי</small></h3>
   ${parents.length?`<div class="small muted" style="margin-top:.4rem;line-height:1.9"><b style="color:var(--text)">ועדה משותפת של:</b></div><div class="chips" style="margin:.3rem 0 .7rem">${parents.map(p=>`<button class="chip" onclick="openCommittee('${p.id}')">${esc(p.name)} ←</button>`).join('')}</div>`:''}
   ${sec?`<div class="small muted" style="line-height:1.9">אושרו/טופלו בוועדה <b>${sec.total.toLocaleString('he-IL')}</b> תקנות, צווים ודיווחים (חקיקת משנה) בכנסת 25</div>
-  <div class="rows" style="margin:.5rem -.9rem 0">${sec.items.map(it=>`<div class="row" style="cursor:default"><span class="flex">${esc(it.name)}<br><span class="dim small">${esc(it.cause||'')}${it.date?` · ${fmtDate(it.date)}`:''}</span></span>${it.status?`<span class="chip">${esc(it.status)}</span>`:''}</div>`).join('')}</div>
+  <div class="rows" style="margin:.5rem -.9rem 0">${sec.items.map(it=>`<div class="row" style="cursor:default"><span class="flex">${esc(it.name)}<br><span class="dim small">${esc(it.cause||'')}${it.date?` · ${fmtDate(it.date)}`:''}</span></span>${it.status?`<span class="chip">${esc(it.status)}</span>`:''}${(it.docs||[]).map(d=>`<a class="chip" href="${esc(d.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(d.group||'מסמך')} ↗</a>`).join('')}</div>`).join('')}</div>
   ${sec.total>sec.items.length?`<div class="small dim" style="margin-top:.45rem">מוצגים ${sec.items.length} האחרונים מתוך ${sec.total.toLocaleString('he-IL')}.</div>`:''}`:''}</div>`;
 }
 function lobbyBrowserHTML(){
@@ -2200,7 +2240,7 @@ function lobbyBrowserHTML(){
   ${list.length>shown.length?`<div style="text-align:center;margin-top:1rem"><button class="btn" onclick="lobbyFilter.limit+=40;renderCommittees()">עוד שדלנים</button></div>`:''}`:'<div class="card empty"><div class="big">🔍</div>לא נמצאו שדלנים בסינון הזה.</div>'}`;
 }
 function renderMkDetail(){
-  ensureCmem(); ensureWiki(); ensureAnalytics(); ensureExtras();
+  ensureCmem(); ensureWiki(); ensureAnalytics(); ensureLivePresence(); ensureExtras(); ensureRoles();
   const name=viewArg, app=$('#app');
   if(KN===26){ const e=k26Entry(name); const rec=IDX25[name];
     if(!e){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצא/ה ברשימת הנבחרים לכנסת 26.</div>'; return }
@@ -2218,12 +2258,18 @@ function renderMkDetail(){
     ${mkKnStrip(name)}
     ${mkWikiHTML(name)}
     ${mkInitiatedHTML(name,true)}
+    ${mkRolesHTML(name)}
     ${mkCommitteesHTML(name)}
     <div class="card pad" style="margin-top:.85rem"><h3>${esc(e.party.name)} — סדר הרשימה</h3><div class="rows" style="margin:.5rem -.9rem 0">${e.party.candidates.slice(0,Math.max(e.party.seats, e.rank||0)).map((n,i)=>{const has=k26HasPage(n), srv=(K26_TENURE[n]||[]).some(x=>!x[1]); return `<div class="row" style="cursor:${has?'pointer':'default'};${i===e.rank-1?'background:var(--surface2)':''}" ${has?`onclick="openMk('${jsq(n)}')"`:''}><b style="width:1.6rem;color:${i<e.party.seats?'var(--accent)':'var(--dim)'}">${i+1}</b><span class="flex">${esc(disp(n))} ${n===name?'← כאן':''}</span>${srv?'<span class="chip for">מכהן/ת</span>':i<e.party.seats?'<span class="chip for">נבחר/ה</span>':'<span class="dim small">מחוץ למנדטים</span>'}</div>`}).join('')}</div></div>`;
     window.scrollTo(0,0); return }
   const m=mkIndex[name]; if(!m){app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצאו הצבעות מתועדות לח״כ הזה/זו באתר — לא בכנסת 25 ולא בכנסת 26.</div>';return}
   const pfaction=realFaction(MKP[name]?.faction||m.faction||FACTION25[name]||'');
   const pshort=shortF(pfaction);
+  // RANK25 is the place in this faction's own list sequence (see
+  // build_k25_list_order.py), so name that specific list — "רשימת
+  // <faction> לכנסת ה־25", as the K26 card names its list. A one-person
+  // faction / no faction has no list to name.
+  const rank25Txt=RANK25[name]?(pshort&&pshort!=='סיעת יחיד'&&pshort!=='ללא סיעה'?`מקום ${RANK25[name]} ברשימת ${esc(pshort)} לכנסת ה־25`:`מקום ${RANK25[name]} ברשימה לכנסת ה־25`):'';
   const hasFactionPage=!!pfaction&&currentFactions().some(f=>f.name===pshort);
   location.hash='mk='+encodeURIComponent(name);
   const c={1:0,2:0,3:0}; m.votes.forEach(v=>c[v.result]++);
@@ -2254,7 +2300,7 @@ function renderMkDetail(){
       ${avatar(name,pfaction,84)}
       <div style="flex:1"><h1 style="font-size:1.5rem">${esc(disp(name))} ${followedMk(name)?'★':''}</h1>
       ${hasFactionPage?`<button class="chip" style="color:${fcol(pfaction)};font-weight:700" onclick="openFaction('${jsq(pshort)}')">${esc(pshort)} ←</button>`:pfaction?`<span class="chip" style="color:${fcol(pfaction)};font-weight:700">${esc(pshort)}</span>`:'<span class="chip">ללא סיעה</span>'}
-      <div class="small dim">${tot} הצבעות מתועדות בכנסת 25${RANK25[name]?` · מקום ${RANK25[name]} בסדר רשימת הבחירות 2022`:''}</div>
+      <div class="small dim">${tot} הצבעות מתועדות בכנסת 25${rank25Txt?` · ${rank25Txt}`:''}</div>
       ${isFormerMk(name)?`<span class="chip" style="margin-top:.4rem">${formerBadgeText(name)} · כהונה: ${esc(mkTenureText(name)||'—')}</span>`:''}
       ${k26elected?`<span class="chip acc" style="margin-top:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> נבחר/ה לכנסת ה־26 · מקום ${k26elected.rank} ברשימת ${esc(k26elected.p)}</span>`:''}
       </div>${starBtn('mk',name,name)}
@@ -2283,6 +2329,7 @@ function renderMkDetail(){
   ${mkInitiatedHTML(name)}
   ${mkPartyHTML(name)}
   ${mkRebelHTML(name,deviations)}
+  ${mkRolesHTML(name)}
   ${mkCommitteesHTML(name)}
   ${mkAnalyticsHTML(name)}
   ${mkExtrasHTML(name)}
@@ -2311,21 +2358,27 @@ function mkWikiHTML(name){
 }
 function mkContactHTML(name){
   const c=CONTACTS[name];
-  if(!c){ // former MKs have no Knesset contact card; show a Wikidata-only X if one was discovered
+  // Presence: live read (ensureLivePresence) wins; until it lands — or if
+  // it fails — the daily snapshot in `c` is the fallback, and the header
+  // says which one you're looking at and as of when.
+  const live=livePresenceOf(name);
+  const liveWhen=LIVE_PRESENCE.at?new Date(LIVE_PRESENCE.at).toLocaleString('he-IL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
+  const chipFor=v=>v?'<span class="chip" style="color:#4ade80;border-color:#166534"><span class="pdot" style="background:var(--for)"></span> כעת במשכן הכנסת</span>':'<span class="chip"><span class="pdot" style="background:var(--dim)"></span> לא במשכן כרגע</span>';
+  if(!c){ // former MKs have no Knesset contact card; show live presence if the feed has them, and a Wikidata-only X if one was discovered
     const wx=WIKI[name]?.x_handles?.[0];
-    if(!wx) return '';
-    return `<div class="card pad" style="margin-top:.85rem"><h3>𝕏 ברשת <small class="dim">מויקינתונים בלבד</small></h3>
+    if(live===undefined&&!wx) return '';
+    return `${live!==undefined?`<div class="card pad" style="margin-top:.85rem"><h3>נוכחות <small class="dim">קריאה חיה מאפליקציית לובי הח״כים של הכנסת · נכון ל־${esc(liveWhen)}</small></h3><div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.55rem;align-items:center">${chipFor(live)}</div></div>`:''}${wx?`<div class="card pad" style="margin-top:.85rem"><h3>𝕏 ברשת <small class="dim">מויקינתונים בלבד</small></h3>
     <div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.55rem"><a class="chip" href="https://x.com/${esc(wx)}" target="_blank" rel="noopener" title="מקור: ויקינתונים (Wikidata), לא אתר הכנסת">𝕏 @${esc(wx)} · מויקינתונים ↗</a></div>
-    <p class="small dim" style="margin-top:.5rem">לח״כ לשעבר אין כרטיס קשר באתר הכנסת; הקישור הזה מויקינתונים (CC0) ועלול להיות לא מעודכן — בדקו בעמוד עצמו.</p></div>`;
+    <p class="small dim" style="margin-top:.5rem">לח״כ לשעבר אין כרטיס קשר באתר הכנסת; הקישור הזה מויקינתונים (CC0) ועלול להיות לא מעודכן — בדקו בעמוד עצמו.</p></div>`:''}`;
   }
   const soc=[['twitter','𝕏'],['facebook','פייסבוק'],['instagram','אינסטגרם'],['youtube','יוטיוב'],['website','אתר/ערוץ']].filter(([k])=>c[k]);
   // Wikidata-discovered X (build_mk_wiki.py): only when the Knesset publishes none.
   // Provenance is kept visibly separate — never presented as Knesset-official.
   const wdX=(!c.twitter&&WIKI[name]?.x_handles?.length)?WIKI[name].x_handles[0]:'';
   const when=CONTACTS_META.fetched_at?new Date(CONTACTS_META.fetched_at).toLocaleString('he-IL',{day:'numeric',month:'short',hour:'2-digit',minute:'2-digit'}):'';
-  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m4 7.5 8 6 8-6"/></svg> יצירת קשר רשמית <small class="dim">כפי שמפורסם באתר הכנסת${when?` · נוכחות נכון ל־${esc(when)}`:''}</small></h3>
+  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m4 7.5 8 6 8-6"/></svg> יצירת קשר רשמית <small class="dim">כפי שמפורסם באתר הכנסת${live!==undefined?` · נוכחות חיה נכון ל־${esc(liveWhen)}`:when?` · נוכחות מצילום יומי, נכון ל־${esc(when)}`:''}</small></h3>
   <div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.55rem;align-items:center">
-  ${c.present?'<span class="chip" style="color:#4ade80;border-color:#166534"><span class="pdot" style="background:var(--for)"></span> כעת במשכן הכנסת</span>':'<span class="chip"><span class="pdot" style="background:var(--dim)"></span> לא במשכן כרגע</span>'}
+  ${chipFor(live!==undefined?live:c.present)}
   ${c.email?`<a class="chip acc" href="mailto:${esc(c.email)}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m4 7.5 8 6 8-6"/></svg> ${esc(c.email)}</a>`:''}
   ${c.phone?`<a class="chip" href="tel:${esc(c.phone.replace(/[^0-9+]/g,''))}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l1.5 4.5L8 10a12 12 0 0 0 6 6l1.5-2.5L20 15v4a2 2 0 0 1-2.2 2A17.5 17.5 0 0 1 3 6.2 2 2 0 0 1 5 4z"/></svg> ${esc(c.phone)}</a>`:''}
   ${soc.map(([k,l])=>`<a class="chip" href="${esc(c[k])}" target="_blank" rel="noopener">${l} ↗</a>`).join('')}
@@ -2789,7 +2842,7 @@ function renderAbout(){
         <li>הנתונים מתרעננים אוטומטית מבוני־נתונים פתוחים (<span dir="ltr">build_*.py</span> בקוד המקור); האתר עצמו הוא דף סטטי שמציג תמונת־מצב (snapshot) של אותם נתונים.</li>
         <li>כל טענה מחושבת מסומנת בכיסוי שלה — למשל כמה מההצבעות כוללות תוצאות לפי ח״כ — כדי שאפשר יהיה להבחין בין מאגר מלא לחלקי.</li>
         <li><b>דמיון הצבעה</b> בניתוח הוא שיעור הסכמה בהצבעות משותפות בלבד. הוא אינו מודד אידאולוגיה, אינו מעיד על תיאום, ואין לקרוא בו סיבה ותוצאה.</li>
-        <li>״נוכח/ת בבניין״ הוא <b>צילום מצב חי</b> מרגע השליפה, לא היסטוריית נוכחות. תקצירי ויקיפדיה בדפי ח״כים מובאים עם ייחוס למקור, וקישורי X שמקורם בוויקינתונים מסומנים ככאלה — בנפרד מהערוצים הרשמיים של הכנסת.</li>
+        <li>״נוכח/ת בבניין״ נקרא <b>חי</b> מאפליקציית לובי הח״כים של הכנסת כשפותחים את כרטיס הח״כ או את מפת כנסת 26 (ומתרענן כל כמה דקות); אם הקריאה נכשלת מוצג צילום יומי, מסומן ככזה. זה מצב נוכחי בלבד, לא היסטוריית נוכחות. תקצירי ויקיפדיה בדפי ח״כים מובאים עם ייחוס למקור, וקישורי X שמקורם בוויקינתונים מסומנים ככאלה — בנפרד מהערוצים הרשמיים של הכנסת.</li>
       </ul>
     </div>
 

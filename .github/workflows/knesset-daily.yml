@@ -72,6 +72,8 @@ jobs:
           python3 -u build_k25_tenure.py --knesset 25
           python3 -u build_k25_committee_members.py --knesset 25
           python3 -u build_k25_list_order.py --knesset 25
+          python3 -u build_k25_roles.py --knesset 25          # gov/Knesset/faction leadership roles -> data/k25_roles.json
+          python3 -u build_k25_bill_history.py --knesset 25   # removed initiators/sponsors -> data/k25_bill_history.json (after build_knesset: reads k25_bills.json)
 
       - name: Harvest per-MK vote results (K25)
         if: ${{ inputs.target != 'k26-only' }}
@@ -104,6 +106,8 @@ jobs:
           python3 -u build_k25_tenure.py --knesset 26          # -> data/k26_tenure.json (no-op until positions publish)
           python3 -u build_k25_list_order.py --knesset 26      # -> data/k26_list_order.json (from CEC preview, works pre-OData)
           python3 -u build_k25_committee_members.py --knesset 26 # -> data/k26_committee_members.json
+          python3 -u build_k25_roles.py --knesset 26             # -> data/k26_roles.json (no-op until positions publish)
+          python3 -u build_k25_bill_history.py --knesset 26      # -> data/k26_bill_history.json (no-op until k26 bills exist)
 
       - name: Build K26 committees + protocols
         if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_committee_sessions == 'true' }}

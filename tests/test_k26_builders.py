@@ -118,6 +118,58 @@ class K26CommitteesBillIdsTest(unittest.TestCase):
             self.assertEqual(mod.bill_ids_for(26), [5, 9])
 
 
+class PickDocUrlTest(unittest.TestCase):
+    """KNS_DocumentBill holds a bill's נוסח from the day it is tabled —
+    the original 'לדיון מוקדם' print (with דברי הסבר) wins, PDF over DOC."""
+
+    def test_prefers_original_pdf_over_doc_and_later_versions(self):
+        mod = load_module("build_knesset.py")
+        docs = [
+            {"Id": 30, "GroupTypeID": 4, "ApplicationDesc": "PDF",
+             "FilePath": "https://fs.knesset.gov.il/25\\law\\25_ls2_30.pdf"},
+            {"Id": 10, "GroupTypeID": 1, "ApplicationDesc": "DOC",
+             "FilePath": "https://fs.knesset.gov.il/25\\law\\25_lst_10.docx"},
+            {"Id": 11, "GroupTypeID": 1, "ApplicationDesc": "PDF",
+             "FilePath": "https://fs.knesset.gov.il/25\\law\\25_lst_10.pdf"},
+            {"Id": 40, "GroupTypeID": 9, "ApplicationDesc": "PDF",
+             "FilePath": "https://fs.knesset.gov.il/25\\law\\25_lsr_40.pdf"},
+        ]
+        self.assertEqual(mod.pick_doc_url(docs),
+                         "https://fs.knesset.gov.il/25/law/25_lst_10.pdf")
+
+    def test_gov_bill_without_preliminary_print_uses_first_reading(self):
+        mod = load_module("build_knesset.py")
+        docs = [{"Id": 20, "GroupTypeID": 2, "ApplicationDesc": "PDF",
+                 "FilePath": "https://fs.knesset.gov.il/25\\law\\25_ls1_20.pdf"}]
+        self.assertEqual(mod.pick_doc_url(docs),
+                         "https://fs.knesset.gov.il/25/law/25_ls1_20.pdf")
+
+    def test_no_docs(self):
+        mod = load_module("build_knesset.py")
+        self.assertIsNone(mod.pick_doc_url([]))
+        self.assertIsNone(mod.pick_doc_url(None))
+
+    def test_build_docs_dedupes_formats_and_orders_stages(self):
+        mod = load_module("build_knesset.py")
+        docs = [
+            {"Id": 5, "GroupTypeID": 9, "GroupTypeDesc": "חוק - פרסום ברשומות",
+             "ApplicationDesc": "PDF", "FilePath": "https://fs.knesset.gov.il/25\\law\\25_lsr_5.pdf"},
+            {"Id": 2, "GroupTypeID": 1, "GroupTypeDesc": "הצעת חוק לדיון מוקדם",
+             "ApplicationDesc": "DOC", "FilePath": "https://fs.knesset.gov.il/25\\law\\25_lst_2.docx"},
+            {"Id": 3, "GroupTypeID": 1, "GroupTypeDesc": "הצעת חוק לדיון מוקדם",
+             "ApplicationDesc": "PDF", "FilePath": "https://fs.knesset.gov.il/25\\law\\25_lst_2.pdf"},
+            {"Id": 4, "GroupTypeID": 59, "GroupTypeDesc": "חומר רקע",
+             "ApplicationDesc": "PDF", "FilePath": "https://fs.knesset.gov.il/25\\law\\bg_4.pdf"},
+            {"Id": 6, "GroupTypeID": 1, "GroupTypeDesc": "הצעת חוק לדיון מוקדם",
+             "ApplicationDesc": "PDF", "FilePath": "https://fs.knesset.gov.il/25\\law\\25_lst_2.pdf"},
+        ]
+        out = mod.build_docs(docs)
+        self.assertEqual([d["group_id"] for d in out], [1, 9, 59])
+        self.assertEqual(out[0]["format"], "PDF")
+        self.assertEqual(out[0]["url"], "https://fs.knesset.gov.il/25/law/25_lst_2.pdf")
+        self.assertEqual(mod.build_docs([]), [])
+
+
 class UnpublishedLayerNoOpTest(unittest.TestCase):
     """Builders run from a cwd with no K26 data must exit 0 and write nothing."""
 
