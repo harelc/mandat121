@@ -599,7 +599,11 @@ const ARC_ORDER_K25=['הרשימה המשותפת','בל"ד','חד"ש-תע"ל','
 function partyRank(faction,kn){ const order=(kn||KN)===26?ARC_ORDER_K26:ARC_ORDER_K25; const k=shortF(faction||'').replace(/״/g,'"').trim(); const i=order.indexOf(k); return i<0?99:i }
 const FORWARD={'פרקש הכהן אורית':'אורית פרקש הכהן','בן גביר איתמר':'איתמר בן גביר','בן ארי מירב':'מירב בן ארי','בן ברק רם':'רם בן ברק'};
 function disp(name){name=String(name||'').replace(/\s+/g,' ').trim(); if(FORWARD[name])return FORWARD[name]; const p=name.split(' '); return p.length>=2? p.slice(1).join(' ')+' '+p[0] : name}
-const NAME_CANON={'גנץ בני':'גנץ בנימין','סגלוביץ יואב':"סגלוביץ' יואב",'מלקו צגה צגנש':'מלקו צגה','סטרוק אורית':'סטרוק אורית מלכה','פינדרוס יצחק זאב':'פינדרוס יצחק'}; // sources disagree on spelling; canonical = the vote-harvest spelling
+const NAME_CANON={'גנץ בני':'גנץ בנימין','סגלוביץ יואב':"סגלוביץ' יואב",'מלקו צגה צגנש':'מלקו צגה','סטרוק אורית':'סטרוק אורית מלכה','פינדרוס יצחק זאב':'פינדרוס יצחק',
+ // K26 CEC lists use full legal names (middle names, nicknames spelled out,
+ // hyphen/joined particles) where every K25 source uses the short form —
+ // without these, returning MKs read as "חדש/ה בכנסת" on their K26 card.
+ 'סון הר-מלך לימור':'סון הר מלך לימור','אל הואשלה ואליד':'אלהואשלה ואליד','ביסמוט בעז':'ביסמוט בועז','איזנקוט גד':'איזנקוט גדי','כהן אליהו':'כהן אלי','לוין יריב גדעון':'לוין יריב','רגב מרים':'רגב מירי מרים','סער גדעון משה':'סער גדעון','זוהר מכלוף':'זוהר מכלוף מיקי','עטייה חוה':'עטייה חוה אתי','גמליאל דמרי גילה':'גמליאל גילה','טרופר יחיאל משה':'טרופר חילי','גולדקנופ יצחק יששכר':'גולדקנופ יצחק','מלינובסקי קונין יוליה':'מלינובסקי יוליה','גוטליב רויטל טלי':'גוטליב טלי','מלכיאלי מיכאל משה':'מלכיאלי מיכאל','סמוטריץ בצלאל יואל':"סמוטריץ' בצלאל",'רוטמן שמחה דן':'רוטמן שמחה','מושיאשוילי סימיון':'מושיאשוילי סימון'}; // sources disagree on spelling; canonical = the vote-harvest spelling
 const normName=n=>{ let s=String(n||'').replace(/\s+/g,' ').replace(/[׳\u05F3]/g,"'").replace(/[״\u05F4]/g,'"').trim(); return NAME_CANON[s]||s }; // one canonical spelling per person: geresh==apostrophe, plus the aliases above
 function realFaction(full){ const s=String(full||'').trim(); return s.startsWith('חה"כ')?'סיעת יחיד':s } // OData labels one-person factions 'חה"כ <name>' — a single-member faction, not "no faction"
 const dedupeNames=names=>[...new Map(names.map(n=>[normName(n),normName(n)])).values()]; // one entry per person, however a source spelled the name
