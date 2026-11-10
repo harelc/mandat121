@@ -14,9 +14,8 @@ election day; the 121st stays with the citizens, and works the whole term.
 This README is only the front door. The deeper docs are:
 
 - `ROADMAP.md` — plan, current status, and roadmap
-- `OPEN_KNESSET.md` — the design document
+- `MANDAT121_DESIGN.md` — the design document
 - `KNESSET_APIS.md` — the Knesset OData API field guide
-- `thread/THREAD.md` — the launch thread (cards in `thread/cards/`)
 
 ## biapia
 

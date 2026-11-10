@@ -1,6 +1,6 @@
-# המנדט ה־121 (working name) — citizen Knesset tracker — design & prep
+# המנדט ה־121 / Mandat121 — citizen Knesset tracker — design & prep
 
-Name note: "כנסת פתוחה / Open Knesset" is the Hasadna brand — do not use. Working name **המנדט ה־121**: 120 mandates are handed out on election day; the 121st stays with the citizens and works all term (follow, "I would have voted", who represents me). Check trademark/domain before launch.
+Name note: "כנסת פתוחה / Open Knesset" is the Hasadna brand — do not use (this file was renamed from `OPEN_KNESSET.md` to `MANDAT121_DESIGN.md` on 2026-11-10 for that reason). Working name **המנדט ה־121**: 120 mandates are handed out on election day; the 121st stays with the citizens and works all term (follow, "I would have voted", who represents me). Check trademark/domain before launch.
 
 Status: **live — Knesset 25 and Knesset 26 together in one site** — root `index.html` (renamed from `open.html` 2026-11-10; serve: `python3 -m http.server 8091`). Knesset 25 has full coverage; Knesset 26 sits alongside it in the same UI (header switcher) and fills in as its OData publishes (probe: `python3 probe_knesset.py`, exit 2 as of 2026-11-09).
 Decisions (2026-11-09): launch corpus = K25 now → K26 when live; scope = all views. Product center is **citizen tracking** (follow bills/MKs/topics, "since your last visit", faction rebels, loyalty/cohesion) — the biapia "I would have voted X" is one lens inside it (`שלי` tab + per-bill toggle), not the app itself.

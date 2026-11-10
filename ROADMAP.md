@@ -192,7 +192,7 @@ discovered handles returned 200 on x.com; the 2 dead ones (@Moshesolomonr,
 2 handle mismatches vs the Knesset are reported (official wins in UI).
 Still open: the explainer pages themselves.
 Pre-public cleanup DONE 2026-11-10 (repo still private — flip is the
-owner's, in GitHub settings, after a skim of ROADMAP/OPEN_KNESSET as
+owner's, in GitHub settings, after a skim of ROADMAP/MANDAT121_DESIGN as
 public reading): `.claude/settings.local.json` untracked + `.claude/`
 gitignored; local git identity switched to
 `harelc@users.noreply.github.com` (the 26 existing commits still carry
