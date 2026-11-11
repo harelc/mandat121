@@ -814,9 +814,9 @@ const PTV_PLAN_API='https://knesset.gov.il/WebSiteApi/knessetapi/KnessetMainLobb
 const PTV_CFG_API='https://knesset.gov.il/WebSiteApi/knessetapi/GlobalResources/GetResourceValues?LanguageId=1&Keys=knsgroup_broadcastLobby';
 const PTV_FALLBACK='https://knesetn.gostreaming.tv/Knesset/index.m3u8';
 const PTV_HOSTS=new Set(['knesetn.gostreaming.tv','w1.013.gostreaming.tv','video.knesset.gov.il']);
-let PLENUM_TV={at:0,tryAt:0,data:null,liveUrl:null,hls:null,src:null,timer:null,lastOnAirAt:0,closed:false};
-function ptvClose(){ PLENUM_TV.closed=true; ptvDestroy(); renderPlenumTv() }
-function ptvOpen(){ PLENUM_TV.closed=false; PLENUM_TV.lastOnAirAt=Date.now(); renderPlenumTv() }
+let PLENUM_TV={at:0,tryAt:0,data:null,liveUrl:null,hls:null,src:null,timer:null,lastOnAirAt:0,closed:false,force:false};
+function ptvClose(){ PLENUM_TV.closed=true; PLENUM_TV.force=false; ptvDestroy(); renderPlenumTv() }
+function ptvOpen(){ PLENUM_TV.closed=false; PLENUM_TV.force=true; renderPlenumTv() }
 const ptvUrl=u=>{ try{ const x=new URL(u); return x.protocol==='https:'&&PTV_HOSTS.has(x.host)?x.href:null }catch(e){ return null } };
 function ptvDestroy(){ if(PLENUM_TV.hls){ try{PLENUM_TV.hls.destroy()}catch(e){} PLENUM_TV.hls=null } PLENUM_TV.src=null; const v=document.getElementById('plenumTvVideo'); if(v){ v.dataset.ptvSrc=''; v.pause(); v.removeAttribute('src'); v.load() } }
 function ensurePlenumTv(){
@@ -894,7 +894,7 @@ function renderPlenumTv(){
     <section class="card ptv-off rise"><span class="chip acc">הנגן נסגר</span><span class="small muted">השידור ממשיך ברקע הישיבה — אפשר לפתוח אותו מחדש בכל רגע.</span><span style="margin-inline-start:auto"><button class="btn ghost small" onclick="ptvOpen()">הצגת השידור ←</button></span></section>`;
     return;
   }
-  if(d.onAir){
+  if(d.onAir||PLENUM_TV.force){
     const spk=d.speaker||{};
     const who=spk.SPK1_Name?`${spk.SPK1_Gender?'הנואם':'הנואמת'} כעת: ${spk.SPK1_Name}`:'';
     const subj=spk.Curr_Subject||(d.agenda&&d.agenda.Name)||'';
@@ -902,11 +902,13 @@ function renderPlenumTv(){
     if(!box.querySelector('video')){ // first paint of this sitting — later polls only update the text below
       box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת · מתוך אתר הכנסת</small></div>
       <section class="card ptv rise"><div class="ptv-frame"><video id="plenumTvVideo" controls playsinline muted poster="" aria-label="שידור חי ממליאת הכנסת"></video><button type="button" class="ptv-close" onclick="ptvClose()" title="סגירת השידור" aria-label="סגירת השידור החי">✕</button></div>
-      <div class="ptv-meta"><span class="ptv-live"><i></i>חי עכשיו</span> <span class="now" id="ptvNow"></span><div class="small muted" id="ptvSubj" style="margin-top:.3rem"></div></div></section>`;
+      <div class="ptv-meta"><span class="ptv-live" id="ptvBadge"><i></i>חי עכשיו</span> <span class="now" id="ptvNow"></span><div class="small muted" id="ptvSubj" style="margin-top:.3rem"></div></div></section>`;
     }
+    const b=document.getElementById('ptvBadge');
+    if(b) b.innerHTML=d.onAir?'<i></i>חי עכשיו':'<i></i>ערוץ הכנסת · נפתח ידנית';
     const n=document.getElementById('ptvNow'), s=document.getElementById('ptvSubj');
-    if(n) n.textContent=who+next;
-    if(s) s.textContent=subj?`על סדר היום: ${subj}`:'';
+    if(n) n.textContent=d.onAir?who+next:'המליאה אינה על המסך כעת';
+    if(s) s.textContent=d.onAir?(subj?`על סדר היום: ${subj}`:''):'מוצג שידור ערוץ הכנסת — השידור מהמליאה יחזור לכאן כשהדיון יתחדש.';
     ptvInitPlayer(PLENUM_TV.liveUrl||PTV_FALLBACK);
   } else if(d.active) {
     // Sitting day, but the channel is not showing the chamber right now
@@ -914,13 +916,13 @@ function renderPlenumTv(){
     if(box.querySelector('video')) ptvDestroy();
     const when=d.nextDate?` הישיבה הבאה: ${esc(d.nextDate)}.`:'';
     box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת</small></div>
-    <section class="card ptv-off rise"><span class="chip abstain">המליאה לא על המסך כעת</span><span class="small muted">הישיבה בהפסקה או שהסתיימה, וערוץ הכנסת משדר בינתיים תכניות אחרות.${when} השידור מהמליאה יחזור לכאן כשהדיון יתחדש.</span></section>`;
+    <section class="card ptv-off rise"><span class="chip abstain">המליאה לא על המסך כעת</span><span class="small muted">הישיבה בהפסקה או שהסתיימה, וערוץ הכנסת משדר בינתיים תכניות אחרות.${when} השידור מהמליאה יחזור לכאן כשהדיון יתחדש.</span><span style="margin-inline-start:auto"><button class="btn ghost small" onclick="ptvOpen()">פתיחת ערוץ הכנסת בכל זאת ←</button></span></section>`;
   } else {
     if(box.querySelector('video')) ptvDestroy();
     const when=d.nextDate?`הישיבה הבאה: ${esc(d.nextDate)}${d.nextTime?` בשעה ${esc(d.nextTime)}`:''}`:'המליאה אינה מתכנסת כעת — מועד הישיבה הבאה טרם פורסם';
     const vod=d.lastVod&&ptvUrl(d.lastVod.Stream_PublishedUrl);
     box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת</small></div>
-    <section class="card ptv-off rise"><span class="chip">המליאה לא בישיבה כעת</span><span class="small muted">${when}. השידור החי יופיע כאן כשהישיבה תתחיל.</span>${vod?`<span style="margin-inline-start:auto"><a class="btn ghost small" href="${esc(vod)}" target="_blank" rel="noopener">הישיבה האחרונה (ארכיון) ↗</a></span>`:''}</section>`;
+    <section class="card ptv-off rise"><span class="chip">המליאה לא בישיבה כעת</span><span class="small muted">${when}. השידור החי יופיע כאן כשהישיבה תתחיל.</span><span style="margin-inline-start:auto;display:flex;gap:.45rem;flex-wrap:wrap"><button class="btn ghost small" onclick="ptvOpen()">פתיחת ערוץ הכנסת בכל זאת ←</button>${vod?`<a class="btn ghost small" href="${esc(vod)}" target="_blank" rel="noopener">הישיבה האחרונה (ארכיון) ↗</a>`:''}</span></section>`;
   }
 }
 let K26B=[], K26V=[], K26CMT=null, K26CMEM={by_mk:{},by_committee:{}}; // K26 layers as the daily builders publish them (k26_bills/votes/committees/committee_members.json); empty until then, K26 views fall back to their "not yet" states
@@ -1738,7 +1740,7 @@ function setupGlobalSearch(){
 }
 
 /* ============ committees (K25 data layer) ============ */
-const cmtName=id=>(CMT_BY_ID[id]||{}).name||'ועדה';
+const cmtName=id=>(CMT_BY_ID[id]||{}).name||((K26CMT?.committees||[]).find(c=>String(c.id)===String(id))||{}).name||'ועדה';
 function billCmtHTML(b){
   const hist=(CMT&&CMT.bill_committees[String(b.bill_id)])||[];
   if(!hist.length) return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> עבודת ועדה</h3><p class="muted small" style="margin-top:.3rem">לא נמצאו ישיבות ועדה מתועדות לחוק הזה ב־OData (ייתכן שהוועדה טרם דנה בו, או שהדיון תועד תחת פריט אחר).</p></div>`;
@@ -2705,11 +2707,11 @@ function mkCommitteesHTML(name){
   const dedup=arr=>{ const seen={}; return arr.filter(x=>{const k=x.committee_id; if(seen[k])return false; seen[k]=1; return true}) };
   const curD=dedup(cur);
   return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ועדות בכנסת ${KN}</h3>
-  ${curD.length?`<div class="chips" style="margin-top:.45rem">${curD.map(x=>KN===26?`<span class="chip ${x.role==='chair'?'acc':''}">${x.role==='chair'?'★ ':''}${esc(x.committee||'')} · ${roleLbl[x.role]}</span>`:`<button class="chip ${x.role==='chair'?'acc':''}" onclick="openCommittee('${x.committee_id}')">${x.role==='chair'?'★ ':''}${esc(x.committee||cmtName(x.committee_id))} · ${roleLbl[x.role]} ←</button>`).join('')}</div>`:'<p class="muted small" style="margin-top:.35rem">לא חבר/ה כיום באף ועדה.</p>'}
+  ${curD.length?`<div class="chips" style="margin-top:.45rem">${curD.map(x=>`<button class="chip ${x.role==='chair'?'acc':''}" onclick="openCommittee('${x.committee_id}')">${x.role==='chair'?'★ ':''}${esc(x.committee||cmtName(x.committee_id))} · ${roleLbl[x.role]} ←</button>`).join('')}</div>`:'<p class="muted small" style="margin-top:.35rem">לא חבר/ה כיום באף ועדה.</p>'}
   ${past.length?`<div class="small dim" style="margin-top:.35rem">בעבר: ${dedup(past).slice(0,6).map(x=>esc(x.committee||'')).filter(Boolean).join(' · ')}${past.length>6?' …':''}</div>`:''}</div>`;
 }
 function committeeMembersHTML(c){
-  const all=(CMEM.by_committee[String(c.id)]||[]);
+  const all=((KN===26?K26CMEM:CMEM).by_committee[String(c.id)]||[]);
   if(!all.length) return '';
   const roleLbl={chair:'יו״ר',member:'חבר/ה',substitute:'מ״מ'};
   const rank=r=>r.role==='chair'?0:r.role==='member'?1:2;
@@ -2720,7 +2722,7 @@ function committeeMembersHTML(c){
   const seen=new Set(), curD=cur.filter(x=>{const k=x.name; if(seen.has(k))return false; seen.add(k); return true});
   const pastN=new Set(all.filter(x=>x.to).map(x=>x.name)).size;
   return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> חברי הוועדה כיום (${curD.length})</h3>
-  ${curD.length?`<div class="rows" style="margin:.5rem -.9rem 0">${curD.map(x=>`<div class="row" onclick="openMk('${jsq(x.name)}')">${avatar(x.name,(MKP[x.name]||mkIndex[x.name]||{}).faction||'',32)}<span class="flex">${esc(disp(x.name))}<br><span class="dim small">${esc(shortF((MKP[x.name]||mkIndex[x.name]||{}).faction||''))}</span></span>${x.role==='chair'?'<span class="chip acc">★ יו״ר</span>':x.role==='substitute'?'<span class="chip">מ״מ</span>':'<span class="chip acc">לכרטיס ←</span>'}</div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.35rem">אין חברים נוכחיים במאגר.</p>'}
+  ${curD.length?`<div class="rows" style="margin:.5rem -.9rem 0">${curD.map(x=>{const fac=KN===26?(K26_FACTIONS[x.name]||''):((MKP[x.name]||mkIndex[x.name]||{}).faction||''); return `<div class="row" onclick="openMk('${jsq(x.name)}')">${avatar(x.name,fac,32)}<span class="flex">${esc(disp(x.name))}<br><span class="dim small">${esc(shortF(fac))}</span></span>${x.role==='chair'?'<span class="chip acc">★ יו״ר</span>':x.role==='substitute'?'<span class="chip">מ״מ</span>':'<span class="chip acc">לכרטיס ←</span>'}</div>`}).join('')}</div>`:'<p class="muted small" style="margin-top:.35rem">אין חברים נוכחיים במאגר.</p>'}
   ${pastN?`<div class="small dim" style="margin-top:.4rem">${pastN} ח״כים נוספים כיהנו בוועדה במהלך הקדנציה.</div>`:''}</div>`;
 }
 /* One person, two Knessets: a shared strip atop the MK page in both
@@ -3428,7 +3430,7 @@ const cmtMemberCount=c=>new Set((CMEM.by_committee[String(c.id)]||[]).filter(m=>
 const miniStar=c=>`<button class="mini-star ${followedCommittee(c.id)?'on':''}" title="מעקב אחרי ${esc(c.name)}" aria-label="מעקב ${esc(c.name)}" onclick="event.stopPropagation();toggleFollow('committee','${c.id}',this)">${followedCommittee(c.id)?'★':'☆'}</button>`;
 function renderCommittees(){
   if(KN===26){ if(K26CMT?.committees?.length){ const cs=[...K26CMT.committees].sort((a,b)=>(b.sessions_total||0)-(a.sessions_total||0));
-    $('#app').innerHTML=`<div class="sec-title">ועדות <small>כנסת 26 · ${cs.length} ועדות · ${(K26CMT.recent_sessions||[]).length} ישיבות אחרונות במאגר</small></div><div class="card rows">${cs.map(c=>{ const members=new Set((K26CMEM.by_committee[String(c.id)]||[]).filter(m=>!m.to).map(m=>m.name)).size; return `<div class="row"><span class="flex">${esc(c.name||'')}<br><span class="dim small">${esc(c.type||c.category||'')}${members?` · ${members} חברים כיום`:''}${c.last_session?` · ישיבה אחרונה ${fmtDate(c.last_session)}`:''}</span></span><span class="chip acc">${c.sessions_total||0} ישיבות</span></div>` }).join('')}</div><p class="small dim" style="margin-top:.6rem">רשימה בסיסית מהמאגר הרשמי — דפי ועדה מלאים ייפתחו כשיצטברו ישיבות ופרוטוקולים בכנסת 26.</p>`; return }
+    $('#app').innerHTML=`<div class="sec-title">ועדות <small>כנסת 26 · ${cs.length} ועדות · ${(K26CMT.recent_sessions||[]).length} ישיבות אחרונות במאגר</small></div><div class="card rows">${cs.map(c=>{ const members=new Set((K26CMEM.by_committee[String(c.id)]||[]).filter(m=>!m.to).map(m=>m.name)).size; const chair=(K26CMEM.by_committee[String(c.id)]||[]).find(m=>!m.to&&m.role==='chair'); return `<div class="row" onclick="openCommittee('${c.id}')"><span class="flex">${esc(c.name||'')}<br><span class="dim small">${esc(c.type||c.category||'')}${chair?` · יו״ר ${esc(disp(chair.name))}`:''}${members?` · ${members} חברים כיום`:''}${c.last_session?` · ישיבה אחרונה ${fmtDate(c.last_session)}`:''}</span></span><span class="chip acc">${c.sessions_total||0} ישיבות</span><span class="chip acc">לדף הוועדה ←</span></div>` }).join('')}</div><p class="small dim" style="margin-top:.6rem">מהמאגר הרשמי של הכנסת. ועדה שחבריה טרם פורסמו במאגר תוצג עם מצב ריק מפורש בדף שלה — לא עם רשימה מנוחשת.</p>`; return }
     $('#app').innerHTML=`<div class="sec-title">ועדות <small>כנסת 26</small></div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>ועדות כנסת 26 עוד לא הוקמו.<br><span class="small">כשהכנסת תתכנס ויוקמו הוועדות, יופיעו כאן הישיבות וסדרי היום שלהן — כמו ועדות כנסת 25.</span><br><button class="btn primary" style="margin-top:.8rem" onclick="switchKnesset(25)">לכנסת 25 המלאה ←</button></div>`; return }
   ensureCmem();
   if(cmtSeg==='lobbyists'){ ensureExtras(); $('#app').innerHTML=`<div class="sec-title">שדלנים <small>המרשם הרשמי של הכנסת · מי מייצג את מי מול הכנסת</small></div>${cmtSegHTML()}${lobbyBrowserHTML()}`; return }
@@ -3516,7 +3518,29 @@ async function loadCommitteeHistory(id){
   cmtHist={id:String(id),list,loading:false,limit:40};
   if(view==='committee'&&String(viewArg)===String(id)) renderCommitteeDetail();
 }
+function renderCommitteeDetail26(){
+  const app=$('#app'), c=(K26CMT?.committees||[]).find(x=>String(x.id)===String(viewArg));
+  if(!c){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>הוועדה לא נמצאה במאגר כנסת 26 — ייתכן שנתוני הוועדות עוד לא נטענו או שהיא טרם הוקמה.<br><button class="btn primary" style="margin-top:.8rem" onclick="go(\'committees\')">› כל ועדות כנסת 26</button></div>'; return }
+  const recent=(K26CMT.recent_sessions||[]).filter(s=>String(s.committee_id)===String(c.id)).sort((a,b)=>(b.start||'').localeCompare(a.start||''));
+  const members=(K26CMEM.by_committee[String(c.id)]||[]);
+  const chair=members.find(m=>!m.to&&m.role==='chair');
+  const memberN=new Set(members.filter(m=>!m.to).map(m=>m.name)).size;
+  const docs=recent.flatMap(s=>(s.docs||[]).map(d=>({...d,date:(s.start||'').slice(0,10)}))).slice(0,18);
+  app.innerHTML=`
+  <button class="btn ghost" onclick="go('committees')">› ועדות</button>
+  <article class="card pad rise" style="margin-top:.6rem">
+    <div style="display:flex;gap:.6rem;align-items:flex-start"><div style="flex:1"><div class="card-top">${c.type?`<span class="chip acc">${esc(c.type)}</span>`:''}${c.category&&c.category!==c.type?`<span class="chip">${esc(c.category)}</span>`:''}${c.current?'<span class="chip acc">פעילה</span>':'<span class="chip against">סיימה את פעילותה</span>'}<span class="chip">כנסת 26</span></div>
+    <h1 style="font-size:1.45rem;line-height:1.35">${esc(c.name)}</h1></div>${starBtn('committee',c.id,c.name)}</div>
+    <div class="kpis"><div class="kpi"><b>${(c.sessions_total||0).toLocaleString('he-IL')}</b><span>ישיבות בקדנציה</span></div><div class="kpi"><b>${memberN?memberN.toLocaleString('he-IL'):'—'}</b><span>חברים כיום</span></div><div class="kpi"><b>${chair?esc(disp(chair.name)):'טרם פורסם'}</b><span>יו״ר</span></div><div class="kpi"><b>${c.last_session?fmtDate(c.last_session):'—'}</b><span>ישיבה אחרונה</span></div></div>
+  </article>
+  ${committeeMembersHTML(c)||`<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> חברי הוועדה</h3><p class="muted small" style="margin-top:.35rem;line-height:1.9">חברי הוועדה ויושב הראש טרם פורסמו במאגר הרשמי של הכנסת (KNS_PersonToPosition). הוועדה כבר קיימת במאגר הוועדות, אבל מינויי החברים עוד לא הופיעו בו — ברגע שיתפרסמו הם יוצגו כאן אוטומטית, בלי שננחש שמות.</p></div>`}
+  <div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg> ישיבות אחרונות במאגר (${recent.length})</h3>
+  ${recent.length?`<div class="rows" style="margin:.5rem -.9rem 0">${recent.slice(0,20).map(s=>`<div class="row" style="cursor:default"><span class="chip acc">${fmtDate((s.start||'').slice(0,10))}</span><span class="flex">${esc(s.type||'ישיבה')}${s.location?` · ${esc(s.location)}`:''}${(s.items||[]).length?`<br><span class="dim small">${s.items.map(it=>esc(it.name||'')).filter(Boolean).join(' · ')}</span>`:''}</span>${s.status?`<span class="chip">${esc(s.status)}</span>`:''}</div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">עדיין אין ישיבות של הוועדה במאגר.</p>'}
+  ${docs.length?`<h3 style="margin-top:1rem">מסמכים אחרונים</h3><div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.45rem">${docs.map(d=>`<a class="chip" href="${esc(d.path)}" target="_blank" rel="noopener">${esc(d.group)} · ${fmtDate(d.date)}</a>`).join('')}</div>`:''}
+  <p class="small dim" style="margin-top:.7rem">פרוטוקולי הישיבות וחוקים שיידונו בוועדה יופיעו כאן כשיתפרסמו במאגרי כנסת 26 — כמו בדפי ועדות כנסת 25.</p></div>`;
+}
 function renderCommitteeDetail(){
+  if(KN===26){ renderCommitteeDetail26(); return }
   ensureCmem(); ensureExtras();
   const app=$('#app'), c=CMT_BY_ID[viewArg];
   if(!c){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>הוועדה לא נמצאה במאגר כנסת 25.</div>'; return }
