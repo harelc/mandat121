@@ -250,6 +250,15 @@ def main():
         out[name] = make_rec(name, title, p, method)
 
     def tokens(s):
+        # Drop parentheticals first (title disambiguation / nickname, and
+        # alt-given-name asides in roster names), then hyphen-split so token
+        # order and multi-word surnames (שאשא ביטון, אבו אל-היג'א) don't
+        # matter.
+        s = re.sub(r"\([^)]*\)", " ", s)
+        # Same combining-mark strip as the UI's normName: the lobby feed
+        # ships e.g. 'פינק ַיאיא' with a stray hataf, which must tokenise
+        # identically to the clean spelling.
+        s = re.sub(r"[\u05B0-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7]", "", s)
         return {t for t in re.split(r"[\s\-־]+", s) if t}
 
     for name, cands in search_candidates.items():
@@ -262,14 +271,24 @@ def main():
             qid = p.get("pageprops", {}).get("wikibase_item", "")
             ent = entities.get(qid, {})
             base = norm(re.sub(r"\s*\(.*\)\s*$", "", p.get("title") or title))
-            # Compare against ALL name tokens (hyphen-split): token order and
-            # multi-word surnames (שאשא ביטון, אבו אל-היג'א) then don't matter.
-            overlap = len(name_tokens & tokens(base)) / max(len(name_tokens), 1)
+            title_tokens = tokens(base)
+            # Full-name identity only: one token set must contain the other
+            # (containment, not equality, for extra middle names on either
+            # side). A partial-overlap rule accepted a different MK who
+            # shared only the given name (רונן עמרי -> עמרי שרון) or only
+            # the surname (זחאלקה האיתם -> ג'מאל זחאלקה — whose Wikidata
+            # X handle also leaked in). P39/abstract MK-verification proves
+            # *a* MK by that name, never that a half-matched name is *this*
+            # MK. Nickname/transliteration variants that fail this test
+            # belong in the hand-curated data/mk_wiki.json (source C).
+            if not title_tokens or not (title_tokens <= name_tokens
+                                        or name_tokens <= title_tokens):
+                continue
             is_mk = KNESSET_MEMBER_QID in claim_ids(ent, "P39")
-            if is_mk and overlap >= 0.5:
+            if is_mk:
                 accepted = (title, p, "search_p39_verified")
                 break
-            if overlap >= 0.75 and ("חבר הכנסת" in p["extract"] or "חברת הכנסת" in p["extract"]):
+            if "חבר הכנסת" in p["extract"] or "חברת הכנסת" in p["extract"]:
                 accepted = (title, p, "search_abstract_verified")
                 break
         if accepted:

@@ -992,7 +992,9 @@ function disp(name){name=String(name||'').replace(/\s+/g,' ').trim(); if(FORWARD
 const NAME_CANON={'גנץ בני':'גנץ בנימין','סגלוביץ יואב':"סגלוביץ' יואב",'מלקו צגה צגנש':'מלקו צגה','סטרוק אורית':'סטרוק אורית מלכה','פינדרוס יצחק זאב':'פינדרוס יצחק',
  // K26 CEC lists use full legal names (middle names, nicknames spelled out,
  // hyphen/joined particles) where every K25 source uses the short form —
- // without these, returning MKs read as "חדש/ה בכנסת" on their K26 card.
+ // without these, returning MKs read as not having served in K25 on their K26 card.
+ // NOTE: absence from K25 data never means "new to the Knesset" — e.g.
+ // פייגלין משה served in K19. UI copy must only ever claim לא כיהן/ה בכנסת 25.
  'סון הר-מלך לימור':'סון הר מלך לימור','אל הואשלה ואליד':'אלהואשלה ואליד','ביסמוט בעז':'ביסמוט בועז','איזנקוט גד':'איזנקוט גדי','כהן אליהו':'כהן אלי','לוין יריב גדעון':'לוין יריב','רגב מרים':'רגב מירי מרים','סער גדעון משה':'סער גדעון','זוהר מכלוף':'זוהר מכלוף מיקי','עטייה חוה':'עטייה חוה אתי','גמליאל דמרי גילה':'גמליאל גילה','טרופר יחיאל משה':'טרופר חילי','גולדקנופ יצחק יששכר':'גולדקנופ יצחק','מלינובסקי קונין יוליה':'מלינובסקי יוליה','גוטליב רויטל טלי':'גוטליב טלי','מלכיאלי מיכאל משה':'מלכיאלי מיכאל','סמוטריץ בצלאל יואל':"סמוטריץ' בצלאל",'רוטמן שמחה דן':'רוטמן שמחה','מושיאשוילי סימיון':'מושיאשוילי סימון',
  // K26 OData (KNS_Person) spellings confirmed 2026-11-10 when the official
  // serving roster published — CEC list spelling on the left, OData on the right.
@@ -1428,7 +1430,7 @@ function hemiCardHTML(s,ctx){
     const mine=myAgreement(s.name); if(mine) rows.push(['התאמה אליך',`${mine.pct}% (${mine.n} משותפות)`]);
     const ten=mkTenureText(s.name); if(ten&&!isCurrentMk(s.name)) rows.push(['כהונה בכנסת 25',ten]);
   } else if(ctx.mode==='k26'){
-    rows.push(['בכנסת 25','לא כיהן/ה — ח״כ חדש/ה']);
+    rows.push(['בכנסת 25','לא כיהן/ה בכנסת 25']);
   }
   return `<div class="ht-head">${avatar(s.name,s.faction,44)}<div style="min-width:0"><div class="ht-name">${esc(disp(s.name))}${followedMk(s.name)?' ★':''}</div><div class="ht-fac"><i style="background:${s.color||fcol(s.faction)}"></i>${esc(fac)}${ctx.mode==='k26'?' · כנסת 26':ctx.mode==='k25'?' · כנסת 25':''}</div></div>${ctx.mode==='actual'&&s.result&&!s.absent?`<span class="vchip ${HEMI_VOTE[s.result][1]}" style="margin-inline-start:auto">${HEMI_VOTE[s.result][0]}</span>`:ctx.mode==='actual'&&s.absent?'<span class="vchip n" style="margin-inline-start:auto">נעדר/ה</span>':''}</div>
   ${rows.length?`<div class="ht-stats">${rows.map(([k,v])=>`<span class="k">${esc(k)}</span><span class="v">${esc(v)}</span>`).join('')}</div>`:''}
@@ -2625,7 +2627,7 @@ function renderMks26(){
   <select onchange="mkFilter.faction=this.value;if(this.value)mkFilter.sort='list';renderMks()" aria-label="סינון לפי סיעה"><option value="">כל הסיעות</option>${parties.map(f=>`<option ${mkFilter.faction===f?'selected':''}>${esc(f)}</option>`).join('')}</select></div>
   ${mkSortPillsHTML()}
   <div class="mk-grid">${list.map(x=>{const rec=IDX25[x.n]; const initiated=initiatedCount(x.n); const present=livePresenceOf(x.n)===true; return `<div class="card mk-card${present?' present':''}" onclick="openMk('${jsq(x.n)}')">${avatar(x.n,x.p,62)}<div style="font-weight:800">${esc(disp(x.n))}${followedMk(x.n)?' ★':''}</div><div class="small" style="color:${x.color}">${esc(x.p)}</div>${presencePillHTML(x.n)}
-  <div class="small dim">מקום ${RANK26[x.n]??x.rank} ברשימת ${esc(x.p)}</div>${rec?`<div class="small" style="color:var(--accent)">כנסת 25: ${rec.votes.length} הצבעות${initiated?` · ${initiated} יוזמות חקיקה`:''}</div>`:'<div class="small dim">חדש/ה בכנסת</div>'}</div>`}).join('')}</div>`;
+  <div class="small dim">מקום ${RANK26[x.n]??x.rank} ברשימת ${esc(x.p)}</div>${rec?`<div class="small" style="color:var(--accent)">כנסת 25: ${rec.votes.length} הצבעות${initiated?` · ${initiated} יוזמות חקיקה`:''}</div>`:'<div class="small dim">לא כיהן/ה בכנסת 25</div>'}</div>`}).join('')}</div>`;
 }
 /* Committee memberships on MK pages + member lists on committee pages. */
 function mkCommitteesHTML(name){
@@ -2794,7 +2796,7 @@ function renderMkDetail(){
       <div class="small dim">${e.rank?`מקום ${e.rank} ברשימת ${esc(e.party.name)} · `:''}${e.serving?'מכהן/ת בפועל':e.elected?'נבחר/ה לכנסת ה־26':'מועמד/ת ברשימה — לא נכנס/ה לכנסת ה־26'}</div>
       <span class="chip acc" style="margin-top:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> היסטוריית ההצבעות תתחיל עם הצבעות כנסת 26 הראשונות</span></div>${starBtn('mk',name,name)}</div>
     ${rec?`<div style="margin-top:1rem"><h3>בכנסת 25</h3><div class="small muted" style="line-height:1.9">${rec.votes.length} הצבעות מתועדות · סיעה אז: ${esc(shortF(rec.faction))} · <span style="color:var(--for)">${rec.votes.filter(v=>v.result===1).length} בעד</span> / <span style="color:var(--against)">${rec.votes.filter(v=>v.result===2).length} נגד</span> / <span style="color:var(--abstain)">${rec.votes.filter(v=>v.result===3).length} נמנע</span><br>איך הצביע/ה על ביטחון, כלכלה, זכויות — הכל שמור בכרטיס של כנסת 25.</div>
-    <button class="btn primary" style="margin-top:.6rem" onclick="switchKnesset(25);openMk('${jsq(name)}')">לכל ההצבעות בכנסת 25 ←</button></div>`:'<p class="muted small" style="margin-top:1rem">לא כיהן/ה בכנסת 25 — זהו/זו ח״כ חדש/ה. הכרטיס יתמלא מההצבעה הראשונה.</p>'}
+    <button class="btn primary" style="margin-top:.6rem" onclick="switchKnesset(25);openMk('${jsq(name)}')">לכל ההצבעות בכנסת 25 ←</button></div>`:'<p class="muted small" style="margin-top:1rem">לא כיהן/ה בכנסת 25. הכרטיס יתמלא מההצבעה הראשונה.</p>'}
     </div>
     ${mkContactHTML(name)}
     ${mkKnStrip(name)}
@@ -3213,7 +3215,7 @@ function renderFactionDetail(){
       <h1 style="font-size:1.55rem;color:${p.color}">${esc(p.name)}</h1>
       <div class="progress" style="margin:.7rem 0"><i style="width:${p.seats/120*100}%;background:${p.color}"></i></div>
       <p class="small muted">הנבחרים לפי סדר הרשימה הרשמי. היסטוריית הצבעות תתחיל להיבנות עם הצבעות כנסת 26 הראשונות; מי שכיהנו בכנסת 25 מקושרים להיסטוריית ההצבעות שלהם.</p>
-      <div class="rows" style="margin:.6rem -.9rem 0">${p.elected.map(n=>{const r=(p.candidates||[]).indexOf(n)+1; return `<div class="row" onclick="openMk('${jsq(n)}')"><b style="width:1.7rem;color:${p.color}">${r}</b>${avatar(n,p.name,34)}<span class="flex">${esc(disp(n))}${IDX25[n]?`<br><span class="dim small">בכנסת 25: ${IDX25[n].votes.length} הצבעות</span>`:'<br><span class="dim small">חדש/ה בכנסת</span>'}</span><span class="chip acc">לכרטיס ←</span></div>`}).join('')}</div>
+      <div class="rows" style="margin:.6rem -.9rem 0">${p.elected.map(n=>{const r=(p.candidates||[]).indexOf(n)+1; return `<div class="row" onclick="openMk('${jsq(n)}')"><b style="width:1.7rem;color:${p.color}">${r}</b>${avatar(n,p.name,34)}<span class="flex">${esc(disp(n))}${IDX25[n]?`<br><span class="dim small">בכנסת 25: ${IDX25[n].votes.length} הצבעות</span>`:'<br><span class="dim small">לא כיהן/ה בכנסת 25</span>'}</span><span class="chip acc">לכרטיס ←</span></div>`}).join('')}</div>
       ${p.elected.some((n,i)=>(p.candidates||[]).indexOf(n)!==i)?'<p class="small dim" style="margin-top:.6rem">המספרים הם המקומות ברשימת המועמדים הרשמית כפי שהוגשה לוועדת הבחירות; פער במספור הוא מועמד שפרש מהרשימה לפני ההשבעה, והבא אחריו נכנס במקומו.</p>':''}
     </article>`;
     return;
