@@ -73,10 +73,22 @@ jobs:
           # are built per-Knesset in the K26 step below; build_mk_contacts.py
           # refuses --knesset 25 outright so this can't regress by accident.
           python3 -u build_k25_tenure.py --knesset 25
-          python3 -u build_k25_committee_members.py --knesset 25
-          python3 -u build_k25_list_order.py --knesset 25
-          python3 -u build_k25_roles.py --knesset 25          # gov/Knesset/faction leadership roles -> data/k25_roles.json
-          python3 -u build_k25_bill_history.py --knesset 25   # removed initiators/sponsors -> data/k25_bill_history.json (after build_knesset: reads k25_bills.json)
+          # Closed-Knesset history layers: K25 is dissolved, so committee
+          # memberships, list order, roles and removed-initiator history
+          # no longer change day to day (feed corrections aside). Refresh
+          # them weekly (Sundays) or on manual dispatch — the same cadence
+          # as the Wikipedia layer below — instead of spending ~1.5 min
+          # of OData fetches on them every run. The builders above stay
+          # daily: they are incremental/probe-gated and exit in seconds
+          # when nothing changed.
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(date -u +%u)" = "7" ]; then
+            python3 -u build_k25_committee_members.py --knesset 25
+            python3 -u build_k25_list_order.py --knesset 25
+            python3 -u build_k25_roles.py --knesset 25          # gov/Knesset/faction leadership roles -> data/k25_roles.json
+            python3 -u build_k25_bill_history.py --knesset 25   # removed initiators/sponsors -> data/k25_bill_history.json (after build_knesset: reads k25_bills.json)
+          else
+            echo "weekly K25 history layers skipped (scheduled weekday run)"
+          fi
 
       - name: Harvest per-MK vote results (K25)
         if: ${{ inputs.target != 'k26-only' }}
@@ -85,7 +97,14 @@ jobs:
       - name: Derived layers (analytics, contacts/presence, protocol search)
         if: ${{ inputs.target != 'k26-only' }}
         run: |
-          python3 -u build_analytics.py          # correlation matrix, close ties, ranks
+          # Analytics is a pure function of the vote/bill datasets: only
+          # recompute when an earlier step actually changed them (on a
+          # no-news day this saves the full 7,451-vote recomputation).
+          if git status --porcelain -- data/k25_vote_results.json data/k25_votes.json data/k25_bills.json | grep -q .; then
+            python3 -u build_analytics.py          # correlation matrix, close ties, ranks
+          else
+            echo "analytics inputs unchanged — skipping build_analytics.py"
+          fi
           # Wikipedia/Wikidata enrichment changes rarely — refresh weekly
           # (Sundays) or on manual dispatch, not daily. Non-fatal either
           # way: a Wikipedia 502 must never block the daily data commit
@@ -93,7 +112,7 @@ jobs:
           if [ "${{ github.event_name }}" = "workflow_dispatch" ] || [ "$(date -u +%u)" = "7" ]; then python3 -u build_mk_wiki.py || echo "::warning::build_mk_wiki failed — keeping previous Wikipedia abstracts"; fi
           python3 -u build_protocols_search.py   # committee protocol search index
           python3 -u build_plenum_search.py      # plenum (דברי הכנסת) search index — incremental, new sessions only
-          python3 -u build_odata_extras.py       # P1 OData extras: queries, agendas, bill lineage, laws, secondary law, broadcasts, lobbyists (~5 min)
+          python3 -u build_odata_extras.py       # P1 OData extras — probe-gated per section: unchanged sections are reused, so this is seconds on a no-news day
           python3 -u build_agenda.py             # this-week agenda: plenum order of the day + committee sittings (windowed, recess-honest)
 
       # K26 layers, in dependency order. Each builder no-ops until its

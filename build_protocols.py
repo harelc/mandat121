@@ -93,15 +93,46 @@ def main():
     if not jobs:
         print(f"K{kn}: no protocol documents yet — skipping (index left untouched)")
         return
+    # Protocol documents are immutable once published, and each run used to
+    # re-download and re-parse all of them (~270 docx, ~30s) to produce
+    # byte-identical output. Skip sessions whose parsed file already exists
+    # for the same source URL (state: data/protocols_state.json, shared
+    # across Knessets — session ids are globally unique); only new or
+    # re-published (URL-changed) protocols are fetched.
+    idx_prev_path = Path("data/protocols_index.json" if kn == 25 else f"data/k{kn}_protocols_index.json")
+    prev_index = {}
+    if idx_prev_path.exists():
+        try:
+            prev_index = json.loads(idx_prev_path.read_text("utf-8"))
+        except Exception:
+            prev_index = {}
+    state_path = Path("data/protocols_state.json")
+    state = {}
+    if state_path.exists():
+        try:
+            state = json.loads(state_path.read_text("utf-8"))
+        except Exception:
+            state = {}
     index, done, failed = {}, 0, []
+    todo = []
+    for s, u in jobs:
+        sid = str(s["id"])
+        if state.get(sid) == u and (OUT / f"{s['id']}.json").exists() and sid in prev_index:
+            index[sid] = prev_index[sid]
+            done += 1
+        else:
+            todo.append((s, u))
+    if todo:
+        print(f"  {len(todo)} new/changed to download, {done} reused from disk", flush=True)
     with ThreadPoolExecutor(max_workers=6) as ex:
-        futs = {ex.submit(parse, s, u): s["id"] for s, u in jobs}
+        futs = {ex.submit(parse, s, u): (s["id"], u) for s, u in todo}
         for fut in as_completed(futs):
-            sid = futs[fut]
+            sid, url = futs[fut]
             try:
                 doc = fut.result()
                 (OUT / f"{sid}.json").write_text(json.dumps(doc, ensure_ascii=False), encoding="utf-8")
                 index[str(sid)] = {"turns": len(doc["turns"]), "speakers": len(doc["speakers"])}
+                state[str(sid)] = url
             except Exception as e:
                 failed.append((sid, str(e)[:80]))
             done += 1
@@ -109,6 +140,7 @@ def main():
                 print(f"{done}/{len(jobs)} done, {len(failed)} failed", flush=True)
     idx_out = "data/protocols_index.json" if kn == 25 else f"data/k{kn}_protocols_index.json"
     json.dump(index, open(idx_out, "w", encoding="utf-8"), ensure_ascii=False)
+    state_path.write_text(json.dumps(state, ensure_ascii=False), "utf-8")
     print(f"DONE {len(index)} protocols, failed: {failed[:8]}")
 
 if __name__ == "__main__":
