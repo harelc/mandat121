@@ -230,12 +230,13 @@ def build_secondary(committee_ids):
     secondary = paged(PI, "KNS_SecondaryLaw",
                       f"$filter=KnessetNum%20eq%20{KN}"
                       "&$select=Id,Name,StatusName,CompletionCauseDesc,CommitteeID,PublicationDate,CommitteeApprovalDate")
-    sdocs = defaultdict(list)
-    for d in in_batches(PI, "KNS_DocumentSecondaryLaw", "SecondaryLawId",
-                        [s["Id"] for s in secondary], "SecondaryLawId,GroupTypeDesc,FilePath"):
-        sdocs[d["SecondaryLawId"]].append({"group": d.get("GroupTypeDesc") or "",
-                                           "url": (d.get("FilePath") or "").replace("\\", "/")})
+    # Only the top-10 items per committee survive into the output, so only
+    # those laws need their documents fetched. Fetching docs for every law
+    # (≈2,850 ids in 25-id batches) made a rebuild cost ~2 min for the sake
+    # of ≤440 visible items; collect the kept items first, then fetch just
+    # their documents and attach them.
     secondary_by_committee = {}
+    kept = []  # (law id, item dict) in output order
     for s in sorted(secondary, key=lambda x: x.get("PublicationDate") or "", reverse=True):
         cid = s.get("CommitteeID")
         if cid not in committee_ids:
@@ -243,10 +244,19 @@ def build_secondary(committee_ids):
         e = secondary_by_committee.setdefault(str(cid), {"total": 0, "items": []})
         e["total"] += 1
         if len(e["items"]) < 10:
-            e["items"].append({"name": s["Name"], "status": s.get("StatusName") or "",
-                               "cause": s.get("CompletionCauseDesc") or "",
-                               "date": (s.get("PublicationDate") or s.get("CommitteeApprovalDate") or "")[:10],
-                               "docs": sdocs.get(s["Id"], [])})
+            item = {"name": s["Name"], "status": s.get("StatusName") or "",
+                    "cause": s.get("CompletionCauseDesc") or "",
+                    "date": (s.get("PublicationDate") or s.get("CommitteeApprovalDate") or "")[:10],
+                    "docs": []}
+            e["items"].append(item)
+            kept.append((s["Id"], item))
+    sdocs = defaultdict(list)
+    for d in in_batches(PI, "KNS_DocumentSecondaryLaw", "SecondaryLawId",
+                        [law_id for law_id, _ in kept], "SecondaryLawId,GroupTypeDesc,FilePath"):
+        sdocs[d["SecondaryLawId"]].append({"group": d.get("GroupTypeDesc") or "",
+                                           "url": (d.get("FilePath") or "").replace("\\", "/")})
+    for law_id, item in kept:
+        item["docs"] = sdocs.get(law_id, [])
     print(f"secondary: {len(secondary)} (in {len(secondary_by_committee)} committees)", flush=True)
     return secondary_by_committee
 
@@ -372,8 +382,11 @@ def main():
         else prev.get("laws", {})
 
     # ---- secondary legislation per committee ---------------------------
+    secondary_probe = "|".join([
+        max_updated(PI, "KNS_SecondaryLaw", f"KnessetNum%20eq%20{KN}"),
+        fingerprint(sorted(committee_ids))])
     secondary_by_committee = build_secondary(committee_ids) \
-        if need("secondary_by_committee", max_updated(PI, "KNS_SecondaryLaw", f"KnessetNum%20eq%20{KN}")) \
+        if need("secondary_by_committee", secondary_probe) \
         else prev.get("secondary_by_committee", {})
 
     # ---- broadcasts + joint composition --------------------------------

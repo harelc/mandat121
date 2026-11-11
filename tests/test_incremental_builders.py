@@ -233,6 +233,35 @@ class ExtrasProbeTest(unittest.TestCase):
             self.assertEqual(out1, out2)
 
 
+class SecondaryDocsTest(unittest.TestCase):
+    """build_secondary keeps only the top-10 items per committee, so it
+    must fetch documents for those laws only. Fetching docs for every
+    law (≈2,850 ids) made each legitimate rebuild cost ~2 minutes."""
+
+    def test_docs_fetched_only_for_kept_items(self):
+        mod = load_module("build_odata_extras.py")
+        laws = [{"Id": i, "Name": f"חוק {i}", "StatusName": "s",
+                 "CompletionCauseDesc": "", "CommitteeID": 7,
+                 "PublicationDate": f"2026-01-{i:02d}T00:00:00",
+                 "CommitteeApprovalDate": None} for i in range(1, 16)]
+        mod.paged = lambda base, entity, params: laws
+        requested = []
+
+        def fake_in_batches(base, entity, field, ids, select, extra=""):
+            requested.extend(ids)
+            return [{"SecondaryLawId": i, "GroupTypeDesc": "g",
+                     "FilePath": f"f{i}.pdf"} for i in ids]
+
+        mod.in_batches = fake_in_batches
+        out = mod.build_secondary({7})
+        self.assertEqual(out["7"]["total"], 15)
+        self.assertEqual(len(out["7"]["items"]), 10)
+        # newest 10 by PublicationDate (ids 15..6), nothing else
+        self.assertEqual(sorted(requested), list(range(6, 16)))
+        self.assertEqual(out["7"]["items"][0]["docs"],
+                         [{"group": "g", "url": "f15.pdf"}])
+
+
 class VoteResultsResumeTest(unittest.TestCase):
     """Regression: a checkpointed vote with exactly 100 rows is treated
     as possibly-truncated, deleted and refetched on resume. Tallies must
