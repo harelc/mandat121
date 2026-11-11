@@ -372,6 +372,12 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 .mk-card{padding:.9rem .6rem;text-align:center;cursor:pointer;transition:transform .15s}
 .mk-card:hover{transform:translateY(-3px)}
 .mk-card .avatar{margin:0 auto .5rem}
+/* currently in the Knesset building (live MkLobby read): green frame +
+   avatar ring + pill, same green language as the hemicycle presence ring */
+.mk-card.present{border-color:#7fb35e;background:linear-gradient(180deg,#eff7e2,var(--bg2));box-shadow:0 0 0 2px rgba(58,138,24,.45),var(--shadow)}
+.mk-card.present .avatar{box-shadow:0 0 0 3px var(--for)}
+.presence-pill{display:inline-flex;align-items:center;gap:.3rem;margin-top:.35rem;padding:.12rem .55rem;border-radius:999px;background:var(--for-dim);color:#2c6311;border:1px solid #b3d697;font-size:.72rem;font-weight:800}
+.presence-pill i{width:.5rem;height:.5rem;border-radius:50%;background:var(--for);flex:none}
 .progress{height:7px;background:#e7ddc6;border-radius:99px;overflow:hidden;direction:ltr}
 .progress i{display:block;height:100%;border-radius:99px}
 .rows{display:flex;flex-direction:column}
@@ -749,9 +755,9 @@ let K26_TENURE={}, K26_FACTIONS={}; // official K26 serving roster (build_k25_te
    name against our own data — no API string ever reaches the DOM.
    Consumers: the K26 Now hemicycle (which paints it ONLY on the official
    serving roster — before that the live feed still describes the
-   outgoing Knesset's members) and the MK page's presence chip (which
-   falls back to the daily mk_contacts snapshot until the live read
-   lands, labelled as such). */
+   outgoing Knesset's members), the MK page's presence chip, and the
+   MK-card grids (cards of MKs currently in the building are framed in
+   green). Presence is live-only: it is not stored in any data file. */
 let LIVE_PRESENCE={at:0,tryAt:0,map:null};
 const livePresenceOf=name=>LIVE_PRESENCE.map&&name in LIVE_PRESENCE.map?LIVE_PRESENCE.map[name]:undefined;
 function ensureLivePresence(){
@@ -769,6 +775,10 @@ function ensureLivePresence(){
       LIVE_PRESENCE={at:Date.now(),tryAt:LIVE_PRESENCE.tryAt,map};
       if(view==='now'&&KN===26) renderNow26();
       else if(view==='mk') renderMkDetail();
+      // MK cards: highlight who is in the building. Skip the re-render
+      // while the user is typing in the grid's search box — it would
+      // steal focus; the next keystroke re-renders with presence anyway.
+      else if(view==='mks'&&document.activeElement?.dataset?.keep!=='mkQ') renderMks();
     }).catch(()=>{});
 }
 let K26B=[], K26V=[], K26CMT=null, K26CMEM={by_mk:{},by_committee:{}}; // K26 layers as the daily builders publish them (k26_bills/votes/committees/committee_members.json); empty until then, K26 views fall back to their "not yet" states
@@ -2417,8 +2427,10 @@ function mkStatusPillsHTML(currentCount,formerCount){
   const total=currentCount+formerCount;
   return `<div class="chips" role="group" aria-label="סגל"><span class="pill-lbl">סגל:</span>${[['current',`מכהנים (${currentCount})`],['all',`כל מי שכיהנו (${total})`],['former',`עזבו במהלך הקדנציה (${formerCount})`]].map(([k,v])=>`<button class="chip ${mkFilter.status===k?'on':''}" onclick="mkFilter.status='${k}';renderMks()">${v}</button>`).join('')}</div>`;
 }
+const presencePillHTML=n=>livePresenceOf(n)===true?`<div><span class="presence-pill"><i></i>כעת במשכן הכנסת</span></div>`:'';
 function renderMks(){
   if(KN===26){ renderMks26(); return }
+  ensureLivePresence(); // highlights cards of MKs currently in the building; re-renders when it lands
   const currentNames=dedupeNames([...Object.keys(MKP),...Object.keys(mkIndex),...Object.keys(CONTACTS)]).filter(n=>isCurrentMk(n)); // the official 120
   const formerNames=Object.keys(mkIndex).filter(n=>!isCurrentMk(n)); // served in K25, no longer on the roster
   const allNames=[...currentNames,...formerNames];
@@ -2438,21 +2450,23 @@ function renderMks(){
     return byVotes(a,b)||listRank25(a)-listRank25(b)||bySurname(a,b);
   });
   const hasMine=Object.keys(S.myVotes).length>0;
+  const presentN=LIVE_PRESENCE.map?list.filter(n=>livePresenceOf(n)===true).length:0;
   $('#app').innerHTML=`
-  <div class="sec-title">חברי הכנסת <small>${list.length} מתוך ${pool.length} (${mkFilter.status==='former'?'כיהנו ועזבו במהלך כנסת 25':mkFilter.status==='all'?'כל מי שכיהנו בכנסת 25':'סגל כנסת 25 המכהן'}) · ★ = במעקב שלי</small></div>
+  <div class="sec-title">חברי הכנסת <small>${list.length} מתוך ${pool.length} (${mkFilter.status==='former'?'כיהנו ועזבו במהלך כנסת 25':mkFilter.status==='all'?'כל מי שכיהנו בכנסת 25':'סגל כנסת 25 המכהן'}) · ★ = במעקב שלי${presentN?` · <span style="color:var(--for);font-weight:800">${presentN} כעת במשכן (מסומנים בירוק)</span>`:''}</small></div>
   ${mkStatusPillsHTML(currentNames.length,formerNames.length)}
   <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.9rem"><input type="search" data-keep="mkQ" placeholder="חיפוש ח״כ…" value="${esc(mkFilter.q)}" style="flex:1;min-width:170px" oninput="mkFilter.q=this.value;renderMksKeep(this)">
   <select onchange="mkFilter.faction=this.value;if(this.value)mkFilter.sort='list';renderMks()" aria-label="סינון לפי סיעה"><option value="">כל הסיעות</option>${factions.map(f=>`<option ${mkFilter.faction===f?'selected':''}>${esc(f)}</option>`).join('')}</select></div>
   ${mkSortPillsHTML()}
   ${list.length?`<div class="mk-grid">${list.map(n=>{const m=mkIndex[n]; const f=factionOf(n); const cnt=m?.votes.length||0; const former=isFormerMk(n);
-    const mine=agreements[n]; const initiated=initiatedCount(n);
-    return `<div class="card mk-card" onclick="openMk('${jsq(n)}')">${avatar(n,f,62)}<div style="font-weight:800">${esc(disp(n))}${followedMk(n)?' ★':''}</div><div class="small" style="color:${fcol(f)}">${esc(shortF(f))}</div>
+    const mine=agreements[n]; const initiated=initiatedCount(n); const present=livePresenceOf(n)===true;
+    return `<div class="card mk-card${present?' present':''}" onclick="openMk('${jsq(n)}')">${avatar(n,f,62)}<div style="font-weight:800">${esc(disp(n))}${followedMk(n)?' ★':''}</div><div class="small" style="color:${fcol(f)}">${esc(shortF(f))}</div>${presencePillHTML(n)}
     ${former?`<span class="chip" style="margin-top:.3rem">${formerBadgeText(n)}</span><div class="small dim" style="margin-top:.3rem">כהונה: ${esc(mkTenureText(n)||'במהלך הקדנציה')}</div>`:''}
     <div class="small dim">${cnt} הצבעות${initiated?` · ${initiated} יוזמות חקיקה`:''}</div>${mine?`<div class="progress" style="margin-top:.45rem"><i style="width:${mine.pct}%;background:linear-gradient(90deg,var(--accent),var(--for))"></i></div><div class="small" style="color:var(--accent);font-weight:700">${mine.pct}% כמוני (${mine.n})</div>`:''}</div>`}).join('')}</div>`:'<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg></div>לא נמצאו ח״כים בסינון הזה.</div>'}`;
 }
 function renderMksKeep(inp){ keepSearchFocus(inp,renderMks) }
 function renderMks26(){
   if(!K26){ $('#app').innerHTML='<div class="card empty">אין נתוני כנסת 26</div>'; return }
+  ensureLivePresence(); // highlights cards of MKs currently in the building; re-renders when it lands
   // Same universe as the Now hemicycle: the official serving roster once it
   // exists (incl. Norwegian-law replacements), else the elected preview.
   const servingSeats=k26ServingSeats();
@@ -2469,12 +2483,13 @@ function renderMks26(){
     return byList(a,b);
   });
   const hasMine=Object.keys(S.myVotes).length>0;
+  const presentN=LIVE_PRESENCE.map?list.filter(x=>livePresenceOf(x.n)===true).length:0;
   $('#app').innerHTML=`
-  <div class="sec-title">${servingSeats?'חברי הכנסת ה־26':'הנבחרים לכנסת ה־26'} <small>${list.length} מתוך ${elected.length} · ★ = במעקב</small></div>
+  <div class="sec-title">${servingSeats?'חברי הכנסת ה־26':'הנבחרים לכנסת ה־26'} <small>${list.length} מתוך ${elected.length} · ★ = במעקב${presentN?` · <span style="color:var(--for);font-weight:800">${presentN} כעת במשכן (מסומנים בירוק)</span>`:''}</small></div>
   <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.9rem"><input type="search" data-keep="mkQ" placeholder="חיפוש נבחר/ת…" value="${esc(mkFilter.q)}" style="flex:1;min-width:170px" oninput="mkFilter.q=this.value;renderMksKeep(this)">
   <select onchange="mkFilter.faction=this.value;if(this.value)mkFilter.sort='list';renderMks()" aria-label="סינון לפי סיעה"><option value="">כל הסיעות</option>${parties.map(f=>`<option ${mkFilter.faction===f?'selected':''}>${esc(f)}</option>`).join('')}</select></div>
   ${mkSortPillsHTML()}
-  <div class="mk-grid">${list.map(x=>{const rec=IDX25[x.n]; const initiated=initiatedCount(x.n); return `<div class="card mk-card" onclick="openMk('${jsq(x.n)}')">${avatar(x.n,x.p,62)}<div style="font-weight:800">${esc(disp(x.n))}${followedMk(x.n)?' ★':''}</div><div class="small" style="color:${x.color}">${esc(x.p)}</div>
+  <div class="mk-grid">${list.map(x=>{const rec=IDX25[x.n]; const initiated=initiatedCount(x.n); const present=livePresenceOf(x.n)===true; return `<div class="card mk-card${present?' present':''}" onclick="openMk('${jsq(x.n)}')">${avatar(x.n,x.p,62)}<div style="font-weight:800">${esc(disp(x.n))}${followedMk(x.n)?' ★':''}</div><div class="small" style="color:${x.color}">${esc(x.p)}</div>${presencePillHTML(x.n)}
   <div class="small dim">מקום ${RANK26[x.n]??x.rank} ברשימת ${esc(x.p)}</div>${rec?`<div class="small" style="color:var(--accent)">כנסת 25: ${rec.votes.length} הצבעות${initiated?` · ${initiated} יוזמות חקיקה`:''}</div>`:'<div class="small dim">חדש/ה בכנסת</div>'}</div>`}).join('')}</div>`;
 }
 /* Committee memberships on MK pages + member lists on committee pages. */
