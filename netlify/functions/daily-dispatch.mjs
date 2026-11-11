@@ -6,7 +6,9 @@
 // 06:06 UTC. Netlify's scheduler is the reliable clock (same pattern as
 // elections-vote-transfer's k26-dispatch), so this function dispatches
 // the workflow every 8 hours (04:30, 12:30, 20:30 UTC) and lets the
-// runner do all the work. Before dispatching it checks for an already active run —
+// runner do all the work. (Cadence since then: hourly during Israel
+// work hours, every 4 hours outside them — see shouldRun below.)
+// Before dispatching it checks for an already active run —
 // the workflow's concurrency group would serialize a duplicate anyway,
 // but skipping here avoids queueing a second full run.
 //
@@ -26,7 +28,20 @@ const REPO = "harelc/mandat121";
 const WORKFLOW = "knesset-daily.yml";
 const API = "https://api.github.com";
 
-export const config = { schedule: "30 4,12,20 * * *" };
+// One cron only (Netlify limit), firing hourly; shouldRun() below
+// applies the real cadence in Israel time, so DST never shifts it.
+export const config = { schedule: "30 * * * *" };
+
+const IL_DAYS = { Sun: 0, Mon: 1, Tue: 2, Wed: 3, Thu: 4, Fri: 5, Sat: 6 };
+export function shouldRun(now = new Date()) {
+  const parts = Object.fromEntries(
+    new Intl.DateTimeFormat("en-US", {
+      timeZone: "Asia/Jerusalem", weekday: "short", hour: "numeric", hourCycle: "h23",
+    }).formatToParts(now).map(p => [p.type, p.value]));
+  const day = IL_DAYS[parts.weekday], hour = Number(parts.hour);
+  const workTime = day <= 4 && hour >= 8 && hour < 20; // Sun–Thu, 08:00–19:59 Israel
+  return workTime || hour % 4 === 0; // outside work hours: every 4 hours
+}
 
 async function gh(token, path, init = {}) {
   return fetch(`${API}${path}`, {
@@ -43,6 +58,7 @@ async function gh(token, path, init = {}) {
 
 export async function dispatch(env = process.env, scheduled = true) {
   if (env.DAILY_DISPATCH === "0") return { ok: true, action: "skip", reason: "DAILY_DISPATCH=0" };
+  if (scheduled && !shouldRun()) return { ok: true, action: "skip", reason: "outside cadence (hourly Sun–Thu 08:00–20:00 Israel, else every 4h)" };
   const token = env.GITHUB_DISPATCH_TOKEN;
   if (!token) return { ok: false, action: "hold", reason: "GITHUB_DISPATCH_TOKEN unset" };
 
@@ -60,7 +76,10 @@ export async function dispatch(env = process.env, scheduled = true) {
 
   const response = await gh(token, `/repos/${REPO}/actions/workflows/${WORKFLOW}/dispatches`, {
     method: "POST",
-    body: JSON.stringify({ ref: "main", inputs: { target: "all" } }),
+    // K26 only for now: K25 is a closed era whose layers are final
+    // (and Sundays still refresh them via the workflow's own gates
+    // whenever a human dispatches target=all).
+    body: JSON.stringify({ ref: "main", inputs: { target: "k26-only" } }),
   });
   if (response.status !== 204) {
     return { ok: false, action: "hold", reason: `github dispatch ${response.status}` };

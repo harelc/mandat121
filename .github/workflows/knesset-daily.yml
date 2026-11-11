@@ -16,9 +16,11 @@
 # on top of the Netlify dispatch would queue a duplicate full build, so
 # there is deliberately no `schedule:` here. The Netlify scheduled
 # function netlify/functions/daily-dispatch.mjs dispatches this workflow
-# every 8 hours (04:30/12:30/20:30 UTC) via GITHUB_DISPATCH_TOKEN
-# (Netlify production env). If that token expires, runs silently stop —
-# renew it there; a manual workflow_dispatch always works.
+# (target=k26-only: K25 is final) hourly in Israel work hours
+# (Sun–Thu 08:00–20:00) and every 4 hours outside them, via
+# GITHUB_DISPATCH_TOKEN (Netlify production env). If that token expires,
+# runs silently stop — renew it there; a manual workflow_dispatch
+# always works.
 name: knesset-daily
 
 on:
