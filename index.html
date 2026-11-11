@@ -811,11 +811,6 @@ function ensureLivePresence(){
    reach the DOM only via esc(). Poll: 2 min, only on the Now view. */
 const PTV_API='https://knesset.gov.il/WebSiteApi/knessetapi/KnessetMainLobby/GetKnessetLobbyBroadcastcurrent';
 const PTV_PLAN_API='https://knesset.gov.il/WebSiteApi/knessetapi/KnessetMainLobby/GetKnessetChannelBroadcastPlan';
-/* Archive VOD cannot be played from here: video.knesset.gov.il bot-walls
-   cross-origin reads (hls.js manifestLoadError, native demuxer error),
-   and a bare .m3u8 link just downloads in Firefox. Link to the official
-   player page instead — it plays the last sitting when off air. */
-const PTV_VOD_PAGE='https://main.knesset.gov.il/News/Broadcast/pages/default.aspx?pos=plm';
 const PTV_CFG_API='https://knesset.gov.il/WebSiteApi/knessetapi/GlobalResources/GetResourceValues?LanguageId=1&Keys=knsgroup_broadcastLobby';
 const PTV_FALLBACK='https://knesetn.gostreaming.tv/Knesset/index.m3u8';
 const PTV_HOSTS=new Set(['knesetn.gostreaming.tv','w1.013.gostreaming.tv','video.knesset.gov.il']);
@@ -857,7 +852,6 @@ function ensurePlenumTv(){
         nextDate:st.NextPlmSessionDateStr||'', nextTime:st.NextSessionTime||'',
         speaker,
         agenda:(j.CurrentPlenumAgenda||[])[0]||null,
-        lastVod:(j.LastVODPlemun||[])[0]||null,
       };
       PLENUM_TV.at=Date.now();
       if(view==='now') renderPlenumTv();
@@ -920,15 +914,13 @@ function renderPlenumTv(){
     // (recess / end of sitting) — IsPlenumActive stays 1 in this state.
     if(box.querySelector('video')) ptvDestroy();
     const when=d.nextDate?` הישיבה הבאה: ${esc(d.nextDate)}.`:'';
-    const vodR=d.lastVod&&ptvUrl(d.lastVod.Stream_PublishedUrl);
     box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת</small></div>
-    <section class="card ptv-off rise"><span class="chip abstain">המליאה אינה משודרת כעת</span><span class="small muted">הישיבה בהפסקה או שהסתיימה, וערוץ הכנסת משדר בינתיים תכניות אחרות.${when} השידור מהמליאה יחזור לכאן כשהדיון יתחדש.</span><span style="margin-inline-start:auto;display:flex;gap:.45rem;flex-wrap:wrap"><button class="btn ghost small" onclick="ptvOpen()">פתיחת ערוץ הכנסת בכל זאת ←</button>${vodR?`<a class="btn ghost small" href="${PTV_VOD_PAGE}" target="_blank" rel="noopener">הישיבה האחרונה — באתר הכנסת ↗</a>`:''}</span></section>`;
+    <section class="card ptv-off rise"><span class="chip abstain">המליאה אינה משודרת כעת</span><span class="small muted">הישיבה בהפסקה או שהסתיימה, וערוץ הכנסת משדר בינתיים תכניות אחרות.${when} השידור מהמליאה יחזור לכאן כשהדיון יתחדש.</span><span style="margin-inline-start:auto"><button class="btn ghost small" onclick="ptvOpen()">פתיחת ערוץ הכנסת בכל זאת ←</button></span></section>`;
   } else {
     if(box.querySelector('video')) ptvDestroy();
     const when=d.nextDate?`הישיבה הבאה: ${esc(d.nextDate)}${d.nextTime&&!d.nextDate.includes('בשעה')?` בשעה ${esc(d.nextTime)}`:''}`:'המליאה אינה מתכנסת כעת — מועד הישיבה הבאה טרם פורסם';
-    const vod=d.lastVod&&ptvUrl(d.lastVod.Stream_PublishedUrl);
     box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת</small></div>
-    <section class="card ptv-off rise"><span class="chip">המליאה לא בישיבה כעת</span><span class="small muted">${when}. השידור החי יופיע כאן כשהישיבה תתחיל.</span><span style="margin-inline-start:auto;display:flex;gap:.45rem;flex-wrap:wrap"><button class="btn ghost small" onclick="ptvOpen()">פתיחת ערוץ הכנסת בכל זאת ←</button>${vod?`<a class="btn ghost small" href="${PTV_VOD_PAGE}" target="_blank" rel="noopener">הישיבה האחרונה — באתר הכנסת ↗</a>`:''}</span></section>`;
+    <section class="card ptv-off rise"><span class="chip">המליאה לא בישיבה כעת</span><span class="small muted">${when}. השידור החי יופיע כאן כשהישיבה תתחיל.</span><span style="margin-inline-start:auto"><button class="btn ghost small" onclick="ptvOpen()">פתיחת ערוץ הכנסת בכל זאת ←</button></span></section>`;
   }
 }
 let K26B=[], K26V=[], K26CMT=null, K26CMEM={by_mk:{},by_committee:{}}; // K26 layers as the daily builders publish them (k26_bills/votes/committees/committee_members.json); empty until then, K26 views fall back to their "not yet" states
