@@ -811,6 +811,11 @@ function ensureLivePresence(){
    reach the DOM only via esc(). Poll: 2 min, only on the Now view. */
 const PTV_API='https://knesset.gov.il/WebSiteApi/knessetapi/KnessetMainLobby/GetKnessetLobbyBroadcastcurrent';
 const PTV_PLAN_API='https://knesset.gov.il/WebSiteApi/knessetapi/KnessetMainLobby/GetKnessetChannelBroadcastPlan';
+/* Archive VOD cannot be played from here: video.knesset.gov.il bot-walls
+   cross-origin reads (hls.js manifestLoadError, native demuxer error),
+   and a bare .m3u8 link just downloads in Firefox. Link to the official
+   player page instead — it plays the last sitting when off air. */
+const PTV_VOD_PAGE='https://main.knesset.gov.il/News/Broadcast/pages/default.aspx?pos=plm';
 const PTV_CFG_API='https://knesset.gov.il/WebSiteApi/knessetapi/GlobalResources/GetResourceValues?LanguageId=1&Keys=knsgroup_broadcastLobby';
 const PTV_FALLBACK='https://knesetn.gostreaming.tv/Knesset/index.m3u8';
 const PTV_HOSTS=new Set(['knesetn.gostreaming.tv','w1.013.gostreaming.tv','video.knesset.gov.il']);
@@ -907,7 +912,7 @@ function renderPlenumTv(){
     const b=document.getElementById('ptvBadge');
     if(b) b.innerHTML=d.onAir?'<i></i>חי עכשיו':'<i></i>ערוץ הכנסת · נפתח ידנית';
     const n=document.getElementById('ptvNow'), s=document.getElementById('ptvSubj');
-    if(n) n.textContent=d.onAir?who+next:'המליאה אינה על המסך כעת';
+    if(n) n.textContent=d.onAir?who+next:'המליאה אינה משודרת כעת';
     if(s) s.textContent=d.onAir?(subj?`על סדר היום: ${subj}`:''):'מוצג שידור ערוץ הכנסת — השידור מהמליאה יחזור לכאן כשהדיון יתחדש.';
     ptvInitPlayer(PLENUM_TV.liveUrl||PTV_FALLBACK);
   } else if(d.active) {
@@ -915,14 +920,15 @@ function renderPlenumTv(){
     // (recess / end of sitting) — IsPlenumActive stays 1 in this state.
     if(box.querySelector('video')) ptvDestroy();
     const when=d.nextDate?` הישיבה הבאה: ${esc(d.nextDate)}.`:'';
+    const vodR=d.lastVod&&ptvUrl(d.lastVod.Stream_PublishedUrl);
     box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת</small></div>
-    <section class="card ptv-off rise"><span class="chip abstain">המליאה לא על המסך כעת</span><span class="small muted">הישיבה בהפסקה או שהסתיימה, וערוץ הכנסת משדר בינתיים תכניות אחרות.${when} השידור מהמליאה יחזור לכאן כשהדיון יתחדש.</span><span style="margin-inline-start:auto"><button class="btn ghost small" onclick="ptvOpen()">פתיחת ערוץ הכנסת בכל זאת ←</button></span></section>`;
+    <section class="card ptv-off rise"><span class="chip abstain">המליאה אינה משודרת כעת</span><span class="small muted">הישיבה בהפסקה או שהסתיימה, וערוץ הכנסת משדר בינתיים תכניות אחרות.${when} השידור מהמליאה יחזור לכאן כשהדיון יתחדש.</span><span style="margin-inline-start:auto;display:flex;gap:.45rem;flex-wrap:wrap"><button class="btn ghost small" onclick="ptvOpen()">פתיחת ערוץ הכנסת בכל זאת ←</button>${vodR?`<a class="btn ghost small" href="${PTV_VOD_PAGE}" target="_blank" rel="noopener">הישיבה האחרונה — באתר הכנסת ↗</a>`:''}</span></section>`;
   } else {
     if(box.querySelector('video')) ptvDestroy();
-    const when=d.nextDate?`הישיבה הבאה: ${esc(d.nextDate)}${d.nextTime?` בשעה ${esc(d.nextTime)}`:''}`:'המליאה אינה מתכנסת כעת — מועד הישיבה הבאה טרם פורסם';
+    const when=d.nextDate?`הישיבה הבאה: ${esc(d.nextDate)}${d.nextTime&&!d.nextDate.includes('בשעה')?` בשעה ${esc(d.nextTime)}`:''}`:'המליאה אינה מתכנסת כעת — מועד הישיבה הבאה טרם פורסם';
     const vod=d.lastVod&&ptvUrl(d.lastVod.Stream_PublishedUrl);
     box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת</small></div>
-    <section class="card ptv-off rise"><span class="chip">המליאה לא בישיבה כעת</span><span class="small muted">${when}. השידור החי יופיע כאן כשהישיבה תתחיל.</span><span style="margin-inline-start:auto;display:flex;gap:.45rem;flex-wrap:wrap"><button class="btn ghost small" onclick="ptvOpen()">פתיחת ערוץ הכנסת בכל זאת ←</button>${vod?`<a class="btn ghost small" href="${esc(vod)}" target="_blank" rel="noopener">הישיבה האחרונה (ארכיון) ↗</a>`:''}</span></section>`;
+    <section class="card ptv-off rise"><span class="chip">המליאה לא בישיבה כעת</span><span class="small muted">${when}. השידור החי יופיע כאן כשהישיבה תתחיל.</span><span style="margin-inline-start:auto;display:flex;gap:.45rem;flex-wrap:wrap"><button class="btn ghost small" onclick="ptvOpen()">פתיחת ערוץ הכנסת בכל זאת ←</button>${vod?`<a class="btn ghost small" href="${PTV_VOD_PAGE}" target="_blank" rel="noopener">הישיבה האחרונה — באתר הכנסת ↗</a>`:''}</span></section>`;
   }
 }
 let K26B=[], K26V=[], K26CMT=null, K26CMEM={by_mk:{},by_committee:{}}; // K26 layers as the daily builders publish them (k26_bills/votes/committees/committee_members.json); empty until then, K26 views fall back to their "not yet" states
@@ -1980,8 +1986,8 @@ function renderNow26(){
   <section class="card hero rise"><span class="badge k26">כנסת 26 · בבנייה</span>
     <h1 style="margin-top:.5rem">הכנסת ה־26 מתמלאת,<br>נתון אחרי נתון.</h1>
     <p>הבחירות הסתיימו, 120 המנדטים חולקו — ומעכשיו כל ישיבה, חוק והצבעה של הכנסת הזאת יופיעו כאן בדיוק כמו בכנסת 25, עם אותם ח״כים, סיעות וצבעים — של הכנסת הזאת.</p>
-    <div><button class="btn primary" style="margin-top:.7rem" onclick="openIntro()">▶ חדשים כאן? הסבר מצויר בפחות מדקה</button></div>
     ${homeKpisHTML({members:seats.length,factions:serving?legend.length:parties.length,bills:K26B.length,votes:K26V.length,detailed:K26V.filter(v=>v.for!=null).length,lastVote:K26V.length?fmtDate([...K26V].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date):''})}
+    <div><button class="btn primary" style="margin-top:.9rem" onclick="openIntro()">▶ חדשים כאן? הסבר מצויר בפחות מדקה</button></div>
   </section>
   <div id="plenumTvBox"></div>
   ${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?agendaHTML():''}
