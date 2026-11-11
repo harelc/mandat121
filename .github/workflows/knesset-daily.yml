@@ -166,6 +166,16 @@ jobs:
             echo "No data changes."
             exit 0
           fi
+          # Every commit to main triggers a Netlify deploy, so don't let
+          # build-timestamp churn (agenda generated_at, contacts/wiki
+          # fetched_at) or re-serialization noise create one: restore
+          # files whose staged diff is semantically empty, and skip the
+          # commit entirely when nothing meaningful remains.
+          python3 meaningful_diff.py
+          if git diff --cached --quiet; then
+            echo "Only timestamps/formatting changed — no commit, no deploy."
+            exit 0
+          fi
           git commit -m "data: daily OData refresh ($(date -u +%Y-%m-%d))"
           # The build takes ~an hour; main can move under us (human pushes).
           # A bare push then dies non-fast-forward and loses the whole run's
