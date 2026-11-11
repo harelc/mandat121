@@ -137,8 +137,13 @@ def main():
             if done % 500 == 0:
                 print(f"{done}/{len(todo)} votes, {rows_seen} rows, {time.time()-t0:.0f}s", flush=True)
             if done % 1000 == 0:  # checkpoint
-                ckpt.write_text(json.dumps({"names": names, "votes": {str(k): v for k, v in per_vote.items()}}, ensure_ascii=False), encoding="utf-8")
-    out = {"names": names, "votes": {str(k): v for k, v in per_vote.items()}}
+                ckpt.write_text(json.dumps({"names": names, "votes": {str(k): v for k, v in sorted(per_vote.items())}}, ensure_ascii=False), encoding="utf-8")
+    # Sorted vote keys: the resume path deletes and refetches the
+    # exactly-100-row votes, which used to move them to the end of the
+    # dict — the file then differed byte-wise on every run despite zero
+    # semantic change, polluting the daily data commit and needlessly
+    # retriggering the analytics rebuild that gates on this file.
+    out = {"names": names, "votes": {str(k): v for k, v in sorted(per_vote.items())}}
     Path(f"data/k{kn}_vote_results.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
     tallies = compute_tallies(per_vote)
     patched = 0

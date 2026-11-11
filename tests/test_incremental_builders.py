@@ -287,6 +287,29 @@ class VoteResultsResumeTest(unittest.TestCase):
             results = json.loads((data / "k25_vote_results.json").read_text("utf-8"))
             self.assertEqual(len(results["votes"]["1"]), 100)
 
+    def test_output_vote_keys_sorted_despite_refetch_order(self):
+        """Resume deletes + refetches exactly-100-row votes, appending
+        them at the end of the dict. The written file must sort vote
+        keys anyway: unsorted, the file churned byte-wise every run
+        with zero semantic change (seen in data commit f5d47e3) and
+        retriggered the analytics rebuild gated on it."""
+        mod = load_module("build_k25_vote_results.py")
+        with tempfile.TemporaryDirectory() as td, Cwd(td):
+            data = Path(td) / "data"
+            data.mkdir()
+            (data / "k25_votes.json").write_text(json.dumps(
+                [{"id": 2, "for": None, "against": None, "abstain": None},
+                 {"id": 1, "for": None, "against": None, "abstain": None}]), "utf-8")
+            (data / "k25_vote_results.json").write_text(json.dumps(
+                {"names": ["a"], "votes": {"2": [[0, 1]], "1": [[0, 2]]}}), "utf-8")
+            mod.fetch_vote = mock.Mock(side_effect=AssertionError("network!"))
+            with mock.patch.object(sys, "argv", ["build_k25_vote_results.py"]):
+                mod.main()
+            pairs = json.loads((data / "k25_vote_results.json").read_text("utf-8"),
+                               object_pairs_hook=lambda p: p)
+            vote_keys = [k for k, _ in dict(pairs)["votes"]]
+            self.assertEqual(vote_keys, ["1", "2"])
+
 
 if __name__ == "__main__":
     unittest.main()
