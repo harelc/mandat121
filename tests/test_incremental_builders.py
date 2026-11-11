@@ -263,13 +263,15 @@ class SecondaryDocsTest(unittest.TestCase):
 
 
 class VoteResultsResumeTest(unittest.TestCase):
-    """Regression: a checkpointed vote with exactly 100 rows is treated
-    as possibly-truncated, deleted and refetched on resume. Tallies must
-    be computed from the final rows only — the old incremental tally
-    accumulation counted such votes twice (49 votes shipped doubled,
-    e.g. 184 against out of 120 MKs, on 2026-11-10)."""
+    """Regression (2026-11-10): the resume path used to delete the
+    possibly-truncated exactly-100-row votes and refetch them, while
+    tallies were accumulated incrementally — 49 votes shipped doubled
+    (e.g. 184 against out of 120 MKs). Tallies are now a pure function
+    of the final rows, and checkpointed votes are trusted whole (the
+    legacy truncation the refetch guarded against is gone, and the
+    closed era's votes do not change), so no refetch happens at all."""
 
-    def test_refetched_100_row_vote_is_not_counted_twice(self):
+    def test_checkpointed_100_row_vote_is_trusted_and_counted_once(self):
         mod = load_module("build_k25_vote_results.py")
         with tempfile.TemporaryDirectory() as td, Cwd(td):
             data = Path(td) / "data"
@@ -278,8 +280,7 @@ class VoteResultsResumeTest(unittest.TestCase):
                 [{"id": 1, "for": None, "against": None, "abstain": None}]), "utf-8")
             (data / "k25_vote_results.json").write_text(json.dumps(
                 {"names": ["a"], "votes": {"1": [[0, 1]] * 100}}), "utf-8")
-            mod.fetch_vote = lambda vid: (vid, [
-                {"ResultDesc": "בעד", "LastName": "a", "FirstName": ""}] * 100)
+            mod.fetch_vote = mock.Mock(side_effect=AssertionError("network!"))
             with mock.patch.object(sys, "argv", ["build_k25_vote_results.py"]):
                 mod.main()
             votes = json.loads((data / "k25_votes.json").read_text("utf-8"))

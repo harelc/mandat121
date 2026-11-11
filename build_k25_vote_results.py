@@ -98,13 +98,14 @@ def main():
             name_idx = {n: i for i, n in enumerate(names)}
             per_vote = {int(k): v for k, v in prev.get("votes", {}).items()}
             print(f"resumed: {len(per_vote)} votes already harvested", flush=True)
-            # Votes at exactly 100 rows may be truncated by the old $top=200
-            # bug — refetch them (a genuine 100-voter vote just costs a page).
-            truncated = [vid for vid, rows_ in per_vote.items() if len(rows_) == 100]
-            for vid in truncated:
-                del per_vote[vid]
-            if truncated:
-                print(f"refetching {len(truncated)} possibly-truncated votes", flush=True)
+            # Checkpointed votes are trusted as complete: fetches are
+            # per-vote (a vote only lands here whole), fetch_vote pages
+            # correctly at the service's 100-row cap, and every stored
+            # vote has been through it. The old exactly-100-row refetch
+            # guarded against the legacy harvester's silent truncation;
+            # that data is long replaced, and the closed era's votes do
+            # not change upstream. An interrupted run simply leaves votes
+            # missing, and `todo` below picks exactly those up.
         except Exception:
             pass
     todo = sorted(want - set(per_vote))
@@ -138,10 +139,9 @@ def main():
                 print(f"{done}/{len(todo)} votes, {rows_seen} rows, {time.time()-t0:.0f}s", flush=True)
             if done % 1000 == 0:  # checkpoint
                 ckpt.write_text(json.dumps({"names": names, "votes": {str(k): v for k, v in sorted(per_vote.items())}}, ensure_ascii=False), encoding="utf-8")
-    # Sorted vote keys: the resume path deletes and refetches the
-    # exactly-100-row votes, which used to move them to the end of the
-    # dict — the file then differed byte-wise on every run despite zero
-    # semantic change, polluting the daily data commit and needlessly
+    # Sorted vote keys: refetched/resumed votes used to land at the end
+    # of the dict, so the file differed byte-wise on runs with zero
+    # semantic change — polluting the daily data commit and needlessly
     # retriggering the analytics rebuild that gates on this file.
     out = {"names": names, "votes": {str(k): v for k, v in sorted(per_vote.items())}}
     Path(f"data/k{kn}_vote_results.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
