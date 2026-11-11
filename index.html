@@ -789,6 +789,7 @@ let AGENDA=null, agendaMode='week', agendaAnchor=null, agendaLastBody=''; // age
 const AG_CACHE={}; // built agenda per Knesset; each object carries _loaded/_loading Sets of merged month shards
 const AG_MAIN_LOADING=new Set(); // Knessets whose main agenda file is in flight
 let CMEM={by_mk:{},by_committee:{}}; // committee memberships (build_k25_committee_members.py)
+let HIST_SESS={}, cmtHist={id:null,list:null,loading:false,limit:40}; // committee history on demand: every session of one committee, pulled from the agenda month shards (build_agenda.py) — committees.json only details the recent window
 let ALLB=[], ALLB_BY_ID={}, VOTES_ALL=[], MK_INITIATED={};
 let VOTE_RES={names:[],votes:{}}, VOTE_BY_ID={}; // full per-MK results (build_k25_vote_results.py)
 let VOTE_MODELS={}; // vote id -> normalised vote model (voteModel()); the only vote shape the UI renders
@@ -1591,7 +1592,7 @@ function openSession(id){ navTo('session='+id,()=>{viewArg=String(id); view='ses
 function renderSessionDetail(){
   ensureAgenda(); ensureProtoIdx(); ensureExtras();
   const app=$('#app'), id=viewArg;
-  const s=(CMT? CMT.recent_sessions.find(x=>String(x.id)===String(id)) : null) || (AGENDA? (AGENDA.committees||[]).find(x=>String(x.id)===String(id)) : null) || null;
+  const s=(CMT? CMT.recent_sessions.find(x=>String(x.id)===String(id)) : null) || (AGENDA? (AGENDA.committees||[]).find(x=>String(x.id)===String(id)) : null) || HIST_SESS[String(id)] || null;
   // Bills discussed in this session, from per-bill committee histories.
   const bills=[]; if(CMT) for(const [bid,hist] of Object.entries(CMT.bill_committees)) for(const h of hist) if(String(h.session_id)===String(id)) bills.push({bid,h});
   if(!s && !bills.length){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>הישיבה לא נמצאה במאגר.</div>'; return }
@@ -3311,6 +3312,29 @@ function renderCommittees(){
   ${total?permHTML+subHTML+specialHTML+jointHTML:'<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg></div>לא נמצאו ועדות בסינון הזה.</div>'}
   ${committeeFeedHTML(6)}`;
 }
+/* Every session of a committee, not just the detailed recent window:
+   committees.json carries items+docs only for sessions since
+   CMT.recent_since (a few hundred), while build_agenda.py's month
+   shards hold all ~10,800 committee sessions of the term (date, type,
+   status, location, agenda items). On demand, pull the shards, keep
+   this committee's sessions, and register them in HIST_SESS so the
+   session page resolves them exactly like recent ones. */
+async function loadCommitteeHistory(id){
+  if(cmtHist.loading) return;
+  cmtHist={id:String(id),list:null,loading:true,limit:40};
+  if(view==='committee') renderCommitteeDetail();
+  const main=await _fetchJson('data/agenda.json');
+  const months=main?.months||[];
+  const list=[];
+  for(let i=0;i<months.length;i+=8){
+    const batch=await Promise.all(months.slice(i,i+8).map(m=>_fetchJson(`data/agenda/${m}.json`)));
+    for(const j of batch) for(const s of (j?.committees||[]))
+      if(String(s.committee_id)===String(id)){ s.docs=s.docs||[]; HIST_SESS[String(s.id)]=s; list.push(s) }
+  }
+  list.sort((a,b)=>(b.start||'').localeCompare(a.start||''));
+  cmtHist={id:String(id),list,loading:false,limit:40};
+  if(view==='committee'&&String(viewArg)===String(id)) renderCommitteeDetail();
+}
 function renderCommitteeDetail(){
   ensureCmem(); ensureExtras();
   const app=$('#app'), c=CMT_BY_ID[viewArg];
@@ -3335,6 +3359,11 @@ function renderCommitteeDetail(){
     <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg> ישיבות מפורטות אחרונות (${recent.length})</h3>${recent.length?`<div class="rows" style="margin:.5rem -.9rem 0">${recent.slice(0,20).map(s=>`<div class="row" onclick="openSession('${s.id}')"><span class="chip acc">${fmtDate((s.start||'').slice(0,10))}</span><span class="flex">${esc(s.type||'ישיבה')}${s.location?`<br><span class="dim small">${esc(s.location)}</span>`:''}</span><span class="chip acc">לישיבה ←</span></div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">אין ישיבות מפורטות אחרונות במאגר — ספירת הישיבות ההיסטורית מוצגת למעלה.</p>'}
     ${docs.length?`<h3 style="margin-top:1rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> מסמכים אחרונים</h3><div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.45rem">${docs.map(d=>`<a class="chip" href="${esc(d.path)}" target="_blank" rel="noopener"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> ${esc(d.group)} · ${fmtDate(d.date)}</a>`).join('')}</div>`:''}</div>
     <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M8 20h8M4.5 7h15"/><path d="M6.5 7 4 12.5a2.9 2.9 0 0 0 5 0L6.5 7zM17.5 7 15 12.5a2.9 2.9 0 0 0 5 0L17.5 7z"/><path d="M12 4v3"/></svg> חוקים שנידונו בוועדה (${bills.length})</h3>${bills.length?`<div class="rows" style="margin:.5rem -.9rem 0">${bills.slice(0,35).map(({bid,h})=>{const b=ALLB_BY_ID[bid]; return `<div class="row" onclick="openBillPage('${bid}')"><span class="flex">${esc(b?.name||('הצעת חוק '+bid))}<br><span class="dim small">${fmtDate(h.date)} · ${esc(h.status||'')}</span></span><span class="chip acc">לחוק ←</span></div>`}).join('')}</div>${bills.length>35?`<div class="small dim" style="margin-top:.45rem">מוצגים 35 האחרונים.</div>`:''}`:'<p class="muted small" style="margin-top:.4rem">לא נמצאו חוקים מהמאגר המשויכים לוועדה זו.</p>'}</div>
+  </div>
+  <div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg> כל ישיבות הוועדה בקדנציה (${(c.sessions_total||0).toLocaleString('he-IL')})</h3>
+  ${cmtHist.id!==String(c.id)?`<p class="small muted" style="margin-top:.4rem">הישיבות המפורטות שלמעלה הן רק האחרונות (מאז ${fmtDate(CMT?.recent_since||'')}); כל השאר — מתחילת הקדנציה — נמצאות במאגר סדר היום של הכנסת, עם נושאי הישיבה, ולחלקן גם פרוטוקול.</p><button class="btn" style="margin-top:.55rem" onclick="loadCommitteeHistory('${c.id}')">טען את כל הישיבות ←</button>`
+  :cmtHist.loading?'<p class="small muted" style="margin-top:.4rem">טוען את כל ישיבות הוועדה…</p>'
+  :`<div class="rows" style="margin:.5rem -.9rem 0">${cmtHist.list.slice(0,cmtHist.limit).map(s=>`<div class="row" onclick="openSession('${s.id}')"><span class="chip acc">${fmtDate((s.start||'').slice(0,10))}</span><span class="flex">${esc(s.type||'ישיבה')}${s.location?` · ${esc(s.location)}`:''}<br><span class="dim small">${(s.items||[]).length} נושאים על סדר היום</span></span>${recent.some(r=>String(r.id)===String(s.id))?'<span class="chip">מפורטת</span>':''}<span class="chip acc">לישיבה ←</span></div>`).join('')}</div>${cmtHist.list.length>cmtHist.limit?`<div style="text-align:center;margin-top:.8rem"><button class="btn" onclick="cmtHist.limit+=40;renderCommitteeDetail()">עוד ישיבות (${(cmtHist.list.length-cmtHist.limit).toLocaleString('he-IL')} נותרו)</button></div>`:''}`}
   </div>`;
 }
 
