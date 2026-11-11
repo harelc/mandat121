@@ -233,5 +233,31 @@ class ExtrasProbeTest(unittest.TestCase):
             self.assertEqual(out1, out2)
 
 
+class VoteResultsResumeTest(unittest.TestCase):
+    """Regression: a checkpointed vote with exactly 100 rows is treated
+    as possibly-truncated, deleted and refetched on resume. Tallies must
+    be computed from the final rows only — the old incremental tally
+    accumulation counted such votes twice (49 votes shipped doubled,
+    e.g. 184 against out of 120 MKs, on 2026-11-10)."""
+
+    def test_refetched_100_row_vote_is_not_counted_twice(self):
+        mod = load_module("build_k25_vote_results.py")
+        with tempfile.TemporaryDirectory() as td, Cwd(td):
+            data = Path(td) / "data"
+            data.mkdir()
+            (data / "k25_votes.json").write_text(json.dumps(
+                [{"id": 1, "for": None, "against": None, "abstain": None}]), "utf-8")
+            (data / "k25_vote_results.json").write_text(json.dumps(
+                {"names": ["a"], "votes": {"1": [[0, 1]] * 100}}), "utf-8")
+            mod.fetch_vote = lambda vid: (vid, [
+                {"ResultDesc": "בעד", "LastName": "a", "FirstName": ""}] * 100)
+            with mock.patch.object(sys, "argv", ["build_k25_vote_results.py"]):
+                mod.main()
+            votes = json.loads((data / "k25_votes.json").read_text("utf-8"))
+            self.assertEqual(votes[0]["for"], 100)
+            results = json.loads((data / "k25_vote_results.json").read_text("utf-8"))
+            self.assertEqual(len(results["votes"]["1"]), 100)
+
+
 if __name__ == "__main__":
     unittest.main()

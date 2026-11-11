@@ -54,6 +54,24 @@ def fetch_vote(vid):
             return vid, rows
         skip += 100
 
+def compute_tallies(per_vote):
+    """Tallies derived from per-vote rows — the single source of truth.
+
+    Never accumulate tallies incrementally across a resume: the 2026-11-10
+    run computed tallies from the checkpoint, then deleted the possibly-
+    truncated 100-row votes and refetched them, adding their rows to the
+    tallies a second time. 49 votes shipped with exactly doubled counts
+    (e.g. 184 against out of 120 MKs) until this was made a pure function
+    of the final rows."""
+    tallies = {}
+    for vid, rows in per_vote.items():
+        t = tallies.setdefault(vid, {"for": 0, "against": 0, "abstain": 0})
+        for _, code in rows:
+            if code in (1, 2, 3):
+                t[["for", "against", "abstain"][code - 1]] += 1
+    return tallies
+
+
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--knesset", type=int, default=25, choices=(25, 26))
@@ -79,10 +97,6 @@ def main():
             names = prev.get("names", [])
             name_idx = {n: i for i, n in enumerate(names)}
             per_vote = {int(k): v for k, v in prev.get("votes", {}).items()}
-            for vid, rows_ in per_vote.items():
-                t = tallies.setdefault(vid, {"for": 0, "against": 0, "abstain": 0})
-                for _, code in rows_:
-                    t[["for", "against", "abstain"][code - 1]] += 1
             print(f"resumed: {len(per_vote)} votes already harvested", flush=True)
             # Votes at exactly 100 rows may be truncated by the old $top=200
             # bug — refetch them (a genuine 100-voter vote just costs a page).
@@ -119,8 +133,6 @@ def main():
                     name_idx[nm] = i
                     names.append(nm)
                 per_vote.setdefault(vid, []).append([i, code])
-                t = tallies.setdefault(vid, {"for": 0, "against": 0, "abstain": 0})
-                t[["for", "against", "abstain"][code - 1]] += 1
             done += 1
             if done % 500 == 0:
                 print(f"{done}/{len(todo)} votes, {rows_seen} rows, {time.time()-t0:.0f}s", flush=True)
@@ -128,6 +140,7 @@ def main():
                 ckpt.write_text(json.dumps({"names": names, "votes": {str(k): v for k, v in per_vote.items()}}, ensure_ascii=False), encoding="utf-8")
     out = {"names": names, "votes": {str(k): v for k, v in per_vote.items()}}
     Path(f"data/k{kn}_vote_results.json").write_text(json.dumps(out, ensure_ascii=False), encoding="utf-8")
+    tallies = compute_tallies(per_vote)
     patched = 0
     for v in votes:
         t = tallies.get(v["id"])
