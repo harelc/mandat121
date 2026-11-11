@@ -13,7 +13,9 @@
 // Setup (one-time, in the Netlify site env vars — never in the repo,
 // CWE-798): GITHUB_DISPATCH_TOKEN = a fine-grained GitHub token with
 // Actions: write on harelc/mandat121. Without it the function holds
-// (logs and returns) and the GitHub cron remains the fallback trigger.
+// (logs and returns) and no automatic runs happen at all — there is
+// deliberately no GitHub schedule cron (it was unreliable, and a cron
+// fire on top of this dispatch queues a duplicate full build).
 //
 // Invocation guard: Netlify scheduled invocations arrive as a POST
 // whose JSON body carries `next_run`. A plain HTTP hit on the function
@@ -44,8 +46,8 @@ export async function dispatch(env = process.env, scheduled = true) {
   const token = env.GITHUB_DISPATCH_TOKEN;
   if (!token) return { ok: false, action: "hold", reason: "GITHUB_DISPATCH_TOKEN unset" };
 
-  // Never queue a duplicate: a run from the GitHub cron (or a previous
-  // dispatch in this schedule) may already be going.
+  // Never queue a duplicate: a manual dispatch (or a previous dispatch
+  // in this schedule) may already be going.
   for (const status of ["in_progress", "queued"]) {
     const r = await gh(token, `/repos/${REPO}/actions/workflows/${WORKFLOW}/runs?status=${status}&per_page=1`);
     if (r.ok) {

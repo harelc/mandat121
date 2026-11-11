@@ -10,13 +10,18 @@
 # Every K26 builder below takes --knesset 26 and is a safe no-op (exit 0,
 # no write) when its layer is unpublished, so partial publication — e.g.
 # factions before bills — builds incrementally instead of failing.
+#
+# Trigger: Netlify only. GitHub's schedule cron is best-effort (it fired
+# ~7h late on 2026-11-10 and not at all on 2026-11-11), and a cron fire
+# on top of the Netlify dispatch would queue a duplicate full build, so
+# there is deliberately no `schedule:` here. The Netlify scheduled
+# function netlify/functions/daily-dispatch.mjs dispatches this workflow
+# every 8 hours (04:30/12:30/20:30 UTC) via GITHUB_DISPATCH_TOKEN
+# (Netlify production env). If that token expires, runs silently stop —
+# renew it there; a manual workflow_dispatch always works.
 name: knesset-daily
 
 on:
-  schedule:
-    # Fallback only — the reliable trigger is the Netlify scheduled
-    # function (netlify/functions/daily-dispatch.mjs), same cadence.
-    - cron: "30 4,12,20 * * *" # every 8h: 04:30/12:30/20:30 UTC ≈ 06:30/14:30/22:30 Israel
   workflow_dispatch:
     inputs:
       target:
@@ -95,7 +100,7 @@ jobs:
             python3 -u build_k25_roles.py --knesset 25          # gov/Knesset/faction leadership roles -> data/k25_roles.json
             python3 -u build_k25_bill_history.py --knesset 25   # removed initiators/sponsors -> data/k25_bill_history.json (after build_knesset: reads k25_bills.json)
           else
-            echo "weekly K25 history layers skipped (scheduled weekday run)"
+            echo "weekly K25 history layers skipped (not a Sunday or full=true run)"
           fi
 
       - name: Harvest per-MK vote results (K25)
