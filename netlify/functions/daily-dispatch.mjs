@@ -5,8 +5,8 @@
 // started ~7 hours late, and on 2026-11-11 it had not fired at all by
 // 06:06 UTC. Netlify's scheduler is the reliable clock (same pattern as
 // elections-vote-transfer's k26-dispatch), so this function dispatches
-// the workflow at 04:30, 05:30 and 06:30 UTC and lets the runner do all
-// the work. Before dispatching it checks for an already active run —
+// the workflow every 8 hours (04:30, 12:30, 20:30 UTC) and lets the
+// runner do all the work. Before dispatching it checks for an already active run —
 // the workflow's concurrency group would serialize a duplicate anyway,
 // but skipping here avoids queueing a second full run.
 //
@@ -24,7 +24,7 @@ const REPO = "harelc/mandat121";
 const WORKFLOW = "knesset-daily.yml";
 const API = "https://api.github.com";
 
-export const config = { schedule: "30 4,5,6 * * *" };
+export const config = { schedule: "30 4,12,20 * * *" };
 
 async function gh(token, path, init = {}) {
   return fetch(`${API}${path}`, {
