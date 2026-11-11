@@ -91,6 +91,16 @@ svg.icn{width:1.05em;height:1.05em;flex:none;fill:none;stroke:currentColor;strok
 .sec-title{font-size:1.28rem;font-weight:800;margin:1.6rem 0 .7rem;display:flex;align-items:center;gap:.55rem;flex-wrap:wrap}
 .sec-title::before{content:'';width:.5rem;height:.5rem;flex-shrink:0;background:#b98f1f;transform:rotate(45deg)}
 .sec-title small{font-family:'Heebo';font-size:.8rem;color:var(--dim);font-weight:500}
+/* live plenum TV (see PLENUM_TV below) */
+.ptv{overflow:hidden}
+.ptv-head{display:flex;align-items:center;gap:.55rem;flex-wrap:wrap;padding:.85rem 1rem .6rem}
+.ptv-live{display:inline-flex;align-items:center;gap:.35rem;background:var(--against);color:#fff;font-weight:800;font-size:.72rem;padding:.24rem .6rem;border-radius:999px}
+.ptv-live i{width:.5rem;height:.5rem;border-radius:50%;background:#fff;animation:pulse 1.4s ease infinite}
+.ptv-frame{position:relative;aspect-ratio:16/9;background:#171410}
+.ptv-frame video{position:absolute;inset:0;width:100%;height:100%;display:block;background:#171410}
+.ptv-meta{padding:.7rem 1rem .95rem}
+.ptv-meta .now{font-weight:700}
+.ptv-off{padding:1rem 1.15rem;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap}
 .chip{display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;font-weight:700;padding:.24rem .6rem;border-radius:999px;background:var(--surface2);color:var(--mid);border:1px solid var(--line);white-space:nowrap;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
 /* chips inside horizontal scroll rows must keep their natural width —
    the row scrolls, the chip must not shrink/truncate instead */
@@ -780,6 +790,102 @@ function ensureLivePresence(){
       // steal focus; the next keystroke re-renders with presence anyway.
       else if(view==='mks'&&document.activeElement?.dataset?.keep!=='mkQ') renderMks();
     }).catch(()=>{});
+}
+/* ============ LIVE PLENUM TV ============
+   The Knesset broadcast page cannot be iframed (X-Frame-Options:
+   SAMEORIGIN + CSP frame-ancestors 'self'), but the HLS feed its own
+   player uses is served with Access-Control-Allow-Origin: *. When the
+   plenum is sitting, that feed is the Knesset Channel live stream
+   (720p); off-air it is general channel programming, so we gate the
+   player on the official broadcast-lobby status API and otherwise say
+   when the next sitting is. Stream URL is read from the Knesset's own
+   GlobalResources config (key broadcastLobby_KnessetChannelLivePath),
+   host-allowlisted, with today's value as fallback. All API strings
+   reach the DOM only via esc(). Poll: 2 min, only on the Now view. */
+const PTV_API='https://knesset.gov.il/WebSiteApi/knessetapi/KnessetMainLobby/GetKnessetLobbyBroadcastcurrent';
+const PTV_CFG_API='https://knesset.gov.il/WebSiteApi/knessetapi/GlobalResources/GetResourceValues?LanguageId=1&Keys=knsgroup_broadcastLobby';
+const PTV_FALLBACK='https://knesetn.gostreaming.tv/Knesset/index.m3u8';
+const PTV_HOSTS=new Set(['knesetn.gostreaming.tv','w1.013.gostreaming.tv','video.knesset.gov.il']);
+let PLENUM_TV={at:0,tryAt:0,data:null,liveUrl:null,hls:null,src:null,timer:null};
+const ptvUrl=u=>{ try{ const x=new URL(u); return x.protocol==='https:'&&PTV_HOSTS.has(x.host)?x.href:null }catch(e){ return null } };
+function ptvDestroy(){ if(PLENUM_TV.hls){ try{PLENUM_TV.hls.destroy()}catch(e){} PLENUM_TV.hls=null } PLENUM_TV.src=null; const v=document.getElementById('plenumTvVideo'); if(v){ v.dataset.ptvSrc=''; v.pause(); v.removeAttribute('src'); v.load() } }
+function ensurePlenumTv(){
+  const now=Date.now();
+  if(!PLENUM_TV.timer) PLENUM_TV.timer=setInterval(()=>{ if(view==='now') ensurePlenumTv(); else ptvDestroy() },120000);
+  if(PLENUM_TV.data&&now-PLENUM_TV.at<120000){ renderPlenumTv(); return }
+  if(now-PLENUM_TV.tryAt<30000) return;
+  PLENUM_TV.tryAt=now;
+  const cfg=PLENUM_TV.liveUrl?Promise.resolve(PLENUM_TV.liveUrl)
+    :fetch(PTV_CFG_API,{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{
+        const hit=Array.isArray(j)&&j.find(x=>x.Key==='broadcastLobby_KnessetChannelLivePath');
+        return ptvUrl(hit&&hit.Value)||PTV_FALLBACK }).catch(()=>PTV_FALLBACK);
+  Promise.all([fetch(PTV_API,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null),cfg])
+    .then(([j,liveUrl])=>{
+      if(!j) return;
+      PLENUM_TV.liveUrl=liveUrl;
+      const st=(j.PlenumStatus||[])[0]||{};
+      PLENUM_TV.data={
+        active:+st.IsPlenumActive===1,
+        nextDate:st.NextPlmSessionDateStr||'', nextTime:st.NextSessionTime||'',
+        speaker:(j.CurrentSpeakers||[])[0]||null,
+        agenda:(j.CurrentPlenumAgenda||[])[0]||null,
+        lastVod:(j.LastVODPlemun||[])[0]||null,
+      };
+      PLENUM_TV.at=Date.now();
+      if(view==='now') renderPlenumTv();
+    }).catch(()=>{});
+}
+function ptvInitPlayer(url){
+  const v=document.getElementById('plenumTvVideo');
+  // Guard on the element itself, not global state: every full Now-view
+  // re-render (presence/agenda reads landing) replaces the <video> with
+  // a fresh one, and that fresh element must be attached even though
+  // the stream URL has not changed.
+  if(!v||v.dataset.ptvSrc===url) return;
+  ptvDestroy();
+  v.dataset.ptvSrc=url;
+  PLENUM_TV.src=url;
+  if(v.canPlayType('application/vnd.apple.mpegurl')){ v.src=url; v.play().catch(()=>{}); return } // Safari/iOS native HLS
+  const attach=()=>{
+    if(!window.Hls||!window.Hls.isSupported()) return;
+    const h=new window.Hls({capLevelToPlayerSize:true});
+    PLENUM_TV.hls=h; h.loadSource(url); h.attachMedia(v);
+    h.on(window.Hls.Events.MANIFEST_PARSED,()=>v.play().catch(()=>{}));
+  };
+  if(window.Hls) attach();
+  else{ // lazy-load only when a live sitting actually needs MSE playback
+    const s=document.createElement('script');
+    s.src='https://cdn.jsdelivr.net/npm/hls.js@1.5.13/dist/hls.min.js';
+    s.integrity='sha384-w6Gb3fXHb5e1LUYa/hYA5Q41bEDglN5ZPCG7Jvnoo8/X90oGnlPqBlBJCe38mEMm';
+    s.crossOrigin='anonymous'; s.onload=attach; document.head.appendChild(s);
+  }
+}
+function renderPlenumTv(){
+  const box=document.getElementById('plenumTvBox');
+  if(!box){ ptvDestroy(); return }
+  const d=PLENUM_TV.data;
+  if(!d) return; // unknown yet — stay invisible rather than flicker
+  if(d.active){
+    const spk=d.speaker||{};
+    const who=spk.SPK1_Name?`${spk.SPK1_Gender?'הנואם':'הנואמת'} כעת: ${spk.SPK1_Name}`:'';
+    const subj=spk.Curr_Subject||(d.agenda&&d.agenda.Name)||'';
+    const next=spk.SPK2_Name?` · הבא/ה: ${spk.SPK2_Name}`:'';
+    if(!box.querySelector('video')){ // first paint of this sitting — later polls only update the text below
+      box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת · מתוך אתר הכנסת</small></div>
+      <section class="card ptv rise"><div class="ptv-frame"><video id="plenumTvVideo" controls playsinline muted poster="" aria-label="שידור חי ממליאת הכנסת"></video></div>
+      <div class="ptv-meta"><span class="ptv-live"><i></i>חי עכשיו</span> <span class="now" id="ptvNow"></span><div class="small muted" id="ptvSubj" style="margin-top:.3rem"></div></div></section>`;
+    }
+    const n=document.getElementById('ptvNow'), s=document.getElementById('ptvSubj');
+    if(n) n.textContent=who+next;
+    if(s) s.textContent=subj?`על סדר היום: ${subj}`:'';
+    ptvInitPlayer(PLENUM_TV.liveUrl||PTV_FALLBACK);
+  } else {
+    if(box.querySelector('video')) ptvDestroy();
+    const when=d.nextDate?`הישיבה הבאה: ${esc(d.nextDate)}${d.nextTime?` בשעה ${esc(d.nextTime)}`:''}`:'המליאה אינה מתכנסת כעת — מועד הישיבה הבאה טרם פורסם';
+    const vod=d.lastVod&&ptvUrl(d.lastVod.Stream_PublishedUrl);
+    box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת</small></div>
+    <section class="card ptv-off rise"><span class="chip">המליאה לא בישיבה כעת</span><span class="small muted">${when}. השידור החי יופיע כאן כשהישיבה תתחיל.</span>${vod?`<span style="margin-inline-start:auto"><a class="btn ghost small" href="${esc(vod)}" target="_blank" rel="noopener">הישיבה האחרונה (ארכיון) ↗</a></span>`:''}</section>`;
+  }
 }
 let K26B=[], K26V=[], K26CMT=null, K26CMEM={by_mk:{},by_committee:{}}; // K26 layers as the daily builders publish them (k26_bills/votes/committees/committee_members.json); empty until then, K26 views fall back to their "not yet" states
 let RANK26={}; // surname-first name -> CEC list position (build_k25_list_order.py --knesset 26); preview rank is the fallback
@@ -1786,6 +1892,7 @@ function k26ServingSeats(){
 }
 function renderNow26(){
   ensureLivePresence(); // live in-the-building overlay; re-renders when it lands
+  ensurePlenumTv(); // live plenum TV block (#plenumTvBox); paints itself when the status read lands
   ensureAgenda(); // סדר יום pane (k26_agenda.json) — shows below once OData has published a sitting
   const parties=K26?K26.parties.filter(p=>p.seats>0):[];
   const serving=k26ServingSeats();
@@ -1805,6 +1912,7 @@ function renderNow26(){
     <div><button class="btn primary" style="margin-top:.7rem" onclick="openIntro()">▶ חדשים כאן? הסבר מצויר בפחות מדקה</button></div>
     ${homeKpisHTML({members:seats.length,factions:serving?legend.length:parties.length,bills:K26B.length,votes:K26V.length,detailed:K26V.filter(v=>v.for!=null).length,lastVote:K26V.length?fmtDate([...K26V].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date):''})}
   </section>
+  <div id="plenumTvBox"></div>
   ${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?agendaHTML():''}
   <div class="sec-title">${serving?'מליאת הכנסת ה־26':'המליאה הנכנסת'} <small>${serving?'מי מכהן/ת בפועל — כולל כניסות ויציאות לפי החוק הנורווגי':'רחפו או לחצו על מושב — חלקם כיהנו גם בכנסת 25'}</small></div>
   <div class="card pad plenum-wrap home rise"><div id="k26plenum">${K26?plenumSVG(seats,'k26',null):''}</div>
@@ -1817,6 +1925,7 @@ function renderNow26(){
     <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> יגיע בהמשך — מעצמו</h3><div class="small muted" style="line-height:2">${serving?'':'רשימת הח״כים הרשמית של הכנסת ה־26<br>'}הצעות החוק הראשונות<br>ישיבות הוועדות הראשונות<br>ההצבעות הראשונות במליאה — ומהן גם ״אני הייתי מצביע״ ו״מי מצביע כמוני״<br><span class="dim">${serving?'המכהנים והתפקידים כבר פורסמו (עם ישיבת הפתיחה, 10 בנובמבר 2026); חוקים, ועדות והצבעות עוד לא פורסמו. ברגע שיתפרסמו — הם יופיעו כאן לבד.':'הכנסת החדשה עוד לא פרסמה כלום. ברגע שתתחיל — זה יופיע כאן לבד.'}</span></div></div>
   </div>
   <div style="text-align:center;margin-top:1.1rem"><button class="btn" onclick="switchKnesset(25)">לראות איך זה נראה עם נתונים מלאים — כנסת 25 ←</button></div>`;
+  renderPlenumTv(); // repaint into the fresh #plenumTvBox (the innerHTML above replaced it)
   if(K26) setTimeout(()=>{document.querySelectorAll('#k26plenum .seat').forEach((el,i)=>el.addEventListener('click',()=>openMk(seats[i].name)))},0);
 }
 
@@ -1997,6 +2106,7 @@ function agendaHTML(){
 function renderNow(){
   if(KN===26){ renderNow26(); return }
   ensureAgenda();
+  ensurePlenumTv(); // live plenum TV block (#plenumTvBox); paints itself when the status read lands
   const app=$('#app');
   const latest=VOTES_ALL.reduce((mx,v)=>(v.date||'')>mx?(v.date||''):mx,'');
   const newSince=prevSeen? VOTES_ALL.filter(v=>(v.date||'')>prevSeen) : [];
@@ -2025,6 +2135,8 @@ function renderNow(){
     ${followCount()?`<button class="btn" style="margin-top:.9rem" onclick="go('mine')">★ המעקב שלי (${followCount()})</button>`:''}</div>
   </section>
 
+  <div id="plenumTvBox"></div>
+
   ${agendaHTML()}
 
   <div class="sec-title">מליאת הכנסת ה־25 <small>120 הח״כים, בסדר הישיבה של הכנסת הזאת — רחפו או לחצו על מושב</small></div>
@@ -2044,6 +2156,7 @@ function renderNow(){
   <div class="sec-title">האחרונות במליאה</div>
   ${Object.entries(byDay).slice(0,4).map(([d,bs])=>`<div class="feed-day">${fmtDate(d)} · ${bs.length} הצבעות</div><div class="grid c2">${bs.slice(0,6).map(v=>voteCard(v)).join('')}</div>`).join('')}
   <div style="text-align:center;margin-top:1.2rem"><button class="btn primary" onclick="go('votes')">כל ההצבעות ←</button></div>`;
+  renderPlenumTv(); // repaint into the fresh #plenumTvBox (the innerHTML above replaced it)
   setTimeout(()=>{ document.querySelectorAll('#k25plenum .seat').forEach((el,i)=>el.addEventListener('click',()=>openMk(seats25[i].name))) },0);
 }
 
