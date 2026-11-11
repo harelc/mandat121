@@ -798,7 +798,12 @@ function ensureLivePresence(){
    plenum is sitting, that feed is the Knesset Channel live stream
    (720p); off-air it is general channel programming, so we gate the
    player on the official broadcast-lobby status API and otherwise say
-   when the next sitting is. Stream URL is read from the Knesset's own
+   when the next sitting is. IsPlenumActive alone is a sitting-day flag:
+   it stays 1 through recesses while the channel airs studio shows, so
+   “actually on air” ALSO requires the channel schedule's current item
+   to be the plenum or a current speaker to be named — with a 5-minute
+   grace so speaker changes/votes don't flicker the player off.
+   Stream URL is read from the Knesset's own
    GlobalResources config (key broadcastLobby_KnessetChannelLivePath),
    host-allowlisted, with today's value as fallback. All API strings
    reach the DOM only via esc(). Poll: 2 min, only on the Now view. */
@@ -1141,20 +1146,28 @@ function billDocsHTML(b){
 }
 
 /* ============ load ============ */
-/* Two phases. Phase 1 fetches only what the default Knesset-26 Now page
-   needs (~120 KB: preview, tenure, photos, contacts…) and paints it.
-   Phase 2 streams the K25 archive bulk (~16 MB of bills/votes/results)
-   in behind it and re-renders the current route when it lands. First
-   paint used to wait for all 17 files, so on load the browser sat on
-   its restored snapshot of the previous session (often the K25 view)
-   for a visible second before K26 appeared. */
+/* Three phases. Phase 1 fetches only what the default Knesset-26 Now
+   page needs (~120 KB: preview, tenure, photos, contacts…) and paints
+   it. Phase 2a lands everything small (official portraits, contacts,
+   ranks, K26 layers) and re-renders. Phase 2b streams the K25 archive
+   bulk (~16 MB of bills/votes/results) in behind it — started only
+   after 2a has painted, via idle time — and re-renders the current
+   route when it lands. First paint used to wait for all 17 files, so
+   on load the browser sat on its restored snapshot of the previous
+   session (often the K25 view) for a visible second before K26
+   appeared; and 2a used to wait on the archive, so portraits arrived
+   minutes late on slow connections. */
 async function load(){
-  const vrP=fetch('data/k25_vote_results.json').then(r=>r.ok?r.json():null).catch(()=>null); // started now, awaited before the MK index is built
+  const _loadT0=performance.now();
+  const _loadMark=phase=>console.info(`[load] ${phase} ${Math.round(performance.now()-_loadT0)}ms`);
   // Phase 1 proper: only what renderNow26 needs to paint (preview +
   // serving tenure + portraits). Everything else K26 is phase 2 too —
   // the sooner the first paint lands, the sooner the browser drops
-  // whatever frame the previous session left on screen.
-  const [pr,kr,t26]=await Promise.all([fetch('data/mk_photos.json'),fetch('data/k26_preview.json').catch(()=>null),fetch('data/k26_tenure.json').catch(()=>null)]);
+  // whatever frame the previous session left on screen. NOTE: nothing
+  // heavy may start before this paint — the 4.9 MB vote-results fetch
+  // used to start here and compete with phase 1 on the same connection,
+  // stalling the "טוען את נתוני הכנסת…" screen on a hard refresh.
+  const [pr,kr,t26]=await Promise.all([fetch('data/mk_photos.json').catch(()=>null),fetch('data/k26_preview.json').catch(()=>null),fetch('data/k26_tenure.json').catch(()=>null)]);
   // Name keys are canonicalised (whitespace-collapsed) at ingestion: some
   // builders emit 'גואטה  ששון ששי' / 'דיסטל אטבריאן  גלית' with a double
   // space, others the single-space form. Un-normalised, the same person
@@ -1162,17 +1175,23 @@ async function load(){
   // 120 came back as 122 (and lookups in TENURE/RANK/CMEM missed).
   const normKeys=o=>{ const r={}; for(const[k,v]of Object.entries(o||{})) r[normName(k)]=v; return r };
   if(t26&&t26.ok){ const tj=await t26.json(); K26_TENURE=normKeys(tj.tenure); for(const[k,v]of Object.entries(tj.factions||{})) K26_FACTIONS[normName(k)]=String(v).trim() }
-  MKP=normKeys(await pr.json()); if(kr&&kr.ok){ K26=await kr.json(); (K26.parties||[]).forEach(p=>{ p.elected=(p.elected||[]).map(normName); p.candidates=(p.candidates||[]).map(normName) }) }
+  if(pr&&pr.ok) MKP=normKeys(await pr.json()); if(kr&&kr.ok){ K26=await kr.json(); (K26.parties||[]).forEach(p=>{ p.elected=(p.elected||[]).map(normName); p.candidates=(p.candidates||[]).map(normName) }) }
   // First paint: the K26 Now page (the default route) is fully drawable
   // now. K25-archive routes render their empty states and are re-rendered
   // by phase 2 below the moment the bulk lands.
   buildTabs(); renderKSwitch(); save();
   appLoaded=true; applyRoute();
+  _loadMark('phase1 painted');
   setupGlobalSearch();
-  // ---- phase 2: the K25 archive bulk ----
+  // ---- phase 2a: everything small (portraits, contacts, ranks, tenure,
+  // K26 layers) — a few hundred KB total. This used to sit in one
+  // Promise.all with the ~16 MB K25 archive, so official portraits
+  // (OFFICIAL_PHOTOS) and contact cards only appeared once the archive
+  // had fully downloaded. Landing these first + re-rendering makes MK
+  // pages whole within seconds, even on a slow connection.
   // Secondary datasets are NOT fetched here — see the lazy loaders above.
   // Each view pulls what it needs via ensureAgenda()/ensureCmem()/…
-  const [cr,abr,avr,lor,tnr,oph,cor,b26,v26,lo26,c26,cm26,oph26,cor26]=await Promise.all([fetch('data/committees.json').catch(()=>null),fetch('data/k25_bills.json').catch(()=>null),fetch('data/k25_votes.json').catch(()=>null),fetch('data/k25_list_order.json').catch(()=>null),fetch('data/k25_tenure.json').catch(()=>null),fetch('data/k25_official_photos.json').catch(()=>null),fetch('data/mk_contacts.json').catch(()=>null),fetch('data/k26_bills.json').catch(()=>null),fetch('data/k26_votes.json').catch(()=>null),fetch('data/k26_list_order.json').catch(()=>null),fetch('data/k26_committees.json').catch(()=>null),fetch('data/k26_committee_members.json').catch(()=>null),fetch('data/k26_official_photos.json').catch(()=>null),fetch('data/k26_contacts.json').catch(()=>null)]);
+  const [lor,tnr,oph,cor,b26,v26,lo26,c26,cm26,oph26,cor26]=await Promise.all([fetch('data/k25_list_order.json').catch(()=>null),fetch('data/k25_tenure.json').catch(()=>null),fetch('data/k25_official_photos.json').catch(()=>null),fetch('data/mk_contacts.json').catch(()=>null),fetch('data/k26_bills.json').catch(()=>null),fetch('data/k26_votes.json').catch(()=>null),fetch('data/k26_list_order.json').catch(()=>null),fetch('data/k26_committees.json').catch(()=>null),fetch('data/k26_committee_members.json').catch(()=>null),fetch('data/k26_official_photos.json').catch(()=>null),fetch('data/k26_contacts.json').catch(()=>null)]);
   if(b26&&b26.ok){ K26B=await b26.json(); K26B.forEach(b=>(b.initiators||[]).forEach(i=>i.name=normName(i.name))) }
   if(v26&&v26.ok){ K26V=await v26.json() }
   if(lo26&&lo26.ok){ const lo=await lo26.json(); for(const[k,v]of Object.entries(lo.ranks||{})) if(v.rank) RANK26[normName(k)]=v.rank }
@@ -1183,11 +1202,22 @@ async function load(){
   if(oph26&&oph26.ok){ Object.assign(OFFICIAL_PHOTOS,normKeys((await oph26.json()).photos||{})) } // K26 portraits merge on top (build_k26_photos_official.py), as before
   if(tnr&&tnr.ok){ const tj=await tnr.json(); TENURE=normKeys(tj.tenure); FACTION_STINTS=normKeys(tj.faction_stints); for(const[k,v]of Object.entries(tj.factions||{})) FACTION25[normName(k)]=String(v).trim() }
   if(lor&&lor.ok){ const lo=await lor.json(); for(const[k,v]of Object.entries(lo.ranks||{})) if(v.rank) RANK25[normName(k)]=v.rank }
+  if(cor&&cor.ok){ const cj=await cor.json(); CONTACTS=normKeys(cj.by_name); CONTACTS_META=cj._meta||{}; ROSTER25=new Set(Object.keys(CONTACTS)) }
+  _loadMark('phase2a small files in');
+  { const y=window.scrollY; applyRoute(); window.scrollTo({top:y}); } // portraits/contacts/ranks now land on the already-painted page
+  // ---- phase 2b: the K25 archive bulk (~16 MB raw: bills, votes,
+  // vote-results, committees). Nothing above this line needs it, so it
+  // starts only after phase 2a has painted — yielded through idle time
+  // (with a timeout cap) so a hard refresh stays interactive instead of
+  // saturating the connection and main thread up front. K25 routes show
+  // their empty states until this lands and re-renders, as before.
+  await new Promise(r=>{ if(window.requestIdleCallback) requestIdleCallback(()=>r(),{timeout:1200}); else setTimeout(r,50) });
+  const [cr,abr,avr,vrr]=await Promise.all([fetch('data/committees.json').catch(()=>null),fetch('data/k25_bills.json').catch(()=>null),fetch('data/k25_votes.json').catch(()=>null),fetch('data/k25_vote_results.json').catch(()=>null)]);
   if(abr&&abr.ok){ ALLB=await abr.json(); ALLB.forEach(b=>ALLB_BY_ID[b.id]=b); MK_INITIATED={}; ALLB.forEach(b=>(b.initiators||[]).forEach(i=>{ i.name=normName(i.name); if(i.initiator) MK_INITIATED[i.name]=(MK_INITIATED[i.name]||0)+1 })) }
   if(avr&&avr.ok){ VOTES_ALL=await avr.json(); VOTES_ALL.forEach(v=>VOTE_BY_ID[v.id]=v) }
-  const vr=await vrP; if(vr){ vr.names=(vr.names||[]).map(normName); VOTE_RES=vr }
-  if(cor&&cor.ok){ const cj=await cor.json(); CONTACTS=normKeys(cj.by_name); CONTACTS_META=cj._meta||{}; ROSTER25=new Set(Object.keys(CONTACTS)) }
+  const vr=(vrr&&vrr.ok)?await vrr.json():null; if(vr){ vr.names=(vr.names||[]).map(normName); VOTE_RES=vr }
   if(cr&&cr.ok){ CMT=await cr.json(); (CMT.committees||[]).forEach(c=>CMT_BY_ID[c.id]=c) }
+  _loadMark('phase2b archive in');
   /* There is exactly one kind of vote: a plenum vote (VOTES_ALL), keyed
      everywhere — routes, "my vote", MK histories — by its vote id. A vote
      may link to a bill (item_id -> ALLB); the bill layers on context
@@ -1211,6 +1241,7 @@ async function load(){
   for(const m of Object.values(mkIndex)){ const ds=m.votes.map(v=>v.bill.vote_date).filter(Boolean).sort(); if(ds.length) VOTE_TENURE[m.name]={from:ds[0],to:ds[ds.length-1]} }
   IDX25=mkIndex;
   computeFactionStats(); buildTabs(); save();
+  _loadMark('phase2b indexed');
   // Re-render the current route now that the archive is in — preserving
   // the scroll position (applyRoute scrolls to top; the user may already
   // be reading the phase-1 page).
