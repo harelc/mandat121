@@ -101,6 +101,8 @@ svg.icn{width:1.05em;height:1.05em;flex:none;fill:none;stroke:currentColor;strok
 .ptv-meta{padding:.7rem 1rem .95rem}
 .ptv-meta .now{font-weight:700}
 .ptv-off{padding:1rem 1.15rem;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap}
+.ptv-close{position:absolute;top:.6rem;inset-inline-end:.6rem;z-index:3;width:2.2rem;height:2.2rem;border-radius:50%;border:1px solid rgba(255,255,255,.45);background:rgba(20,16,10,.72);color:#fff;font-size:1.05rem;line-height:1;display:flex;align-items:center;justify-content:center;backdrop-filter:blur(4px)}
+.ptv-close:hover{background:rgba(20,16,10,.92)}
 .chip{display:inline-flex;align-items:center;gap:.3rem;font-size:.72rem;font-weight:700;padding:.24rem .6rem;border-radius:999px;background:var(--surface2);color:var(--mid);border:1px solid var(--line);white-space:nowrap;max-width:100%;min-width:0;overflow:hidden;text-overflow:ellipsis;flex-shrink:1}
 /* chips inside horizontal scroll rows must keep their natural width —
    the row scrolls, the chip must not shrink/truncate instead */
@@ -808,31 +810,47 @@ function ensureLivePresence(){
    host-allowlisted, with today's value as fallback. All API strings
    reach the DOM only via esc(). Poll: 2 min, only on the Now view. */
 const PTV_API='https://knesset.gov.il/WebSiteApi/knessetapi/KnessetMainLobby/GetKnessetLobbyBroadcastcurrent';
+const PTV_PLAN_API='https://knesset.gov.il/WebSiteApi/knessetapi/KnessetMainLobby/GetKnessetChannelBroadcastPlan';
 const PTV_CFG_API='https://knesset.gov.il/WebSiteApi/knessetapi/GlobalResources/GetResourceValues?LanguageId=1&Keys=knsgroup_broadcastLobby';
 const PTV_FALLBACK='https://knesetn.gostreaming.tv/Knesset/index.m3u8';
 const PTV_HOSTS=new Set(['knesetn.gostreaming.tv','w1.013.gostreaming.tv','video.knesset.gov.il']);
-let PLENUM_TV={at:0,tryAt:0,data:null,liveUrl:null,hls:null,src:null,timer:null};
+let PLENUM_TV={at:0,tryAt:0,data:null,liveUrl:null,hls:null,src:null,timer:null,lastOnAirAt:0,closed:false};
+function ptvClose(){ PLENUM_TV.closed=true; ptvDestroy(); renderPlenumTv() }
+function ptvOpen(){ PLENUM_TV.closed=false; PLENUM_TV.lastOnAirAt=Date.now(); renderPlenumTv() }
 const ptvUrl=u=>{ try{ const x=new URL(u); return x.protocol==='https:'&&PTV_HOSTS.has(x.host)?x.href:null }catch(e){ return null } };
 function ptvDestroy(){ if(PLENUM_TV.hls){ try{PLENUM_TV.hls.destroy()}catch(e){} PLENUM_TV.hls=null } PLENUM_TV.src=null; const v=document.getElementById('plenumTvVideo'); if(v){ v.dataset.ptvSrc=''; v.pause(); v.removeAttribute('src'); v.load() } }
 function ensurePlenumTv(){
   const now=Date.now();
   if(!PLENUM_TV.timer) PLENUM_TV.timer=setInterval(()=>{ if(view==='now') ensurePlenumTv(); else ptvDestroy() },120000);
-  if(PLENUM_TV.data&&now-PLENUM_TV.at<120000){ renderPlenumTv(); return }
+  if(PLENUM_TV.data&&now-PLENUM_TV.at<100000){ renderPlenumTv(); return }
   if(now-PLENUM_TV.tryAt<30000) return;
   PLENUM_TV.tryAt=now;
   const cfg=PLENUM_TV.liveUrl?Promise.resolve(PLENUM_TV.liveUrl)
     :fetch(PTV_CFG_API,{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{
         const hit=Array.isArray(j)&&j.find(x=>x.Key==='broadcastLobby_KnessetChannelLivePath');
         return ptvUrl(hit&&hit.Value)||PTV_FALLBACK }).catch(()=>PTV_FALLBACK);
-  Promise.all([fetch(PTV_API,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null),cfg])
-    .then(([j,liveUrl])=>{
+  const plan=fetch(PTV_PLAN_API,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null);
+  Promise.all([fetch(PTV_API,{cache:'no-store'}).then(r=>r.ok?r.json():null).catch(()=>null),cfg,plan])
+    .then(([j,liveUrl,planJ])=>{
       if(!j) return;
       PLENUM_TV.liveUrl=liveUrl;
       const st=(j.PlenumStatus||[])[0]||{};
+      const speaker=(j.CurrentSpeakers||[])[0]||null;
+      const active=+st.IsPlenumActive===1;
+      const planNow=planJ&&Array.isArray(planJ.AllSchedulePlan)?planJ.AllSchedulePlan.find(x=>x.isNow):null;
+      const planTitle=planNow?(planNow.Title||'').trim():'';
+      // On air = sitting day AND (schedule says the plenum is the current
+      // programme OR a speaker is on the floor). 5-minute grace after the
+      // last on-air poll covers speaker changes and votes.
+      const rawOnAir=active&&((planTitle.includes('מליאה'))||!!(speaker&&speaker.SPK1_Name));
+      if(rawOnAir) PLENUM_TV.lastOnAirAt=Date.now();
+      if(!active) PLENUM_TV.closed=false; // a new sitting re-opens a closed player
       PLENUM_TV.data={
-        active:+st.IsPlenumActive===1,
+        active,
+        onAir:rawOnAir||(active&&PLENUM_TV.lastOnAirAt&&Date.now()-PLENUM_TV.lastOnAirAt<300000),
+        planTitle,
         nextDate:st.NextPlmSessionDateStr||'', nextTime:st.NextSessionTime||'',
-        speaker:(j.CurrentSpeakers||[])[0]||null,
+        speaker,
         agenda:(j.CurrentPlenumAgenda||[])[0]||null,
         lastVod:(j.LastVODPlemun||[])[0]||null,
       };
@@ -870,20 +888,33 @@ function renderPlenumTv(){
   if(!box){ ptvDestroy(); return }
   const d=PLENUM_TV.data;
   if(!d) return; // unknown yet — stay invisible rather than flicker
-  if(d.active){
+  if(PLENUM_TV.closed){
+    if(box.querySelector('video')) ptvDestroy();
+    box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת</small></div>
+    <section class="card ptv-off rise"><span class="chip acc">הנגן נסגר</span><span class="small muted">השידור ממשיך ברקע הישיבה — אפשר לפתוח אותו מחדש בכל רגע.</span><span style="margin-inline-start:auto"><button class="btn ghost small" onclick="ptvOpen()">הצגת השידור ←</button></span></section>`;
+    return;
+  }
+  if(d.onAir){
     const spk=d.speaker||{};
     const who=spk.SPK1_Name?`${spk.SPK1_Gender?'הנואם':'הנואמת'} כעת: ${spk.SPK1_Name}`:'';
     const subj=spk.Curr_Subject||(d.agenda&&d.agenda.Name)||'';
     const next=spk.SPK2_Name?` · הבא/ה: ${spk.SPK2_Name}`:'';
     if(!box.querySelector('video')){ // first paint of this sitting — later polls only update the text below
       box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת · מתוך אתר הכנסת</small></div>
-      <section class="card ptv rise"><div class="ptv-frame"><video id="plenumTvVideo" controls playsinline muted poster="" aria-label="שידור חי ממליאת הכנסת"></video></div>
+      <section class="card ptv rise"><div class="ptv-frame"><video id="plenumTvVideo" controls playsinline muted poster="" aria-label="שידור חי ממליאת הכנסת"></video><button type="button" class="ptv-close" onclick="ptvClose()" title="סגירת השידור" aria-label="סגירת השידור החי">✕</button></div>
       <div class="ptv-meta"><span class="ptv-live"><i></i>חי עכשיו</span> <span class="now" id="ptvNow"></span><div class="small muted" id="ptvSubj" style="margin-top:.3rem"></div></div></section>`;
     }
     const n=document.getElementById('ptvNow'), s=document.getElementById('ptvSubj');
     if(n) n.textContent=who+next;
     if(s) s.textContent=subj?`על סדר היום: ${subj}`:'';
     ptvInitPlayer(PLENUM_TV.liveUrl||PTV_FALLBACK);
+  } else if(d.active) {
+    // Sitting day, but the channel is not showing the chamber right now
+    // (recess / end of sitting) — IsPlenumActive stays 1 in this state.
+    if(box.querySelector('video')) ptvDestroy();
+    const when=d.nextDate?` הישיבה הבאה: ${esc(d.nextDate)}.`:'';
+    box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת</small></div>
+    <section class="card ptv-off rise"><span class="chip abstain">המליאה לא על המסך כעת</span><span class="small muted">הישיבה בהפסקה או שהסתיימה, וערוץ הכנסת משדר בינתיים תכניות אחרות.${when} השידור מהמליאה יחזור לכאן כשהדיון יתחדש.</span></section>`;
   } else {
     if(box.querySelector('video')) ptvDestroy();
     const when=d.nextDate?`הישיבה הבאה: ${esc(d.nextDate)}${d.nextTime?` בשעה ${esc(d.nextTime)}`:''}`:'המליאה אינה מתכנסת כעת — מועד הישיבה הבאה טרם פורסם';
