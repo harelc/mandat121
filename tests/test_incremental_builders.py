@@ -145,6 +145,68 @@ class CommitteesIncrementalTest(unittest.TestCase):
             self.assertTrue(new_state["watermark"].startswith("2026-07-09"))
 
 
+class CommitteesFullBuildTest(unittest.TestCase):
+    """Full build (no previous output/state — K26's first run, --full).
+
+    Regression: the session-totals fetch selected only CommitteeID,
+    StartDate while the state seeding below it keys by s["Id"], so every
+    full build died with KeyError: 'Id' (CI run 43024368630). The fake
+    OData here honours $select, unlike the incremental test's fakes.
+    """
+
+    def test_full_build_seeds_session_index(self):
+        mod = load_module("build_committees.py")
+        with tempfile.TemporaryDirectory() as td:
+            data = Path(td) / "data"
+            data.mkdir()
+            mod.DATA = data
+            (data / "bills.json").write_text(json.dumps(
+                [{"bill_id": 100, "knesset_num": 25}]), "utf-8")
+
+            def apply_select(rows, params):
+                sel = params.get("$select")
+                if not sel:
+                    return rows
+                keep = {k.strip() for k in sel.split(",")}
+                return [{k: v for k, v in r.items() if k in keep} for r in rows]
+
+            def fake_fetch_all(entity, params, page=100):
+                if entity == "KNS_Committee":
+                    rows = [{"Id": 7, "Name": "ועדה", "CategoryDesc": "c",
+                             "CommitteeTypeDesc": "t", "IsCurrent": True}]
+                elif entity == "KNS_Status":
+                    rows = [{"Id": 5, "Desc": "סטטוס"}]
+                elif entity == "KNS_CommitteeSession":
+                    if "$orderby" in params:  # recent window
+                        rows = [SESSION(2, "2026-07-05T10:00:00+03:00")]
+                    else:  # session totals over the whole Knesset
+                        rows = [SESSION(1, "2026-07-01T10:00:00+03:00"),
+                                SESSION(2, "2026-07-05T10:00:00+03:00")]
+                else:
+                    raise AssertionError(f"unexpected fetch_all {entity}")
+                return apply_select(rows, params)
+
+            def fake_fetch_in(entity, field, ids, extra, select, batch=15):
+                if entity == "KNS_CmtSessionItem":
+                    return [{"CommitteeSessionID": 2, "ItemID": 100,
+                             "Name": "הצעה", "ItemTypeID": 2, "StatusID": 5}]
+                if entity == "KNS_DocumentCommitteeSession":
+                    return []
+                if entity == "KNS_CommitteeSession":
+                    return []
+                raise AssertionError(f"unexpected fetch_in {entity}")
+
+            mod.fetch_all, mod.fetch_in = fake_fetch_all, fake_fetch_in
+            with mock.patch.object(sys, "argv", ["build_committees.py", "--knesset", "25"]):
+                mod.main()
+
+            out = json.loads((data / "committees.json").read_text("utf-8"))
+            self.assertEqual(out["committees"][0]["sessions_total"], 2)
+            self.assertEqual([e["session_id"] for e in out["bill_committees"]["100"]], [2])
+            state = json.loads((data / "committees_state.json").read_text("utf-8"))
+            self.assertEqual(sorted(state["sessions"]), ["1", "2"])
+
+
 class ProtocolsSkipTest(unittest.TestCase):
     def _fixture(self, td, url):
         data = Path(td) / "data"

@@ -345,9 +345,12 @@ def main():
                              "", "Id,CommitteeID,StartDate,TypeDesc,StatusDesc,Location")
     sess = {s["Id"]: s for s in recent + hist_sessions}
 
-    print("per-committee session totals (all K25)...")
+    print(f"per-committee session totals (all K{kn})...")
+    # Id must be selected: the state seeding below keys the session index
+    # by it (and incremental totals are computed from that index). Without
+    # it the full build — K26's first run, or any --full — dies KeyError.
     all_sessions = fetch_all("KNS_CommitteeSession", {
-        "$filter": f"KnessetNum eq {kn}", "$select": "CommitteeID,StartDate",
+        "$filter": f"KnessetNum eq {kn}", "$select": "Id,CommitteeID,StartDate",
     })
     totals = Counter(s["CommitteeID"] for s in all_sessions)
     last_session = {}
