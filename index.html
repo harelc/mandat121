@@ -823,6 +823,7 @@ let K26_TENURE={}, K26_FACTIONS={}; // official K26 serving roster (build_k25_te
 let LIVE_PRESENCE={at:0,tryAt:0,map:null};
 const livePresenceOf=name=>LIVE_PRESENCE.map&&name in LIVE_PRESENCE.map?LIVE_PRESENCE.map[name]:undefined;
 function ensureLivePresence(){
+  startPresenceTicker();
   const now=Date.now();
   if(LIVE_PRESENCE.map&&now-LIVE_PRESENCE.at<180000) return;
   if(now-LIVE_PRESENCE.tryAt<60000) return; // in flight, or a recent failure — don't hammer
@@ -834,14 +835,76 @@ function ensureLivePresence(){
       const map={};
       for(const [k,v] of Object.entries(cur.map)){ const key=normName(k); if(key) map[key]=!!v }
       if(!Object.keys(map).length) return;
+      const changed=!LIVE_PRESENCE.map||JSON.stringify(LIVE_PRESENCE.map)!==JSON.stringify(map);
       LIVE_PRESENCE={at:Date.parse(cur.at)||Date.now(),tryAt:LIVE_PRESENCE.tryAt,map};
-      if(view==='now'&&KN===26) renderNow26();
+      if(!changed) return; // same building as last paint — leave the DOM (and any playing TV) alone
+      if(view==='now'&&KN===26){ if(!repaintHemiPresence()) renderNow26() }
       else if(view==='mk') renderMkDetail();
       // MK cards: highlight who is in the building. Skip the re-render
       // while the user is typing in the grid's search box — it would
       // steal focus; the next keystroke re-renders with presence anyway.
       else if(view==='mks'&&document.activeElement?.dataset?.keep!=='mkQ') renderMks();
     }).catch(()=>{});
+}
+/* Auto-refresh while a presence surface stays open: a 60s tick, only
+   while the tab is visible. Fetches stay gated (live: tryAt 60s and
+   snapshot age; history: 4 min), and repaints happen only when data
+   actually changed — the Now view is repainted in place (hemicycle
+   SVG, arrival card, matrix) instead of re-rendering the whole view,
+   so a playing TV stream or an open <details> is never torn down just
+   because somebody walked into the building. */
+let livePresenceTimer=null, PRESENCE26_AT=0;
+function presenceTick(){
+  if(document.visibilityState!=='visible') return;
+  if(KN===26&&view==='now'){ ensureLivePresence(); refreshPresence26() }
+  else if(view==='mk'||view==='mks') ensureLivePresence();
+}
+function startPresenceTicker(){
+  if(livePresenceTimer) return;
+  livePresenceTimer=setInterval(presenceTick,60000);
+  document.addEventListener('visibilitychange',()=>{ if(document.visibilityState==='visible') presenceTick() });
+}
+function adoptPresence26(j){
+  j.by_mk=_normKeys(j.by_mk);
+  for(const d of Object.values(j.days||{})) (d.arrivals||[]).forEach(a=>a.name=normName(a.name));
+  PRESENCE26=j; PRESENCE26_AT=Date.now();
+  return j;
+}
+async function refreshPresence26(){
+  if(!PRESENCE26||Date.now()-PRESENCE26_AT<240000) return;
+  PRESENCE26_AT=Date.now(); // stamp the attempt too: a failed fetch waits 4 min like a good one
+  const j=await _fetchJson('/.netlify/functions/presence');
+  if(!j||!Object.keys(j.days||{}).length) return;
+  if(JSON.stringify(PRESENCE26.days||{})===JSON.stringify(j.days)) return;
+  adoptPresence26(j);
+  repaintPresenceCards();
+}
+function repaintPresenceCards(){
+  if(!PG_SEATS){ if(KN===26&&view==='now') renderNow26(); return }
+  const det=document.querySelector('details.arrival-card');
+  if(det){ const t=document.createElement('div'); t.innerHTML=presenceArrivalsHTML(PG_SEATS); if(t.firstElementChild) det.replaceWith(t.firstElementChild) }
+  const sec=document.getElementById('pgStage')?.closest('section.arrival-card');
+  if(sec){ const t=document.createElement('div'); t.innerHTML=presenceGridHTML(PG_SEATS); if(t.firstElementChild){ sec.replaceWith(t.firstElementChild); drawPresenceGrid() } }
+}
+function repaintHemiPresence(){
+  const box=document.getElementById('k26plenum');
+  const serving=typeof k26ServingSeats==='function'?k26ServingSeats():null;
+  if(!box||!serving||!LIVE_PRESENCE.map) return false; // overlay paints only on the official serving roster — same gate as the full render
+  const seats=serving.map(s=>({...s}));
+  if(seats.filter(s=>s.name in LIVE_PRESENCE.map).length<Math.max(60,seats.length*0.5)) return false; // feed doesn't cover this map
+  seats.forEach(s=>{ if(s.name in LIVE_PRESENCE.map) s.present=LIVE_PRESENCE.map[s.name] });
+  box.innerHTML=plenumSVG(seats,'k26',null);
+  box.querySelectorAll('.seat').forEach((el,i)=>el.addEventListener('click',()=>openMk(seats[i].name)));
+  const presentN=seats.filter(s=>s.present).length;
+  const presenceWhen=new Date(LIVE_PRESENCE.at).toLocaleTimeString('he-IL',{hour:'2-digit',minute:'2-digit'});
+  const card=box.closest('.card');
+  let line=[...card.querySelectorAll('div.small')].find(e=>e.textContent.includes('כעת במשכן'));
+  if(!line){ // first snapshot landed after the last full render painted no line — create it where the template puts it, after the legend
+    line=document.createElement('div'); line.className='small'; line.style.marginTop='.35rem';
+    const legend=card.querySelector('.legend'); if(legend) legend.after(line); else card.appendChild(line);
+  }
+  line.innerHTML=`<span class="pdot" style="background:var(--for)"></span> <b>${presentN} מתוך ${seats.length}</b> כעת במשכן הכנסת — מושב בטבעת ירוקה = במשכן, מושב כהה = לא במשכן · קריאת לובי הח״כים של הכנסת, נכון ל־${esc(presenceWhen)} · מתרענן כל כמה דקות`;
+  return true;
 }
 /* ============ LIVE PLENUM TV ============
    The Knesset broadcast page cannot be iframed (X-Frame-Options:
@@ -1223,7 +1286,7 @@ function ensureWiki(){ return _lazyOnce('wiki',async()=>{ const j=await _fetchJs
 function ensureExtras(){ if(EXTRAS) return Promise.resolve(EXTRAS); return _lazyOnce('extras',async()=>{ const j=await _fetchJson('data/k25_extras.json'); if(j){ j.queries_by_mk=_normKeys(j.queries_by_mk); j.agendas_by_mk=_normKeys(j.agendas_by_mk); EXTRAS=j; if(view==='mk') renderMkDetail(); else if(view==='billAll') renderBillLite(); else if(view==='committee') renderCommitteeDetail(); else if(view==='session') renderSessionDetail(); else if(view==='committees') renderCommittees() } return EXTRAS }) }
 function ensureBillDocs(){ if(BILL_DOCS) return Promise.resolve(BILL_DOCS); return _lazyOnce('billDocs',async()=>{ const j=await _fetchJson(`data/k${KN}_bill_docs.json`); if(j){ BILL_DOCS=j; if(view==='billAll') renderBillLite(); else if(view==='vote') renderVote() } return BILL_DOCS }) }
 function ensureRoles(){ if(ROLES) return Promise.resolve(ROLES); return _lazyOnce('roles',async()=>{ const j=await _fetchJson(`data/k${KN}_roles.json`); if(j){ ROLES=j; if(view==='mk') renderMkDetail() } return ROLES }) }
-function ensurePresence26(){ if(PRESENCE26) return Promise.resolve(PRESENCE26); return _lazyOnce('presence26',async()=>{ let j=await _fetchJson('/.netlify/functions/presence'); if(!j||!Object.keys(j.days||{}).length) j=await _fetchJson('data/k26_presence.json'); if(j){ j.by_mk=_normKeys(j.by_mk); for(const d of Object.values(j.days||{})) (d.arrivals||[]).forEach(a=>a.name=normName(a.name)); PRESENCE26=j; if(KN===26&&(view==='now'||view==='mks'||view==='mk')) render() } return PRESENCE26 }) } // live state: Netlify Blobs via presence-poll.mjs; the committed file is the frozen GH-era seed/fallback only
+function ensurePresence26(){ if(PRESENCE26) return Promise.resolve(PRESENCE26); return _lazyOnce('presence26',async()=>{ let j=await _fetchJson('/.netlify/functions/presence'); if(!j||!Object.keys(j.days||{}).length) j=await _fetchJson('data/k26_presence.json'); if(j){ adoptPresence26(j); if(KN===26&&(view==='now'||view==='mks'||view==='mk')) render() } return PRESENCE26 }) } // live state: Netlify Blobs via presence-poll.mjs; the committed file is the frozen GH-era seed/fallback only
 function ensureMkHighlights(){ if(MK_HIGHLIGHTS) return Promise.resolve(MK_HIGHLIGHTS); return _lazyOnce('mkHighlights',async()=>{ const j=await _fetchJson('data/mk_highlights.json'); if(j){ j.by_mk=_normKeys(j.by_mk); MK_HIGHLIGHTS=j; if(view==='mk') renderMkDetail() } return MK_HIGHLIGHTS }) }
 /* Scroll to + flash one exact turn (data-turn anchor in protoTurnsHTML).
    Highlight rows promise THIS turn, not just the sitting — anything less
