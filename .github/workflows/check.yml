@@ -31,6 +31,9 @@ jobs:
       - name: K26 builder tests (offline, synthetic OData)
         run: python3 -m unittest discover -s tests 2>&1 | tail -5
 
+      - name: Presence merge tests (Netlify function, plain node — no deps)
+        run: node tests/test_presence_merge.mjs
+
       - name: data/*.json parses
         run: |
           python3 - <<'EOF'

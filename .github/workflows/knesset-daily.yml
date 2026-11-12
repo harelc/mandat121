@@ -150,7 +150,6 @@ jobs:
           python3 -u build_k25_tenure.py --knesset 26          # -> data/k26_tenure.json (no-op until positions publish)
           python3 -u build_k26_photos_official.py              # -> data/k26_official_photos.json + data/photos/ (portraits for K26 MKs with none yet; no-op until tenure exists)
           python3 -u build_mk_contacts.py --knesset 26         # -> data/k26_contacts.json (official contact/social/presence snapshot; --knesset 25 is refused, K25 file stays frozen)
-          python3 -u build_presence.py || echo "::warning::build_presence failed — keeping previous presence history" # one lobby poll per run -> data/k26_presence.json (coarse fallback; presence-poll.yml polls every 5 min on workdays). Non-fatal: a lobby outage must not block the data commit
           python3 -u build_k25_list_order.py --knesset 26      # -> data/k26_list_order.json (from CEC preview, works pre-OData)
           python3 -u build_k25_committee_members.py --knesset 26 # -> data/k26_committee_members.json
           python3 -u build_k25_roles.py --knesset 26             # -> data/k26_roles.json (no-op until positions publish)

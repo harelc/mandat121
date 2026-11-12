@@ -87,11 +87,15 @@ Per MK it returns `IsPresent` (in the building *right now*), plus official
   not personal data).
 
 **Presence history — DONE 2026-11-12 (K26 only).** Since no time series
-exists, we make one: `build_presence.py` is a single lobby poll merged
-into `data/k26_presence.json` (per-workday arrival order + derived
-per-MK workday counts), run every 5 min on Sun–Thu by
-`.github/workflows/presence-poll.yml` (UTC cron + a Jerusalem workday
-gate in the builder; knesset-daily also polls once per run as fallback).
+exists, we make one: a single lobby poll merged into a presence state
+(per-workday arrival order + derived per-MK workday counts), every
+5 min on Sun–Thu. Originally GitHub Actions committing
+`data/k26_presence.json`; migrated the same day to Netlify —
+`netlify/functions/presence-poll.mjs` (scheduled) writes one Blobs
+object, `netlify/functions/presence.mjs` serves it — because every
+GH data commit was a full site deploy. The committed file remains
+as the frozen seed the blob adopted on first run (and the client's
+fallback); `tests/test_presence_merge.mjs` pins the merge semantics.
 UI: collapsible "סדר ההגעה למשכן" under the K26 Now hemicycle (day
 picker, ranks, `at_first_poll` honestly flagged), a presence layer on
 K26 MK cards + a "ימי נוכחות במשכן" sort in the K26 MK view, and an
