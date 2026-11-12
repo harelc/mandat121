@@ -53,7 +53,8 @@ PROTO_DIR = Path("data/protocols")
 PLENUM_HL_DIR = Path("data/plenum_hl")
 OUT = Path("data/mk_highlights.json")
 MIN_WORDS, MIN_TERMS, TOP_N, PER_SESSION_CAP = 30, 25, 5, 2
-PICKS_PER_SOURCE = 3  # top committee + top plenum picks per MK (scores are per-corpus; never compared across sources)
+PICKS_PER_SOURCE = 2  # top picks per corpus per MK (committee / plenum / committee archive — scores are per-corpus, never compared across sources)
+CMT_HL = Path("data/cmt_hl.json")
 
 # index.html FORWARD: surname-first key -> given-first display, for
 # multi-token surnames the naive token move gets wrong. Keep in sync.
@@ -182,7 +183,7 @@ def main():
             h["kind"] = "committee"
         by_mk[key] = {"turns": agg["turns"], "words": agg["words"],
                       "sessions": len(agg["sessions"]),
-                      "committee_sessions": len(agg["sessions"]),
+                      "committee_sessions": len(agg["sessions"]), "archive_sessions": 0,
                       "plenum_sessions": 0,
                       "appearances": appearances,
                       "highlights": highlights[:PICKS_PER_SOURCE]}
@@ -205,7 +206,7 @@ def main():
             if not key:
                 continue
             e = by_mk.setdefault(key, {"turns": 0, "words": 0, "sessions": 0,
-                                       "committee_sessions": 0, "plenum_sessions": 0,
+                                       "committee_sessions": 0, "plenum_sessions": 0, "archive_sessions": 0,
                                        "appearances": [], "highlights": []})
             e["turns"] += s.get("turns", 0)
             e["words"] += s.get("words", 0)
@@ -225,23 +226,56 @@ def main():
             if not key:
                 continue
             e = by_mk.setdefault(key, {"turns": 0, "words": 0, "sessions": 0,
-                                       "committee_sessions": 0, "plenum_sessions": 0,
+                                       "committee_sessions": 0, "plenum_sessions": 0, "archive_sessions": 0,
                                        "appearances": [], "highlights": []})
             e.setdefault("_plenum_hl", []).extend(
                 {**rec, "sid": sid, "kind": "plenum", "committee": label,
                  "date": p.get("date", "")} for rec in tops)
+    # ---- committee archive (full-term residue, build_cmt_hl.py):
+    # appearances/highlights for every K25 committee sitting NOT in the
+    # full-text corpus. Third corpus, own picks; archive rows link to
+    # the official document (no in-app reader for these sittings).
+    arch_sessions = 0
+    if CMT_HL.exists():
+        arch = json.loads(CMT_HL.read_text("utf-8"))
+        sess_tab = arch.get("sessions", {})
+        arch_sessions = len(sess_tab)
+        for key, agg in (arch.get("by_mk") or {}).items():
+            e = by_mk.setdefault(key, {"turns": 0, "words": 0, "sessions": 0,
+                                       "committee_sessions": 0, "plenum_sessions": 0, "archive_sessions": 0,
+                                       "appearances": [], "highlights": []})
+            have = {a["sid"] for a in e["appearances"] if a.get("kind") == "committee"}
+            for sid, turns, words in agg.get("apps", []):
+                if sid in have:
+                    continue  # full-text corpus owns this sitting
+                meta = sess_tab.get(sid) or ["", "", ""]
+                e["appearances"].append({"sid": sid, "kind": "committee_archive",
+                                         "committee": meta[0], "date": meta[1], "doc": meta[2],
+                                         "turns": turns, "words": words})
+                e["turns"] += turns
+                e["words"] += words
+                e["archive_sessions"] += 1
+            e["_arch_hl"] = [{**rec, "kind": "committee_archive",
+                              "committee": (sess_tab.get(rec["sid"]) or ["", "", ""])[0],
+                              "date": (sess_tab.get(rec["sid"]) or ["", "", ""])[1],
+                              "doc": (sess_tab.get(rec["sid"]) or ["", "", ""])[2]}
+                             for rec in agg.get("top", []) if rec["sid"] not in have]
+
     for e in by_mk.values():
-        picks = sorted(e.pop("_plenum_hl", []), key=lambda r: -r["score"])[:PICKS_PER_SOURCE]
+        p_picks = sorted(e.pop("_plenum_hl", []), key=lambda r: -r["score"])[:PICKS_PER_SOURCE]
+        a_picks = sorted(e.pop("_arch_hl", []), key=lambda r: -r["score"])[:PICKS_PER_SOURCE]
         merged, c_hl = [], e["highlights"]
-        for i in range(max(len(c_hl), len(picks))):
+        for i in range(max(len(c_hl), len(p_picks), len(a_picks))):
             if i < len(c_hl):
                 merged.append(c_hl[i])
-            if i < len(picks):
-                merged.append(picks[i])
+            if i < len(p_picks):
+                merged.append(p_picks[i])
+            if i < len(a_picks):
+                merged.append(a_picks[i])
         e["highlights"] = merged
         e["appearances"].sort(key=lambda a: (-a["words"], a["date"]))
-        e["appearances"] = e["appearances"][:12]  # UI shows top 6; counts live in the *_sessions fields
-        e["sessions"] = e["committee_sessions"] + e["plenum_sessions"]
+        e["appearances"] = e["appearances"][:12]  # UI shows the top few; counts live in the *_sessions fields
+        e["sessions"] = e["committee_sessions"] + e["plenum_sessions"] + e["archive_sessions"]
 
     payload = {
         "_meta": {
@@ -250,7 +284,7 @@ def main():
                       f"candidates >= {MIN_WORDS} words; max {PER_SESSION_CAP} "
                       "per sitting. No LLM.",
             "sessions": len(docs), "turns_scored": n_turns, "mks": len(by_mk),
-            "plenum_sessions": len(plenum_seen),
+            "plenum_sessions": len(plenum_seen), "archive_sessions": arch_sessions,
             "source": "data/protocols/*.json (official committee transcripts) "
                       "+ data/plenum_hl/*.json (plenum residue, build_plenum_hl.py; "
                       "session-level IDF, picked separately — scores are not "

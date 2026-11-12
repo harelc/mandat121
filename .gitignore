@@ -2,6 +2,7 @@
 __pycache__/
 *.pyc
 data/docs/
+data/cmt_hl_work/
 .env
 *.egg-info/
 dist/
