@@ -16,6 +16,10 @@ Unlike fetch_all_bills.py (vote-linked bills only), this builds:
   data/k{N}_votes.json — EVERY plenum vote header of the era, classified
       by kind (readings, reservations, no-confidence, transfers, agenda…)
       with tallies merged from the existing results dataset where known.
+      Votes with no per-MK rows in OData (hand/secret ballots) get their
+      official counter tally from the WebSiteApi GetVoteDetails fallback
+      (parse_website_vote) and carry method_id (1 electronic, 2 roll-call,
+      3 secret, 4 hands-with-counters, 5 hands-without-counters).
 
 Usage: python3 -u build_knesset.py [--knesset 25] [--full]
 
@@ -39,6 +43,7 @@ from collections import defaultdict
 from pathlib import Path
 
 BASE = "https://knesset.gov.il/OdataV4/ParliamentInfo"
+WEBSITE_API = "https://www.knesset.gov.il/WebSiteApi/knessetapi"
 HEADERS = {"Accept": "application/json", "User-Agent": "Mozilla/5.0 mandat121-build"}
 DATA = Path(__file__).parent / "data"
 DELAY = 0.1
@@ -58,6 +63,54 @@ def get(entity, params):
         except Exception:
             if attempt == 2:
                 raise
+            time.sleep(2 * (attempt + 1))
+
+
+def parse_website_vote(detail):
+    """Normalise one WebSiteApi Votes/GetVoteDetails payload.
+
+    OData carries NO tally for non-electronic votes: KNS_PlenumVote has
+    no count fields and KNS_PlenumVoteResult only holds rows for
+    electronic (1) and roll-call (2) votes. The counter tallies of
+    hand votes (4 = הרמת ידיים עם מונים), the candidate counts of
+    secret ballots (3 = חשאית) and the accepted/rejected verdict of
+    uncounted hand votes (5 = ללא מונים) are published only here.
+    Counters omit zero categories, so missing titles default to 0;
+    'נוכח ולא הצביע' is presence, not a vote, and is ignored.
+    """
+    out = {"tally": None, "secret": None, "accepted": None}
+    if not detail:
+        return out
+    counters = {c.get("Title"): c.get("countOfResult")
+                for c in detail.get("VoteCounters") or []}
+    if counters:
+        key = {"בעד": "for", "נגד": "against", "נמנע": "abstain"}
+        out["tally"] = {v: counters.get(k) or 0 for k, v in key.items()}
+    secret = [{"name": r.get("description"), "votes": r.get("AmountFor")}
+              for r in detail.get("DescreetVoteResults") or []
+              if r.get("description")]
+    if secret:
+        out["secret"] = secret
+    header = (detail.get("VoteHeader") or [{}])[0]
+    if header.get("IsForAccepted") is not None:
+        out["accepted"] = bool(header["IsForAccepted"])
+    return out
+
+
+def fetch_website_vote(vid):
+    """GetVoteDetails for one vote; None on any failure — the WebSiteApi
+    is a fallback for a handful of votes and must never fail the build."""
+    url = f"{WEBSITE_API}/Votes/GetVoteDetails/{vid}"
+    for attempt in range(3):
+        try:
+            req = urllib.request.Request(url, headers=HEADERS)
+            with urllib.request.urlopen(req, timeout=30) as r:
+                return parse_website_vote(json.loads(r.read().decode("utf-8")))
+        except Exception:
+            if attempt == 2:
+                print(f"  website vote {vid}: fetch failed, tally left unknown",
+                      flush=True)
+                return None
             time.sleep(2 * (attempt + 1))
 
 
@@ -305,34 +358,55 @@ def main():
         print(f"plenum votes since {since} (merge over {len(old_votes)} existing)...", flush=True)
         votes = fetch_all("KNS_PlenumVote", {
             "$filter": f"VoteDateTime gt {since}",
-            "$select": "Id,VoteDateTime,ItemID,VoteTitle,ForOptionDesc,IsNoConfidenceInGov,SessionID",
+            "$select": "Id,VoteDateTime,ItemID,VoteTitle,ForOptionDesc,IsNoConfidenceInGov,SessionID,VoteMethodID,VoteMethodDesc",
             "$orderby": "VoteDateTime",
         }, label="recent votes")
     else:
         print("all plenum votes of the era...", flush=True)
         votes = fetch_all("KNS_PlenumVote", {
             "$filter": f"VoteDateTime gt {ERA_START[kn]}",
-            "$select": "Id,VoteDateTime,ItemID,VoteTitle,ForOptionDesc,IsNoConfidenceInGov,SessionID",
+            "$select": "Id,VoteDateTime,ItemID,VoteTitle,ForOptionDesc,IsNoConfidenceInGov,SessionID,VoteMethodID,VoteMethodDesc",
             "$orderby": "VoteDateTime",
         }, label="votes")
     READING = {"pre1": 0, "reading1": 1, "reading2": 2, "reading3": 3}
     votes_by_bill = defaultdict(list)
     out_votes = []
+    web_cache = {}
     for v in votes:
         kind, label = classify(v.get("ForOptionDesc"), v.get("VoteTitle"))
         if v.get("IsNoConfidenceInGov"):
             kind, label = "noconfidence", "אי־אמון"
         t = tally.get(v["Id"])
+        web = None
+        if not t:
+            # No per-MK rows in OData (non-electronic vote, or the
+            # harvest has not reached it yet): the official counter
+            # tally / secret-ballot counts live only in the WebSiteApi.
+            if v["Id"] not in web_cache:
+                web_cache[v["Id"]] = fetch_website_vote(v["Id"])
+            web = web_cache[v["Id"]]
+            if web and web["tally"]:
+                t = web["tally"]
         rec = {
             "id": v["Id"], "date": (v.get("VoteDateTime") or "")[:10],
             "item_id": v.get("ItemID"),
             "in_bills": v.get("ItemID") in bill_set,
             "title": v.get("VoteTitle"), "desc": v.get("ForOptionDesc"),
             "kind": kind, "kind_label": label,
+            "method_id": v.get("VoteMethodID"),
             "for": t["for"] if t else None,
             "against": t["against"] if t else None,
             "abstain": t["abstain"] if t else None,
         }
+        if web and web["secret"]:
+            rec["secret"] = web["secret"]
+        if not t and web and not web["secret"] and web["accepted"] is not None:
+            # Uncounted hand vote: no numbers exist anywhere, but the
+            # official verdict does — carry it so the UI (and the bill
+            # journey) can state the outcome without inventing a tally.
+            # (Secret ballots are excluded: IsForAccepted there is not a
+            # for/against verdict — the candidate counts are the result.)
+            rec["accepted"] = 1 if web["accepted"] else 0
         out_votes.append(rec)
         if rec["item_id"] in bill_set and kind in READING:
             votes_by_bill[rec["item_id"]].append({
@@ -341,7 +415,8 @@ def main():
                 "for": rec["for"], "against": rec["against"],
                 "abstain": rec["abstain"],
                 "accepted": (1 if rec["for"] > rec["against"] else 0)
-                if rec["for"] is not None and rec["against"] is not None else None,
+                if rec["for"] is not None and rec["against"] is not None
+                else rec.get("accepted"),
             })
 
     if incremental and old_votes:
@@ -368,7 +443,8 @@ def main():
                     "for": rec["for"], "against": rec["against"],
                     "abstain": rec["abstain"],
                     "accepted": (1 if rec["for"] > rec["against"] else 0)
-                    if rec["for"] is not None and rec["against"] is not None else None,
+                    if rec["for"] is not None and rec["against"] is not None
+                    else rec.get("accepted"),
                 })
         print(f"votes merged: {kept} carried over, {len(out_votes)} total", flush=True)
 

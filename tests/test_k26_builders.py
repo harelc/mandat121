@@ -177,6 +177,58 @@ class PickDocUrlTest(unittest.TestCase):
         self.assertEqual(mod.build_docs([]), [])
 
 
+class WebsiteVoteFallbackTest(unittest.TestCase):
+    """Non-electronic votes have no OData tally (KNS_PlenumVoteResult
+    holds rows only for electronic/roll-call votes), so build_knesset
+    falls back to WebSiteApi GetVoteDetails — counters there omit zero
+    categories, and secret ballots report candidates, not for/against."""
+
+    def parse(self, detail):
+        return load_module("build_knesset.py").parse_website_vote(detail)
+
+    def test_hand_vote_counters_default_missing_titles_to_zero(self):
+        out = self.parse({
+            "VoteHeader": [{"IsForAccepted": True}],
+            "VoteCounters": [{"Title": "בעד", "countOfResult": 6}],
+            "VoteDetails": [], "DescreetVoteResults": []})
+        self.assertEqual(out["tally"], {"for": 6, "against": 0, "abstain": 0})
+        self.assertIsNone(out["secret"])
+        self.assertTrue(out["accepted"])
+
+    def test_present_not_voting_is_not_a_tally(self):
+        out = self.parse({
+            "VoteHeader": [{"IsForAccepted": True}],
+            "VoteCounters": [{"Title": "בעד", "countOfResult": 28},
+                             {"Title": "נוכח ולא הצביע", "countOfResult": 4}],
+            "VoteDetails": [], "DescreetVoteResults": []})
+        self.assertEqual(out["tally"], {"for": 28, "against": 0, "abstain": 0})
+
+    def test_secret_ballot_reports_candidates_not_for_against(self):
+        out = self.parse({
+            "VoteHeader": [{"IsForAccepted": False}],
+            "VoteCounters": [],
+            "VoteDetails": [],
+            "DescreetVoteResults": [
+                {"description": "מועמד א", "AmountFor": 57},
+                {"description": "מועמד ב", "AmountFor": 60}]})
+        self.assertIsNone(out["tally"])
+        self.assertEqual(out["secret"],
+                         [{"name": "מועמד א", "votes": 57},
+                          {"name": "מועמד ב", "votes": 60}])
+        self.assertFalse(out["accepted"])
+
+    def test_uncounted_hand_vote_carries_only_the_verdict(self):
+        out = self.parse({
+            "VoteHeader": [{"IsForAccepted": True}],
+            "VoteCounters": [], "VoteDetails": [], "DescreetVoteResults": []})
+        self.assertIsNone(out["tally"])
+        self.assertTrue(out["accepted"])
+
+    def test_empty_payload(self):
+        out = self.parse(None)
+        self.assertEqual(out, {"tally": None, "secret": None, "accepted": None})
+
+
 class UnpublishedLayerNoOpTest(unittest.TestCase):
     """Builders run from a cwd with no K26 data must exit 0 and write nothing."""
 

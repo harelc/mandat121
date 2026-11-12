@@ -52,7 +52,7 @@ https://knesset.gov.il/OdataV4/ParliamentInfo/
 | `ForOptionDesc` | string | Description of the "for" option (e.g., "לקבל את הצעת החוק בקריאה שלישית") |
 | `AgainstOptionDesc` | string | Description of the "against" option |
 | `VoteStatusCode` | int | 7 = מפורסם (published) |
-| `VoteMethodID` | int | 1 = אלקטרונית |
+| `VoteMethodID` | int | 1 = אלקטרונית, 2 = שמית (both have per-MK rows), 3 = חשאית, 4 = הרמת ידיים עם מונים, 5 = הרמת ידיים ללא מונים (3–5 have **no** per-MK rows, ever) |
 | `Ordinal` | int | Vote order within session |
 
 **Filtering 2nd+3rd reading votes:**
@@ -210,6 +210,6 @@ https://fs.knesset.gov.il/{KnessetNum}/law/{filename}.{ext}
 |--------|---------------|
 | `knesset.gov.il/Odata/ParliamentInfo.svc/` (OData v3) | Superseded by v4 |
 | `knesset.gov.il/Odata/Votes.svc/` (OData v3) | Frozen at K24, not updated |
-| `knesset.gov.il/WebSiteApi/knessetapi/Votes/` | Undocumented REST, brute-force vote ID crawling — replaced by OData v4 filtered queries |
+| `knesset.gov.il/WebSiteApi/knessetapi/Votes/` | Undocumented REST, brute-force vote ID crawling — replaced by OData v4 filtered queries for per-MK rows. **Correction (2026-11-11):** `GET Votes/GetVoteDetails/<id>` on this API is live and is the *only* structured source for non-electronic votes — OData has no tally at all for them (no counts on `KNS_PlenumVote`, no rows in `KNS_PlenumVoteResult`). It returns `VoteCounters` (hand votes with counters; zero categories omitted), `DescreetVoteResults` (secret-ballot candidate counts) and `VoteHeader.IsForAccepted` (the verdict for uncounted hand votes). `build_knesset.py` uses it as a per-vote fallback only when the OData tally is missing (~85 era votes). |
 | hasadna GCS CSV mirrors | Frozen at K24, sourced from stale OData v3 Votes |
 | Fuzzy name matching for bill↔vote | Not needed — `PlenumVote.ItemID → Bill.Id` is a direct FK |

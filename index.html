@@ -1094,17 +1094,31 @@ function closeVote(b){const d=Math.abs((b.total_for||0)-(b.total_against||0)); r
    context (type/topics/text) comes from the linked bill when there is
    one; it is context, not identity — a vote on a bill and the bill are
    different things and only the vote gets a "my vote" key. */
+const VOTE_METHOD={1:'הצבעה אלקטרונית',2:'הצבעה שמית',3:'הצבעה חשאית',4:'הרמת ידיים עם מונים',5:'הרמת ידיים ללא מונים'};
 function voteModel(id){
   const key=String(id); if(VOTE_MODELS[key]) return VOTE_MODELS[key];
   const v=VOTE_BY_ID[key]; if(!v) return null;
   const lite=v.item_id?ALLB_BY_ID[v.item_id]:null;
   const m={id:key,bill_id:v.item_id||null,lite,name:v.title||'',title:v.title||'',sub:v.desc||'',
     vote_date:v.date,kind:v.kind||null,kind_label:v.kind_label||'',
+    method_id:v.method_id||null,secret:v.secret||null,
+    has_tally:v.for!=null&&v.against!=null,
     bill_type:(lite&&lite.type)||'',topics:(lite&&lite.topics)||[],doc_url:(lite&&lite.doc_url)||null,
     summary:(lite&&lite.summary)||null,synopsis:(lite&&lite.synopsis)||null,
     total_for:v.for||0,total_against:v.against||0,total_abstain:v.abstain||0,mk_votes:null};
-  m.is_accepted=m.total_for>m.total_against;
+  m.is_accepted=m.has_tally?m.total_for>m.total_against:(v.secret?null:v.accepted!=null?!!v.accepted:null);
   VOTE_MODELS[key]=m; return m;
+}
+/* Empty per-MK section, by vote method. Non-electronic votes have no
+   individual record anywhere — that is a fact about how the vote was
+   held, not a harvest still in progress, and the copy must say so. */
+function noMkVotesHTML(b){
+  const wrap=(icon,html)=>`<div class="card empty" style="margin-top:.85rem"><div class="big">${icon}</div>${html}</div>`;
+  const searchIcon='<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg>';
+  if(b.method_id===4) return wrap(searchIcon,`הצבעה זו נערכה <b>בהרמת ידיים עם מונים</b> — מזכירות הכנסת ספרה את הידיים המורמות, והתוצאה המספרית למעלה היא הספירה הרשמית. בהצבעה כזאת לא נרשם איך הצביע כל ח״כ, ולכן אין מפת מליאה ואין רשימת ״מי הצביע איך״.`);
+  if(b.method_id===5) return wrap(searchIcon,`הצבעה זו נערכה <b>בהרמת ידיים ללא מונים</b> — יושב־ראש הישיבה אמד את הרוב בעין, בלי ספירה. לא קיימת תוצאה מספרית ולא נרשם איך הצביע כל ח״כ, ולכן אין מפת מליאה ואין רשימת ״מי הצביע איך״.${b.is_accepted!=null?`<br><b>${b.is_accepted?'ההצעה התקבלה':'ההצעה לא התקבלה'}</b> — כך קבע יושב־ראש הישיבה.`:''}`);
+  if(b.method_id===3) return wrap(searchIcon,`הצבעה זו נערכה <b>בהצבעה חשאית</b> מאחורי פרגוד — לא נרשם איך הצביע כל ח״כ, ולכן אין מפת מליאה ואין רשימת ״מי הצביע איך״.${b.secret&&b.secret.length?`<div class="rows" style="margin:.7rem -.9rem 0;text-align:start">${b.secret.map(s=>`<div class="row"><span class="flex">${esc(s.name)}</span><span class="vchip f">${s.votes} קולות</span></div>`).join('')}</div>`:''}`);
+  return wrap(searchIcon,`פירוט ההצבעה לפי ח״כ עדיין באיסוף מה־OData — התוצאה המספרית למעלה מעודכנת.`);
 }
 function voteMkVotes(m){ if(m&&!m.mk_votes) m.mk_votes=mkVotesFor(m.id,m.vote_date); return (m&&m.mk_votes)||[] }
 /* Saved "my vote" keys were once split two ways: a bill id for a bill's
@@ -1357,7 +1371,7 @@ function castMine(id,v,el){
    a firehose, not tracking. Following is reserved for specific bills, MKs
    and committees. */
 function matchStrip(b){ const mine=S.myVotes[String(b?.id)]; if(!mine||!b)return '';
-  const mk=voteMkVotes(b);
+  const mk=voteMkVotes(b); if(!mk.length&&b.method_id>=3) return `<div class="small" style="margin-top:.6rem">הצבעת <b>${mine===1?'בעד':mine===2?'נגד':'נמנע'}</b> — בהצבעה ${esc(VOTE_METHOD[b.method_id])} אין רישום לפי ח״כ, אז אי אפשר לדעת מי הצביע כמוך.</div>`;
   const same=mk.filter(v=>v.result===mine); const half=mk.filter(v=>v.result===3&&mine!==3);
   return `<div class="small" style="margin-top:.6rem">הצבעת <b>${mine===1?'בעד':mine===2?'נגד':'נמנע'}</b> — ${same.length} ח״כים הצביעו כמוך${half.length?`, ${half.length} נמנעו`:''}. <a href="#" onclick="event.preventDefault();event.stopPropagation();go('mine')">מי מצביע כמוני בכלל? ←</a></div>`;
 }
@@ -1369,7 +1383,7 @@ function voteCard(v){
     <span class="date">${fmtDate(b.vote_date)}</span></div>
     <div class="syn">${esc(displayText(b))}</div>
     <div class="bill-name">${esc(b.sub||summaryText(b)||'')}</div>
-    <div style="margin:.7rem 0">${scoreHTML(b)}</div>
+    <div style="margin:.7rem 0">${b.has_tally?scoreHTML(b):`<div class="small dim">${b.method_id>=3?`${esc(VOTE_METHOD[b.method_id])} — אין רישום לפי ח״כ${b.is_accepted!=null?` · ${b.is_accepted?'✓ עברה':'✕ נדחתה'}`:''}`:'התוצאה המספרית בתהליך איסוף'}</div>`}</div>
     ${myVoteHTML(b)}
     <div data-matchhost>${matchStrip(b)}</div>
   </article>`;
@@ -2427,7 +2441,7 @@ function renderVotesAll(){
     <div class="syn" style="font-size:.95rem">${esc(v.title||'')}</div>
     ${v.desc&&v.desc!==v.kind_label?`<div class="small muted" style="margin-top:.3rem">${esc(v.desc)}</div>`:''}
     ${v.for!=null&&tot?`<div class="scorebar" style="margin-top:.55rem"><i style="width:${v.for/tot*100}%;background:var(--for)"></i><i style="width:${(v.abstain||0)/tot*100}%;background:var(--abstain)"></i><i style="width:${v.against/tot*100}%;background:var(--against)"></i></div>
-    <div class="small" style="margin-top:.3rem"><b style="color:var(--for)">${v.for} בעד</b> · <b style="color:var(--against)">${v.against} נגד</b>${v.abstain?` · <b style="color:var(--abstain)">${v.abstain} נמנע</b>`:''} · <b style="color:${v.for>v.against?'var(--for)':v.against>v.for?'var(--against)':'var(--abstain)'}">${v.for>v.against?'✓ עברה':v.against>v.for?'✕ נדחתה':'= תיקו'}</b></div>`:'<div class="small dim" style="margin-top:.4rem">התוצאה המספרית בתהליך איסוף</div>'}
+    <div class="small" style="margin-top:.3rem"><b style="color:var(--for)">${v.for} בעד</b> · <b style="color:var(--against)">${v.against} נגד</b>${v.abstain?` · <b style="color:var(--abstain)">${v.abstain} נמנע</b>`:''} · <b style="color:${v.for>v.against?'var(--for)':v.against>v.for?'var(--against)':'var(--abstain)'}">${v.for>v.against?'✓ עברה':v.against>v.for?'✕ נדחתה':'= תיקו'}</b></div>`:`<div class="small dim" style="margin-top:.4rem">${v.method_id>=3?`${esc(VOTE_METHOD[v.method_id])} — אין רישום לפי ח״כ${v.accepted!=null?` · ${v.accepted?'✓ עברה':'✕ נדחתה'}`:''}`:'התוצאה המספרית בתהליך איסוף'}</div>`}
     <div style="margin-top:.65rem">${myVoteHTML(v)}</div>
     <div data-matchhost>${matchStrip(voteModel(v.id))}</div>
   </article>`}).join('')}</div>
@@ -2479,14 +2493,14 @@ function renderVote(){
   <article class="card pad rise" style="margin-top:.6rem">
     <div style="display:flex;gap:.6rem;align-items:flex-start">
       <div style="flex:1">
-        <div class="card-top">${b.kind_label?`<span class="chip acc">${esc(b.kind_label)}</span>`:''}${b.bill_type?`<span class="chip">${esc(b.bill_type)}</span>`:''}<span class="date">${fmtDate(b.vote_date)}</span></div>
+        <div class="card-top">${b.kind_label?`<span class="chip acc">${esc(b.kind_label)}</span>`:''}${b.bill_type?`<span class="chip">${esc(b.bill_type)}</span>`:''}${b.method_id&&b.method_id>=3?`<span class="chip">${esc(VOTE_METHOD[b.method_id])}</span>`:''}<span class="date">${fmtDate(b.vote_date)}</span></div>
         <h1 style="font-size:1.45rem;line-height:1.35">${esc(b.title)}</h1>
         ${b.sub&&b.sub!==b.title?`<div class="bill-name">${esc(b.sub)}</div>`:''}
         ${b.topics&&b.topics.length?`<div class="chips" style="margin-top:.5rem">${b.topics.map(t=>`<button class="chip" title="כל החוקים בנושא" onclick="filterTopic('${jsq(t)}')">${esc(t)}</button>`).join('')}</div>`:''}
       </div>${b.bill_id?`<div style="text-align:center">${starBtn('bill',b.bill_id,(b.lite&&b.lite.name)||b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.bill_id)?'החוק במעקב ★':'מעקב אחרי החוק'}</div></div>`:''}
     </div>
     ${b.bill_id?`<div class="small dim" style="margin-top:.7rem">מסע הצעת החוק — כל שלביה, לא רק ההצבעה הזאת:</div>${stepperHTML(b.bill_id)}`:''}
-    <div style="margin:1rem 0">${outcomeHTML(b.total_for,b.total_against,b.total_abstain,...nouns)}${scoreHTML(b,true)}</div>
+    <div style="margin:1rem 0">${b.has_tally?`${outcomeHTML(b.total_for,b.total_against,b.total_abstain,...nouns)}${scoreHTML(b,true)}`:b.is_accepted!=null?`<div class="outcome ${b.is_accepted?'for':'against'}" role="status"><span class="o-ic">${b.is_accepted?'✓':'✕'}</span><span class="o-main"><b>${esc(b.is_accepted?nouns[0]:nouns[1])}</b><span>הצבעה ${esc(VOTE_METHOD[b.method_id]||'לא אלקטרונית')} — אין ספירה מספרית</span></span></div>`:''}</div>
     <div data-matchhost-host>
       <div class="myvote" style="max-width:520px"><span class="lbl" style="font-size:.95rem;color:var(--text);font-weight:800">אני הייתי מצביע/ה בהצבעה הזאת:</span>${[1,2,3].map(v=>`<button class="mv ${S.myVotes[String(b.id)]===v?'sel':''}" data-v="${v}" style="padding:.75rem .2rem" onclick="castMine('${b.id}',${v},this)">${v===1?'✓ בעד':v===2?'✕ נגד':'– נמנע'}</button>`).join('')}</div>
       <div data-matchhost>${matchStrip(b)}</div>
@@ -2532,7 +2546,7 @@ function renderVote(){
   <div style="display:flex;gap:.5rem;margin-bottom:.6rem"><input type="search" id="mkq" placeholder="חיפוש ח״כ בהצבעה…" style="flex:1" oninput="filterBillMks(this.value)"><select id="mkf" onchange="filterBillMks($('#mkq').value)"><option value="">כולם</option><option value="1">בעד</option><option value="2">נגד</option><option value="3">נמנעים</option><option value="rebel">רק חורגים</option></select></div>
   <div class="card rows" id="billMkList">${billMkRows(b,reb)}</div>
   ${absentSummaryHTML(seats.filter(s=>s.absent))}`
-  :`<div class="card empty" style="margin-top:.85rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg></div>פירוט ההצבעה לפי ח״כ עדיין באיסוף מה־OData — התוצאה המספרית למעלה מעודכנת.</div>`}`;
+  :noMkVotesHTML(b)}`;
   document.querySelectorAll('.plenum-svg .seat').forEach((el,i)=>el.addEventListener('click',()=>openMk(seats[i].name)));
 }
 function renderVotes(){
