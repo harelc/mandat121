@@ -852,7 +852,7 @@ const PTV_CFG_API='https://knesset.gov.il/WebSiteApi/knessetapi/GlobalResources/
 const PTV_FALLBACK='https://knesetn.gostreaming.tv/Knesset/index.m3u8';
 const PTV_HOSTS=new Set(['knesetn.gostreaming.tv','w1.013.gostreaming.tv','video.knesset.gov.il']);
 let PLENUM_TV={at:0,tryAt:0,data:null,liveUrl:null,hls:null,src:null,timer:null,lastOnAirAt:0,closed:false,force:false};
-function ptvClose(){ PLENUM_TV.closed=true; PLENUM_TV.force=false; ptvDestroy(); renderPlenumTv() }
+function ptvClose(){ PLENUM_TV.closed=!!(PLENUM_TV.data&&PLENUM_TV.data.onAir); PLENUM_TV.force=false; ptvDestroy(); renderPlenumTv() } // closed is remembered only for a live plenum player; closing a forced-open off-air player just exits it, so the plenum can still auto-open when the sitting resumes
 function ptvOpen(){ PLENUM_TV.closed=false; PLENUM_TV.force=true; renderPlenumTv() }
 const ptvUrl=u=>{ try{ const x=new URL(u); return x.protocol==='https:'&&PTV_HOSTS.has(x.host)?x.href:null }catch(e){ return null } };
 function ptvDestroy(){ if(PLENUM_TV.hls){ try{PLENUM_TV.hls.destroy()}catch(e){} PLENUM_TV.hls=null } PLENUM_TV.src=null; const v=document.getElementById('plenumTvVideo'); if(v){ v.dataset.ptvSrc=''; v.pause(); v.removeAttribute('src'); v.load() } }
@@ -924,10 +924,14 @@ function renderPlenumTv(){
   if(!box){ ptvDestroy(); return }
   const d=PLENUM_TV.data;
   if(!d) return; // unknown yet — stay invisible rather than flicker
-  if(PLENUM_TV.closed){
+  if(PLENUM_TV.closed&&d.onAir){
+    // A manual close only collapses a player that was showing the plenum.
+    // Off air there is nothing to collapse into: closing a forced-open
+    // channel player must land back on the same off-air card the user
+    // opened it from, not on a separate "closed" message.
     if(box.querySelector('video')) ptvDestroy();
     box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת</small></div>
-    <section class="card ptv-off rise"><span class="chip acc">הנגן נסגר</span><span class="small muted">השידור ממשיך ברקע הישיבה — אפשר לפתוח אותו מחדש בכל רגע.</span><span style="margin-inline-start:auto"><button class="btn ghost small" onclick="ptvOpen()">הצגת השידור ←</button></span></section>`;
+    <section class="card ptv-off rise"><span class="chip acc">הנגן סגור</span><span class="small muted">המליאה משודרת כעת בשידור חי — הנגן סגור. אפשר לפתוח אותו מחדש בכל רגע.</span><span style="margin-inline-start:auto"><button class="btn ghost small" onclick="ptvOpen()">הצגת השידור ←</button></span></section>`;
     return;
   }
   if(d.onAir||PLENUM_TV.force){
