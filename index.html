@@ -435,6 +435,7 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 #pgCanvas{display:block;width:100%}
 .pg-tip{position:absolute;pointer-events:none;background:var(--card,#fff);border:1px solid var(--line);border-radius:.55rem;box-shadow:var(--shadow);padding:.35rem .6rem;font-size:.75rem;line-height:1.5;white-space:nowrap;z-index:5;display:none}
 .pg-tip b{font-size:.8rem}
+@media (max-width:640px){ .pg-stage{min-width:600px} }
 .progress{height:7px;background:#e7ddc6;border-radius:99px;overflow:hidden;direction:ltr}
 .progress i{display:block;height:100%;border-radius:99px}
 .rows{display:flex;flex-direction:column}
@@ -2205,7 +2206,20 @@ function presenceGridHTML(seats){
   <span class="small dim">${pgMode==='week'?'עוצמת התא = שיעור ימי המעקב באותו שבוע שבהם נכח/ה':'מוצגים '+Math.min(pgLimit,total)+' הימים האחרונים מתוך '+total+' ימי מעקב'}</span></div>
   <div class="pg-scroll"><div class="pg-stage" id="pgStage"><canvas id="pgCanvas"></canvas><div class="pg-tip" id="pgTip"></div></div></div>
   ${pgMode==='day'&&total>pgLimit?`<div style="margin-top:.55rem"><button class="btn ghost small" onclick="pgLimit+=60;renderNow26()">הצגת 60 ימים קודמים נוספים</button></div>`:''}
-  <p class="small dim" style="margin-top:.55rem">ריחוף מציג ח״כ ותאריך, לחיצה על תא פותחת את דף הח״כ/ית. העמודות בסדר המפה למעלה; מי שעזב/ה את הכנסת אינו בעמודות, אבל ימי הנוכחות שלו/ה נשמרים בדף האישי.</p></section>`;
+  <p class="small dim" style="margin-top:.55rem">מעבר עכבר או נגיעה מציגים ח״כ ותאריך; לחיצה על התא פותחת את דף הח״כ/ית (במסך מגע: נגיעה שנייה באותו תא). העמודות בסדר המפה למעלה; מי שעזב/ה את הכנסת אינו בעמודות, אבל ימי הנוכחות שלו/ה נשמרים בדף האישי.</p></section>`;
+}
+let pgTap=null, pgTouch=false; // touch has no hover: first tap pins a cell (below), second tap on the same cell opens it
+function pgCellAt(mx,my){ if(!PG||mx>PG.gridR) return null; const c=Math.floor((PG.gridR-mx)/PG.pitch), r=Math.floor((my-PG.headH)/PG.rowH); return (c>=0&&c<PG.ncols&&r>=0&&r<PG.rows.length)?{c,r}:null }
+function pgShowTip(c,r,mx,my){
+  const tip=document.getElementById('pgTip'); if(!tip||!PG) return;
+  const col=PG.m.cols[c], row=PG.rows[r], val=row.cells[c];
+  tip.innerHTML=`<b>${esc(disp(col.raw))}</b> · ${esc(shortF(col.faction))}<br>${row.date?`${fmtDate(row.date)} — ${val?'נכח/ה במשכן':'לא נכח/ה'}`:`שבוע ${fmtDate(row.weekOf)} — נכח/ה ${Math.round(val*row.ndays)} מתוך ${row.ndays} ימי מעקב`} · סה״כ ${col.total} ימי נוכחות`;
+  tip.style.display='block'; const tw=tip.offsetWidth, th=tip.offsetHeight;
+  tip.style.left=Math.max(0,Math.min(mx+14,PG.W-tw-4))+'px';
+  // Flip above the cursor when below would clip — with a single
+  // tracked day the canvas is shorter than the tooltip itself.
+  let ty=my+16; if(ty+th>PG.H) ty=my-th-10;
+  tip.style.top=Math.max(0,Math.min(ty,Math.max(0,PG.H-th)))+'px';
 }
 function drawPresenceGrid(hover){
   const cv=document.getElementById('pgCanvas'); if(!cv||!PG_SEATS||!PRESENCE26) return;
@@ -2238,22 +2252,18 @@ function drawPresenceGrid(hover){
   x.globalAlpha=1;
   if(hover){ x.strokeStyle=ink; x.lineWidth=1.4; x.strokeRect(cellX(hover.c)+.5,headH+hover.r*rowH,pitch-1,cellH) }
   if(!cv._pgBound){ cv._pgBound=true;
-    cv.addEventListener('mousemove',e=>{ if(!PG) return; const rect=cv.getBoundingClientRect(), mx=e.clientX-rect.left, my=e.clientY-rect.top;
-      const c=Math.floor((PG.gridR-mx)/PG.pitch), r=Math.floor((my-PG.headH)/PG.rowH), tip=document.getElementById('pgTip');
-      if(mx>PG.gridR||c<0||c>=PG.ncols||r<0||r>=PG.rows.length){ if(tip) tip.style.display='none'; if(!pgRaf){pgRaf=true; requestAnimationFrame(()=>{pgRaf=false; drawPresenceGrid()})} return }
-      if(!pgRaf){ pgRaf=true; requestAnimationFrame(()=>{ pgRaf=false; drawPresenceGrid({c,r}) }) }
-      if(tip){ const col=PG.m.cols[c], row=PG.rows[r], val=row.cells[c];
-        tip.innerHTML=`<b>${esc(disp(col.raw))}</b> · ${esc(shortF(col.faction))}<br>${row.date?`${fmtDate(row.date)} — ${val?'נכח/ה במשכן':'לא נכח/ה'}`:`שבוע ${fmtDate(row.weekOf)} — נכח/ה ${Math.round(val*row.ndays)} מתוך ${row.ndays} ימי מעקב`} · סה״כ ${col.total} ימי נוכחות`;
-        tip.style.display='block'; const tw=tip.offsetWidth, th=tip.offsetHeight;
-        tip.style.left=Math.max(0,Math.min(mx+14,PG.W-tw-4))+'px';
-        // Flip above the cursor when below would clip — with a single
-        // tracked day the canvas is shorter than the tooltip itself.
-        let ty=my+16; if(ty+th>PG.H) ty=my-th-10;
-        tip.style.top=Math.max(0,Math.min(ty,Math.max(0,PG.H-th)))+'px' } });
-    cv.addEventListener('mouseleave',()=>{ const tip=document.getElementById('pgTip'); if(tip) tip.style.display='none'; drawPresenceGrid() });
+    cv.addEventListener('pointerdown',e=>{ pgTouch=e.pointerType==='touch'||e.pointerType==='pen' });
+    cv.addEventListener('mousemove',e=>{ if(!PG||pgTouch) return; const rect=cv.getBoundingClientRect(), mx=e.clientX-rect.left, my=e.clientY-rect.top;
+      const cell=pgCellAt(mx,my), tip=document.getElementById('pgTip');
+      if(!cell){ if(tip) tip.style.display='none'; if(!pgRaf){pgRaf=true; requestAnimationFrame(()=>{pgRaf=false; drawPresenceGrid()})} return }
+      if(!pgRaf){ pgRaf=true; requestAnimationFrame(()=>{ pgRaf=false; drawPresenceGrid(cell) }) }
+      pgShowTip(cell.c,cell.r,mx,my) });
+    cv.addEventListener('mouseleave',()=>{ const tip=document.getElementById('pgTip'); if(tip) tip.style.display='none'; pgTap=null; drawPresenceGrid() });
     cv.addEventListener('click',e=>{ if(!PG) return; const rect=cv.getBoundingClientRect(), mx=e.clientX-rect.left, my=e.clientY-rect.top;
-      const c=Math.floor((PG.gridR-mx)/PG.pitch), r=Math.floor((my-PG.headH)/PG.rowH);
-      if(mx<=PG.gridR&&c>=0&&c<PG.ncols&&r>=0&&r<PG.rows.length) openMk(PG.m.cols[c].raw) });
+      const cell=pgCellAt(mx,my); if(!cell) return;
+      if(pgTouch&&!(pgTap&&pgTap.c===cell.c&&pgTap.r===cell.r)){ // first tap only inspects — cells are ~5px, a blind tap would open the wrong MK
+        pgTap={...cell}; drawPresenceGrid(cell); pgShowTip(cell.c,cell.r,PG.gridR-(cell.c+.5)*PG.pitch,PG.headH+cell.r*PG.rowH+PG.cellH/2); return }
+      pgTap=null; openMk(PG.m.cols[cell.c].raw) });
   }
 }
 function renderNow26(){
