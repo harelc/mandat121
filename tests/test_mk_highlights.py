@@ -22,7 +22,7 @@ def load_module(fname):
 
 mh = load_module("build_mk_highlights.py")
 NAMES = {"רוטמן שמחה", "פרקש הכהן אורית", "בן גביר איתמר", "וולדיגר מיכל",
-         "כהן אלי", "כהן אבי"}
+         "כהן אלי", "כהן אבי", "בן צור יואב", "בן שטרית רפאל"}
 BY_DISPLAY, BY_PAIR = mh.speaker_map(NAMES)
 
 
@@ -33,6 +33,13 @@ class ResolveTest(unittest.TestCase):
     def test_multi_token_surname_via_forward(self):
         self.assertEqual(mh.resolve("אורית פרקש הכהן", BY_DISPLAY, BY_PAIR), "פרקש הכהן אורית")
         self.assertEqual(mh.resolve("איתמר בן גביר", BY_DISPLAY, BY_PAIR), "בן גביר איתמר")
+        # בן צור is a two-token surname; the naive flip reads צור יואב בן.
+        self.assertEqual(mh.disp("בן צור יואב"), "יואב בן צור")
+        self.assertEqual(mh.resolve("יואב בן צור", BY_DISPLAY, BY_PAIR), "בן צור יואב")
+
+    def test_particle_surname_without_forward_entry(self):
+        self.assertEqual(mh.disp("בן שטרית רפאל"), "רפאל בן שטרית")
+        self.assertEqual(mh.resolve("רפאל בן שטרית", BY_DISPLAY, BY_PAIR), "בן שטרית רפאל")
 
     def test_middle_name_fallback(self):
         # Transcripts spell her "מיכל מרים וולדיגר"; the key is וולדיגר מיכל.
