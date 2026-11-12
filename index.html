@@ -231,7 +231,34 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 .irebels{flex:1;min-width:180px;display:grid;gap:.35rem;text-align:start}
 .irebel{display:flex;align-items:center;gap:.45rem;background:var(--surface);border:1px solid var(--line);border-radius:10px;padding:.35rem .55rem;font-size:.72rem;font-weight:700}
 .irebel .xb{margin-inline-start:auto;color:var(--against);font-weight:900;white-space:nowrap}
-@media(max-width:560px){.itiles{grid-template-columns:repeat(3,1fr)}.intro-box{padding:.6rem}.iscene{padding:1.4rem .6rem .6rem}.imatrix{width:84px}}
+/* Mobile: a 16:9 stage is only ~195px tall on a phone — the heading alone
+   plus a caption leaves ~35px for the diagram, so scenes were clipped by
+   the stage's overflow:hidden. Give the stage most of the viewport height
+   instead, stack the side-by-side diagrams, and drop the keyboard hint. */
+@media(max-width:560px){
+  .itiles{grid-template-columns:repeat(3,1fr)}
+  .intro-overlay{padding:.45rem;align-items:flex-start}
+  .intro-box{padding:.6rem .6rem .55rem;border-radius:18px;max-height:97dvh}
+  .intro-stage{aspect-ratio:auto;height:min(560px,62dvh)}
+  .iscene{padding:1.35rem .6rem .55rem;overflow-y:auto}
+  .iscene h2{font-size:1.14rem;line-height:1.22;margin:.35rem 0 .15rem}
+  .iscene .cap{font-size:.8rem;line-height:1.5}
+  .iscene .diagram{padding:.2rem 0}
+  .irow{flex-direction:column;gap:.55rem !important}
+  .icmtrows,.irebels{width:100%;min-width:0}
+  .itable{width:138px;height:78px}
+  .imatrix{width:84px}
+  .idots{width:min(250px,78%)}
+  .intro-hint{display:none}
+  .intro-controls{justify-content:center;margin-top:.5rem}
+  .intro-controls .sp{flex:0 0 100%;height:0}
+  .intro-controls .ibtn:last-child{flex:1}
+}
+/* Landscape phones: width passes the breakpoint but height is the constraint. */
+@media(max-height:480px) and (orientation:landscape){
+  .intro-stage{aspect-ratio:auto;height:64dvh}
+  .intro-hint{display:none}
+}
 
 /* vote score bar */
 .scorebar{display:flex;height:14px;border-radius:999px;overflow:hidden;background:#e7ddc6;direction:ltr}
@@ -655,7 +682,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
       <section class="iscene" data-scene>
         <span class="kick">ועדות · 4 מתוך 9</span>
         <h2>הוועדות — שם החוקים באמת מתבשלים</h2>
-        <div class="diagram"><div style="display:flex;gap:.85rem;align-items:center;width:min(500px,96%)">
+        <div class="diagram"><div class="irow" style="display:flex;gap:.85rem;align-items:center;width:min(500px,96%)">
           <div class="itable pop" style="--d:.2s" role="img" aria-label="שולחן ועדה סכמטי"><span class="doc">§ חוק בדיון</span><i class="chair" style="top:-9px;inset-inline-start:calc(50% - 9px)"></i><i style="top:6px;inset-inline-start:14%"></i><i style="top:6px;inset-inline-end:14%"></i><i style="bottom:6px;inset-inline-start:14%"></i><i style="bottom:6px;inset-inline-end:14%"></i><i style="top:calc(50% - 7px);inset-inline-start:-8px"></i><i style="top:calc(50% - 7px);inset-inline-end:-8px"></i></div>
           <div class="icmtrows">
             <div class="irebel pop" style="--d:.55s"><span>לכל ועדה: יו״ר, חברים וכל הישיבות בקדנציה</span></div>
@@ -708,7 +735,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
       <section class="iscene" data-scene>
         <span class="kick">ניתוח · 8 מתוך 9</span>
         <h2>מי מצביע עם מי — ומי חורג מהסיעה</h2>
-        <div class="diagram"><div style="display:flex;gap:.8rem;align-items:center;width:min(480px,96%)">
+        <div class="diagram"><div class="irow" style="display:flex;gap:.8rem;align-items:center;width:min(480px,96%)">
           <div class="imatrix pop" id="introMatrix" style="--d:.2s" role="img" aria-label="מטריצת דמיון הצבעה סכמטית"></div>
           <div class="irebels">
             <div class="irebel pop" style="--d:.6s"><span>מטריצת דמיון: ירוק = מצביעים יחד, אדום = הפכים</span></div>
