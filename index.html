@@ -135,6 +135,8 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 .proto-turn:hover{background:var(--surface2)}
 .proto-turn.chair{background:rgba(185,143,31,.10);border:1px solid rgba(185,143,31,.35)}
 .proto-turn.inter{padding:.2rem .6rem;font-style:italic}
+/* the exact turn an MK-page highlight promised (data-turn anchor) */
+.proto-turn.turn-target,.proto-topic.turn-target{background:#fdf0c0;box-shadow:0 0 0 2px var(--abstain);transition:background .3s}
 .proto-av{flex:0 0 auto;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.8rem;color:#211d13}
 .proto-topic{text-align:center;font-weight:800;color:var(--accent);background:var(--accent-dim);border-radius:10px;padding:.45rem .6rem;margin:.7rem 0;font-size:.85rem}
 .spk-chip{display:inline-flex;gap:.35rem;align-items:center;cursor:pointer}
@@ -1178,17 +1180,32 @@ function ensureBillDocs(){ if(BILL_DOCS) return Promise.resolve(BILL_DOCS); retu
 function ensureRoles(){ if(ROLES) return Promise.resolve(ROLES); return _lazyOnce('roles',async()=>{ const j=await _fetchJson(`data/k${KN}_roles.json`); if(j){ ROLES=j; if(view==='mk') renderMkDetail() } return ROLES }) }
 function ensurePresence26(){ if(PRESENCE26) return Promise.resolve(PRESENCE26); return _lazyOnce('presence26',async()=>{ const j=await _fetchJson('data/k26_presence.json'); if(j){ j.by_mk=_normKeys(j.by_mk); for(const d of Object.values(j.days||{})) (d.arrivals||[]).forEach(a=>a.name=normName(a.name)); PRESENCE26=j; if(KN===26&&(view==='now'||view==='mks'||view==='mk')) render() } return PRESENCE26 }) }
 function ensureMkHighlights(){ if(MK_HIGHLIGHTS) return Promise.resolve(MK_HIGHLIGHTS); return _lazyOnce('mkHighlights',async()=>{ const j=await _fetchJson('data/mk_highlights.json'); if(j){ j.by_mk=_normKeys(j.by_mk); MK_HIGHLIGHTS=j; if(view==='mk') renderMkDetail() } return MK_HIGHLIGHTS }) }
-/* Open a committee session's protocol already filtered to one MK — the
-   deep link behind every highlight/appearance on the MK page. The
-   filter can only be applied once the transcript lands, so it rides in
-   protoFocusSpeaker and toggleProtocol consumes it after rendering. */
-function openMkProtocol(sid,name){
-  protoFocusSpeaker=disp(name);
+/* Scroll to + flash one exact turn (data-turn anchor in protoTurnsHTML).
+   Highlight rows promise THIS turn, not just the sitting — anything less
+   is a misleading button. Returns false when the turn isn't rendered
+   (wrong filter / not loaded yet). */
+let protoFocusTurn=null, plenumFocusTurn=null;
+function flashTurn(ti){
+  if(ti==null) return false;
+  const el=document.querySelector(`[data-turn="${ti}"]`);
+  if(!el) return false;
+  el.scrollIntoView({block:'center',behavior:'smooth'});
+  el.classList.add('turn-target');
+  setTimeout(()=>el.classList.remove('turn-target'),2800);
+  return true;
+}
+/* Open a committee session's protocol filtered to one MK — and, when a
+   turn index rides along (highlight rows), land on that exact turn.
+   The filter can only be applied once the transcript lands, so it rides
+   in protoFocusSpeaker/protoFocusTurn and the loader consumes them. */
+function openMkProtocol(sid,name,turn=null){
+  protoFocusSpeaker=disp(name); protoFocusTurn=turn;
   const apply=()=>{ const box=$('#protoBox'); if(!box) return false;
     if(PROTO_CUR&&PROTO_CUR.id===String(sid)){ delete box.dataset.mkFocus;
       if(protoFocusSpeaker){ protoFilter={speaker:protoFocusSpeaker,q:''}; protoFocusSpeaker=''; renderProtocol() }
-      box.scrollIntoView({block:'start',behavior:'smooth'}); return true }
-    if(!box.dataset.mkFocus){ box.dataset.mkFocus='1'; toggleProtocol(String(sid)) } // once — the transcript fetch is async and toggleProtocol consumes protoFocusSpeaker when it lands
+      if(!flashTurn(protoFocusTurn)) box.scrollIntoView({block:'start',behavior:'smooth'});
+      protoFocusTurn=null; return true }
+    if(!box.dataset.mkFocus){ box.dataset.mkFocus='1'; toggleProtocol(String(sid)) } // once — the transcript fetch is async and toggleProtocol consumes the focus globals when it lands
     return true };
   if(view==='session'&&String(viewArg)===String(sid)){ apply(); return }
   openSession(sid);
@@ -1197,12 +1214,13 @@ function openMkProtocol(sid,name){
 /* Same idea for a plenum sitting: open its דברי הכנסת page, open the
    on-demand reader, then filter it to the MK (plenumProtoFilter.speaker
    is matched against given-first speaker names). */
-function openMkPlenum(sid,name){
-  const apply=()=>{ if(PLENUM_CUR&&PLENUM_CUR.id===String(sid)){ plenumProtoFilter={speaker:disp(name),q:'',hl:[],hlOnly:true}; renderPlenumProtocol(); const b=$('#plenumProtoBox'); if(b) b.scrollIntoView({block:'start',behavior:'smooth'}); return true } return false };
+function openMkPlenum(sid,name,turn=null){
+  plenumFocusTurn=turn;
+  const apply=()=>{ if(PLENUM_CUR&&PLENUM_CUR.id===String(sid)){ plenumProtoFilter={speaker:disp(name),q:'',hl:[],hlOnly:true}; renderPlenumProtocol(); if(!flashTurn(plenumFocusTurn)){ const b=$('#plenumProtoBox'); if(b) b.scrollIntoView({block:'start',behavior:'smooth'}) } plenumFocusTurn=null; return true } return false };
   openPlenum(sid);
   setTimeout(()=>{ if(!apply()) togglePlenumProtocol(String(sid)).then(()=>apply()) },60);
 }
-const openMkTurn=(x,name)=>x.kind==='plenum'?`openMkPlenum('${x.sid}','${jsq(name)}')`:`openMkProtocol('${x.sid}','${jsq(name)}')`;
+const openMkTurn=(x,name)=>x.kind==='plenum'?`openMkPlenum('${x.sid}','${jsq(name)}',${x.turn??'null'})`:`openMkProtocol('${x.sid}','${jsq(name)}',${x.turn??'null'})`;
 /* The MK page's protocol card: where this MK actually spoke — committee
    protocols (full text in the repo) and plenum sittings (דברי הכנסת,
    scored at parse time into data/plenum_hl/) — and their
@@ -1215,10 +1233,10 @@ function mkHighlightsHTML(name){
   const hl=h.highlights||[], apps=(h.appearances||[]).slice(0,8);
   const sessLine=[h.committee_sessions?`<b>${h.committee_sessions}</b> ישיבות ועדה`:null,h.plenum_sessions?`<b>${h.plenum_sessions}</b> ישיבות מליאה`:null].filter(Boolean).join(' ו־');
   return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> בפרוטוקולים <small class="dim">ועדות ומליאה · דבריו/ה המתועדים — והקטעים הבולטים</small></h3>
-  <div class="small muted" style="margin-top:.35rem;line-height:1.9">דיבר/ה ב־${sessLine} מתועדות · <b>${h.turns.toLocaleString('he-IL')}</b> תורות · <b>${h.words.toLocaleString('he-IL')}</b> מילים</div>
-  ${hl.length?`<h4 style="margin-top:.7rem">הקטעים הבולטים</h4><div class="rows" style="margin:.35rem -.9rem 0">${hl.map(x=>`<div class="row" onclick="${openMkTurn(x,name)}"><span class="flex" style="white-space:normal">״${esc(x.excerpt)}…״<br><span class="dim small">${esc(x.committee)} · ${fmtDate(x.date)} · ${x.words} מילים בתור</span></span><span class="chip ${x.kind==='plenum'?'':'acc'}">${x.kind==='plenum'?'מליאה':'ועדה'}</span><span class="chip acc">לפרוטוקול ←</span></div>`).join('')}</div>`:''}
-  ${apps.length?`<h4 style="margin-top:.7rem">ישיבות שדיבר/ה בהן הכי הרבה</h4><div class="rows" style="margin:.35rem -.9rem 0">${apps.map(a=>`<div class="row" onclick="${openMkTurn(a,name)}"><span class="flex">${esc(a.committee)}<br><span class="dim small">${fmtDate(a.date)} · ${a.turns} תורות · ${a.words.toLocaleString('he-IL')} מילים</span></span><span class="chip ${a.kind==='plenum'?'':'acc'}">${a.kind==='plenum'?'מליאה':'ועדה'}</span><span class="chip acc">לפרוטוקול ←</span></div>`).join('')}</div>${h.sessions>apps.length?`<div class="small dim" style="margin-top:.4rem">ועוד ${h.sessions-apps.length} ישיבות מתועדות.</div>`:''}`:''}
-  <p class="small dim" style="margin-top:.55rem">״בולטים״ נבחרו אוטומטית לפי ניקוד TF-IDF על טקסט הפרוטוקולים (מילים ייחודיות וספציפיות שוקלות יותר; מינימום 30 מילים לתור) — בלי מודל שפה. לחיצה פותחת את הפרוטוקול מסונן לדברי הח״כ.</p></div>`;
+  <div class="small muted" style="margin-top:.35rem;line-height:1.9">דיבר/ה ב־${sessLine} מתועדות · <b>${h.turns.toLocaleString('he-IL')}</b> קטעים · <b>${h.words.toLocaleString('he-IL')}</b> מילים</div>
+  ${hl.length?`<h4 style="margin-top:.7rem">הקטעים הבולטים</h4><div class="rows" style="margin:.35rem -.9rem 0">${hl.map(x=>`<div class="row" onclick="${openMkTurn(x,name)}"><span class="flex" style="white-space:normal">״${esc(x.excerpt)}…״<br><span class="dim small">${esc(x.committee)} · ${fmtDate(x.date)} · ${x.words} מילים בקטע</span></span><span class="chip ${x.kind==='plenum'?'':'acc'}">${x.kind==='plenum'?'מליאה':'ועדה'}</span><span class="chip acc">לקטע המדויק ←</span></div>`).join('')}</div>`:''}
+  ${apps.length?`<h4 style="margin-top:.7rem">ישיבות שדיבר/ה בהן הכי הרבה</h4><div class="rows" style="margin:.35rem -.9rem 0">${apps.map(a=>`<div class="row" onclick="${openMkTurn(a,name)}"><span class="flex">${esc(a.committee)}<br><span class="dim small">${fmtDate(a.date)} · ${a.turns} קטעים · ${a.words.toLocaleString('he-IL')} מילים</span></span><span class="chip ${a.kind==='plenum'?'':'acc'}">${a.kind==='plenum'?'מליאה':'ועדה'}</span><span class="chip acc">לדבריו/ה בישיבה ←</span></div>`).join('')}</div>${h.sessions>apps.length?`<div class="small dim" style="margin-top:.4rem">ועוד ${h.sessions-apps.length} ישיבות מתועדות.</div>`:''}`:''}
+  <p class="small dim" style="margin-top:.55rem">״בולטים״ נבחרו אוטומטית לפי ניקוד TF-IDF על טקסט הפרוטוקולים (מילים ייחודיות וספציפיות שוקלות יותר; מינימום 30 מילים לקטע) — בלי מודל שפה. לחיצה על קטע בולט קופצת ישר אליו בפרוטוקול; לחיצה על ישיבה פותחת את דברי הח״כ בה.</p></div>`;
 }
 const presenceTrackedDays=()=>PRESENCE26?Object.keys(PRESENCE26.days||{}).length:0;
 const mkPresenceDays=n=>PRESENCE26?.by_mk?.[normName(n)]?.days||0;
@@ -1933,7 +1951,7 @@ async function toggleProtocol(id){
   const box=$('#protoBox'); if(!box) return;
   if(PROTO_CUR&&PROTO_CUR.id===String(id)){ PROTO_CUR=null; box.innerHTML=''; return }
   box.innerHTML='<p class="muted small">טוען פרוטוקול…</p>';
-  try{ const r=await fetch(`data/protocols/${id}.json`); PROTO_CUR=await r.json(); PROTO_CUR.id=String(id); protoFilter={speaker:protoFocusSpeaker,q:''}; protoFocusSpeaker=''; renderProtocol(); const b2=$('#protoBox'); if(b2&&protoFilter.speaker) b2.scrollIntoView({block:'start',behavior:'smooth'}) }
+  try{ const r=await fetch(`data/protocols/${id}.json`); PROTO_CUR=await r.json(); PROTO_CUR.id=String(id); protoFilter={speaker:protoFocusSpeaker,q:''}; protoFocusSpeaker=''; renderProtocol(); if(!flashTurn(protoFocusTurn)){ const b2=$('#protoBox'); if(b2&&protoFilter.speaker) b2.scrollIntoView({block:'start',behavior:'smooth'}) } protoFocusTurn=null }
   catch(e){ box.innerHTML='<p class="muted small">הפרוטוקול לא נטען.</p>' }
 }
 /* Highlight query matches inside protocol text. Works on the RAW string
@@ -1969,33 +1987,34 @@ function protoTurnsHTML(doc=PROTO_CUR, filter=protoFilter){
   // committee behaviour: keep only turns containing q.
   const HL=filter.hl&&filter.hl.length?filter.hl:filter.q;
   const turns=[]; let lastTopic='';
-  for(const t of doc.turns){
+  for(let ti=0;ti<doc.turns.length;ti++){
+    const t=doc.turns[ti];
     if(t.role==='topic'){ if(t.text===lastTopic) continue; lastTopic=t.text }
     if(filter.speaker&&t.speaker!==filter.speaker) continue;
     if(filter.q&&!filter.hlOnly&&!t.text.includes(filter.q)&&!t.speaker.includes(filter.q)) continue;
-    turns.push(t);
+    turns.push([ti,t]); // ti = index into doc.turns — the anchor highlights link to (data-turn)
   }
-  return turns.map(t=>{
-    if(t.role==='topic') return `<div class="proto-topic"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h11V21L12 17.2 6.5 21z"/></svg> ${hlText(t.text,HL)}</div>`;
+  return turns.map(([ti,t])=>{
+    if(t.role==='topic') return `<div class="proto-topic" data-turn="${ti}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h11V21L12 17.2 6.5 21z"/></svg> ${hlText(t.text,HL)}</div>`;
     const col=protoColor(t.speaker,t.faction_hint); const key=protoSpeakerKey(t.speaker);
     const ini=t.speaker.split(/\s+/).map(w=>w[0]).slice(0,2).join('');
-    if(t.role==='interjection') return `<div class="proto-turn inter"><span class="small" style="color:${col};font-weight:700">${hlText(t.speaker,HL)}:</span><span class="small muted">${hlText(t.text,HL)}</span></div>`;
-    return `<div class="proto-turn ${t.role==='chair'?'chair':''}">
+    if(t.role==='interjection') return `<div class="proto-turn inter" data-turn="${ti}"><span class="small" style="color:${col};font-weight:700">${hlText(t.speaker,HL)}:</span><span class="small muted">${hlText(t.text,HL)}</span></div>`;
+    return `<div class="proto-turn ${t.role==='chair'?'chair':''}" data-turn="${ti}">
       <div class="proto-av" style="background:${col}">${esc(ini)}</div>
       <div style="flex:1;min-width:0"><div style="display:flex;gap:.45rem;align-items:center;flex-wrap:wrap">
         ${key?`<a href="#" onclick="event.preventDefault();openMk('${jsq(key)}')" style="color:${col};font-weight:800">${hlText(t.speaker,HL)}</a>`:`<b style="color:${col}">${hlText(t.speaker,HL)}</b>`}
         ${t.role==='chair'?'<span class="chip" style="color:#96700f;border-color:#dcc175">יו״ר</span>':t.role==='guest'?'<span class="chip">אורח/ת</span>':t.faction_hint?`<span class="small dim">${esc(t.faction_hint)}</span>`:''}
       </div><p style="margin-top:.25rem;line-height:1.65">${hlText(t.text,HL)}</p></div></div>`;
-  }).join('')||'<p class="muted small">אין תורות בסינון הזה.</p>';
+  }).join('')||'<p class="muted small">אין קטעים בסינון הזה.</p>';
 }
 function renderProtocol(){
   const box=$('#protoBox'); if(!box||!PROTO_CUR) return;
   const spk=Object.entries(PROTO_CUR.speakers).sort((a,b)=>b[1].words-a[1].words);
   box.innerHTML=`
-  <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,14).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${protoFilter.speaker&&protoFilter.speaker!==n?'off':''}" onclick="protoFilter.speaker=protoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderProtocol()" title="${s.turns} תורות · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
+  <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,14).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${protoFilter.speaker&&protoFilter.speaker!==n?'off':''}" onclick="protoFilter.speaker=protoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderProtocol()" title="${s.turns} קטעים · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
   ${protoFilter.speaker?`<button class="chip" onclick="protoFilter.speaker='';renderProtocol()">✕ כל הדוברים</button>`:''}</div>
   <input type="search" placeholder="חיפוש בפרוטוקול…" value="${esc(protoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="protoFilter.q=this.value;$('#protoTurns').innerHTML=protoTurnsHTML()">
-  <div class="small dim" style="margin-bottom:.5rem">${PROTO_CUR.turns.filter(t=>t.role!=='topic').length} תורות · ${spk.length} דוברים${protoFilter.q?` · ${protoOccurrences(PROTO_CUR,protoFilter.q)} אזכורים מודגשים`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו</div>
+  <div class="small dim" style="margin-bottom:.5rem">${PROTO_CUR.turns.filter(t=>t.role!=='topic').length} קטעים · ${spk.length} דוברים${protoFilter.q?` · ${protoOccurrences(PROTO_CUR,protoFilter.q)} אזכורים מודגשים`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו</div>
   <div id="protoTurns">${protoTurnsHTML()}</div>`;
 }
 /* Plenum reader: turns come from the on-demand Netlify function
@@ -2036,10 +2055,10 @@ function renderPlenumProtocol(){
   const HL=plenumProtoFilter.hl.length?plenumProtoFilter.hl:plenumProtoFilter.q;
   const occ=HL?protoOccurrences(PLENUM_CUR,HL):0;
   box.innerHTML=`
-  <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,16).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${plenumProtoFilter.speaker&&plenumProtoFilter.speaker!==n?'off':''}" onclick="plenumProtoFilter.speaker=plenumProtoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderPlenumProtocol()" title="${s.turns} תורות · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
+  <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,16).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${plenumProtoFilter.speaker&&plenumProtoFilter.speaker!==n?'off':''}" onclick="plenumProtoFilter.speaker=plenumProtoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderPlenumProtocol()" title="${s.turns} קטעים · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
   ${plenumProtoFilter.speaker?`<button class="chip" onclick="plenumProtoFilter.speaker='';renderPlenumProtocol()">✕ כל הדוברים</button>`:''}</div>
   <input type="search" placeholder="חיפוש בפרוטוקול…" value="${esc(plenumProtoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="plenumProtoFilter.q=this.value;plenumProtoFilter.hl=this.value.trim()?[this.value.trim()]:[];_markI=-1;$('#plenumTurns').innerHTML=protoTurnsHTML(PLENUM_CUR,plenumProtoFilter);const o=$('#plenumOcc');if(o)o.textContent=plenumProtoFilter.hl.length?protoOccurrences(PLENUM_CUR,plenumProtoFilter.hl):'';const n=$('#plenumMarkNav');if(n)n.style.display=plenumProtoFilter.hl.length&&document.querySelector('#plenumTurns mark')?'':'none'">
-  <div class="small dim" style="margin-bottom:.5rem">${PLENUM_CUR.turns.filter(t=>t.role!=='topic').length} תורות · ${spk.length} דוברים${HL?` · <span id="plenumOcc">${occ}</span> אזכורים מודגשים בכל הפרוטוקול`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו
+  <div class="small dim" style="margin-bottom:.5rem">${PLENUM_CUR.turns.filter(t=>t.role!=='topic').length} קטעים · ${spk.length} דוברים${HL?` · <span id="plenumOcc">${occ}</span> אזכורים מודגשים בכל הפרוטוקול`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו
   <span id="plenumMarkNav" style="display:${occ?'':'none'};white-space:nowrap"> · <button class="chip" onclick="plenumMarkNav(-1)">› הקודם</button> <span id="plenumMarkPos"></span> <button class="chip" onclick="plenumMarkNav(1)">הבא ‹</button></span></div>
   <div id="plenumTurns">${protoTurnsHTML(PLENUM_CUR,plenumProtoFilter)}</div>`;
 }
