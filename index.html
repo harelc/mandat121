@@ -390,6 +390,14 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 .mk-card.present .avatar{box-shadow:0 0 0 3px var(--for)}
 .presence-pill{display:inline-flex;align-items:center;gap:.3rem;margin-top:.35rem;padding:.12rem .55rem;border-radius:999px;background:var(--for-dim);color:#2c6311;border:1px solid #b3d697;font-size:.72rem;font-weight:800}
 .presence-pill i{width:.5rem;height:.5rem;border-radius:50%;background:var(--for);flex:none}
+/* K26 arrival order (build_presence.py polls the lobby every 5 min on
+   Sun–Thu workdays): collapsible card under the Now hemicycle */
+.arrival-card{margin-top:.85rem}
+.arrival-card summary{cursor:pointer;font-weight:800;list-style:none;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
+.arrival-card summary::-webkit-details-marker{display:none}
+.arrival-card summary .chev{margin-inline-start:auto;color:var(--dim);transition:transform .15s}
+.arrival-card[open ] summary .chev{transform:rotate(90deg)}
+.arrival-rank{width:1.7rem;text-align:center;color:var(--accent);font-weight:800;flex:none}
 .progress{height:7px;background:#e7ddc6;border-radius:99px;overflow:hidden;direction:ltr}
 .progress i{display:block;height:100%;border-radius:99px}
 .rows{display:flex;flex-direction:column}
@@ -940,6 +948,7 @@ let PROTO_IDX={}, PROTO_CUR=null, protoFilter={speaker:'',q:''}; // committee pr
 let ANALYTICS=null; // MK analytics: correlation, close ties, ranks (build_analytics.py)
 let CONTACTS={}, CONTACTS_META={}; // official contact/social/presence snapshot, K25 (build_mk_contacts.py; data/mk_contacts.json is the frozen final-K25 roster)
 let CONTACTS26={}, CONTACTS26_META={}; // same, Knesset 26 (data/k26_contacts.json) — each Knesset's MK pages read their own roster's card
+let PRESENCE26=null, presenceDaySel=''; // K26 presence HISTORY (build_presence.py -> data/k26_presence.json): per-workday arrival order + per-MK workday counts, polled server-side every 5 min Sun–Thu. K26 only — the lobby feed serves only the current roster, so no K25 history exists and none is shown there.
 let WIKI={}, WIKI_META={}; // Wikipedia abstracts + Wikidata-discovered X handles (build_mk_wiki.py) — NOT Knesset-official; label provenance
 let ROSTER25=new Set(); // the official current-120 roster (CONTACTS names, whitespace-normalised) — authoritative for current vs former
 let PROTO_SEARCH={}; // global protocol search index (build_protocols_search.py)
@@ -1165,6 +1174,20 @@ function ensureWiki(){ return _lazyOnce('wiki',async()=>{ const j=await _fetchJs
 function ensureExtras(){ if(EXTRAS) return Promise.resolve(EXTRAS); return _lazyOnce('extras',async()=>{ const j=await _fetchJson('data/k25_extras.json'); if(j){ j.queries_by_mk=_normKeys(j.queries_by_mk); j.agendas_by_mk=_normKeys(j.agendas_by_mk); EXTRAS=j; if(view==='mk') renderMkDetail(); else if(view==='billAll') renderBillLite(); else if(view==='committee') renderCommitteeDetail(); else if(view==='session') renderSessionDetail(); else if(view==='committees') renderCommittees() } return EXTRAS }) }
 function ensureBillDocs(){ if(BILL_DOCS) return Promise.resolve(BILL_DOCS); return _lazyOnce('billDocs',async()=>{ const j=await _fetchJson(`data/k${KN}_bill_docs.json`); if(j){ BILL_DOCS=j; if(view==='billAll') renderBillLite(); else if(view==='vote') renderVote() } return BILL_DOCS }) }
 function ensureRoles(){ if(ROLES) return Promise.resolve(ROLES); return _lazyOnce('roles',async()=>{ const j=await _fetchJson(`data/k${KN}_roles.json`); if(j){ ROLES=j; if(view==='mk') renderMkDetail() } return ROLES }) }
+function ensurePresence26(){ if(PRESENCE26) return Promise.resolve(PRESENCE26); return _lazyOnce('presence26',async()=>{ const j=await _fetchJson('data/k26_presence.json'); if(j){ j.by_mk=_normKeys(j.by_mk); for(const d of Object.values(j.days||{})) (d.arrivals||[]).forEach(a=>a.name=normName(a.name)); PRESENCE26=j; if(KN===26&&(view==='now'||view==='mks'||view==='mk')) render() } return PRESENCE26 }) }
+const presenceTrackedDays=()=>PRESENCE26?Object.keys(PRESENCE26.days||{}).length:0;
+const mkPresenceDays=n=>PRESENCE26?.by_mk?.[normName(n)]?.days||0;
+function presenceTodayArrivals(){ // today's (Asia/Jerusalem) arrival list, or null before tracking opens today
+  if(!PRESENCE26) return null;
+  const today=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Jerusalem'});
+  return PRESENCE26.days?.[today]?.arrivals||null;
+}
+function mkPresenceLineHTML(name){ // one honest line for a K26 MK page: X of Y tracked workdays, never a % over days before tracking started
+  if(!PRESENCE26) return '';
+  const rec=PRESENCE26.by_mk?.[normName(name)]; const tracked=presenceTrackedDays(); if(!tracked) return '';
+  const today=presenceTodayArrivals(); const tIdx=today?today.findIndex(a=>a.name===normName(name)):-1;
+  return `<div class="small muted" style="margin-top:.45rem;line-height:1.9">נוכחות במשכן: נכח/ה ב־<b>${rec?.days||0}</b> מתוך ${tracked} ימי המעקב (ראשון–חמישי, מאז ${fmtDate(PRESENCE26._meta?.tracking_since||'')})${tIdx>=0?` · היום: מקום ${tIdx+1} בסדר ההגעה (נראה/תה לראשונה ב־${esc((today[tIdx].first_seen||'').slice(11,16))})`:today?' · היום טרם נראה/תה במשכן':''}</div>`;
+}
 function ensureBillHistory(){ if(BILL_HISTORY) return Promise.resolve(BILL_HISTORY); return _lazyOnce('billHistory',async()=>{ const j=await _fetchJson(`data/k${KN}_bill_history.json`); if(j){ BILL_HISTORY=j; if(view==='billAll') renderBillLite() } return BILL_HISTORY }) }
 function billHistoryHTML(b){
   const removed=(BILL_HISTORY&&BILL_HISTORY[String(b.id)])||[];
@@ -1973,8 +1996,29 @@ function k26ServingSeats(){
     return {name:n,faction,result:0,color:hit?.party.color||fcol(faction),rank:hit?.rank,listN:hit?.party.candidates.length,serving:true} })
     .sort((a,b)=>partyRank(a.faction,26)-partyRank(b.faction,26)||(a.rank??999)-(b.rank??999)||disp(a.name).localeCompare(disp(b.name),'he'));
 }
+/* Collapsible per-workday arrival order, under the K26 hemicycle.
+   Data: PRESENCE26 (build_presence.py polls the lobby API server-side
+   every 5 min on Sun–Thu; first_seen = first poll that saw the MK —
+   a polling timestamp, not a turnstile, and the copy says so). Days
+   before tracking_since do not exist and are never backfilled. */
+function presenceArrivalsHTML(seats){
+  if(!PRESENCE26) return '';
+  const days=Object.keys(PRESENCE26.days||{}).sort().reverse();
+  if(!days.length) return '';
+  const sel=presenceDaySel&&PRESENCE26.days[presenceDaySel]?presenceDaySel:days[0];
+  const day=PRESENCE26.days[sel], arrivals=day.arrivals||[];
+  const seatBy={}; (seats||[]).forEach(s=>seatBy[normName(s.name)]=s);
+  const isToday=sel===new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Jerusalem'});
+  return `<details class="card pad arrival-card rise" ${isToday?'open':''}>
+  <summary>סדר ההגעה למשכן · ${fmtDate(sel)} <span class="chip ${isToday?'acc':''}">${arrivals.length} הגיעו${isToday?' עד כה':''}</span><span class="small dim" style="font-weight:400">ראשון–חמישי · מתעדכן כל 5 דקות</span><span class="chev">‹</span></summary>
+  <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.7rem 0 .4rem;align-items:center"><span class="small dim">יום:</span><select onchange="presenceDaySel=this.value;renderNow26()" aria-label="בחירת יום">${days.map(d=>`<option value="${d}" ${d===sel?'selected':''}>${fmtDate(d)} (${(PRESENCE26.days[d].arrivals||[]).length} הגיעו)</option>`).join('')}</select></div>
+  ${arrivals.length?`<div class="rows" style="margin:.3rem -.9rem 0">${arrivals.map((a,i)=>{const s=seatBy[normName(a.name)]; return `<div class="row" onclick="openMk('${jsq(a.name)}')"><b class="arrival-rank">${i+1}</b>${avatar(a.name,s?.faction||'',32)}<span class="flex">${esc(disp(a.name))}<br><span class="dim small">${esc(shortF(s?.faction||''))}</span></span>${a.at_first_poll?'<span class="chip">כבר במשכן כשהמעקב נפתח</span>':''}<span class="chip acc">נראה/תה לראשונה ${esc((a.first_seen||'').slice(11,16))}</span></div>`}).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">ביום זה לא נרשמה הגעה של אף ח״כ בשעות המעקב.</p>'}
+  <p class="small dim" style="margin-top:.6rem;line-height:1.8">איך זה נמדד: שרת המעקב קורא את אותה אפליקציית לובי כל 5 דקות בימי ראשון–חמישי, ו״נראה/תה לראשונה״ היא הקריאה הראשונה שראתה את הח״כ במשכן — לא שעת כניסה בשער. מי שמסומן ״כבר במשכן כשהמעקב נפתח״ הגיע לפני הקריאה הראשונה של אותו יום. המעקב החל ב־${fmtDate(PRESENCE26._meta?.tracking_since||'')} (${presenceTrackedDays()} ימי עבודה עד כה); לפני כן אין היסטוריית נוכחות — היא לא קיימת באף מאגר רשמי, ואנחנו לא ממציאים אותה.</p>
+  </details>`;
+}
 function renderNow26(){
   ensureLivePresence(); // live in-the-building overlay; re-renders when it lands
+  ensurePresence26(); // arrival-order history under the hemicycle; re-renders when it lands
   ensurePlenumTv(); // live plenum TV block (#plenumTvBox); paints itself when the status read lands
   ensureAgenda(); // סדר יום pane (k26_agenda.json) — shows below once OData has published a sitting
   const parties=K26?K26.parties.filter(p=>p.seats>0):[];
@@ -2002,9 +2046,10 @@ function renderNow26(){
   <div class="legend">${legend.map(([f,v])=>`<span><i style="background:${v.color}"></i>${esc(f)} ${v.n}</span>`).join('')}</div>
   ${presenceKnown?`<div class="small" style="margin-top:.35rem"><span class="pdot" style="background:var(--for)"></span> <b>${presentN} מתוך ${seats.length}</b> כעת במשכן הכנסת — מושב בטבעת ירוקה = במשכן, מושב כהה = לא במשכן · קריאה חיה מאפליקציית לובי הח״כים של הכנסת, נכון ל־${esc(presenceWhen)} · מתרענן כל כמה דקות</div>`:''}
   </div>
+  ${presenceArrivalsHTML(seats)}
   <div class="sec-title">מה כבר יש, ומה יגיע</div>
   <div class="grid c2">
-    <div class="card pad"><h3>✓ כבר כאן</h3><div class="small muted" style="line-height:2">תוצאות הבחירות הרשמיות ומנדטים<br>רשימות המועמדים בסדר הרשמי (466)<br>120 הנבחרים וצבעי הסיעות של כנסת 26<br>${serving?'מי מכהן/ת בפועל — מעל המפה<br>':''}${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?'סדר היום — ישיבות שפורסמו כבר כאן, מעל המפה<br>':''}קישור מהנבחרים להיסטוריית ההצבעות שלהם בכנסת 25</div></div>
+    <div class="card pad"><h3>✓ כבר כאן</h3><div class="small muted" style="line-height:2">תוצאות הבחירות הרשמיות ומנדטים<br>רשימות המועמדים בסדר הרשמי (466)<br>120 הנבחרים וצבעי הסיעות של כנסת 26<br>${serving?'מי מכהן/ת בפועל — מעל המפה<br>':''}${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?'סדר היום — ישיבות שפורסמו כבר כאן, מעל המפה<br>':''}${PRESENCE26&&presenceTrackedDays()?'סדר ההגעה למשכן וימי נוכחות — מתחת למפה, מתעדכן כל 5 דקות בימי עבודה<br>':''}קישור מהנבחרים להיסטוריית ההצבעות שלהם בכנסת 25</div></div>
     <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> יגיע בהמשך — מעצמו</h3><div class="small muted" style="line-height:2">${serving?'':'רשימת הח״כים הרשמית של הכנסת ה־26<br>'}הצעות החוק הראשונות<br>ישיבות הוועדות הראשונות<br>ההצבעות הראשונות במליאה — ומהן גם ״אני הייתי מצביע״ ו״מי מצביע כמוני״<br><span class="dim">${serving?'המכהנים והתפקידים כבר פורסמו (עם ישיבת הפתיחה, 10 בנובמבר 2026); חוקים, ועדות והצבעות עוד לא פורסמו. ברגע שיתפרסמו — הם יופיעו כאן לבד.':'הכנסת החדשה עוד לא פרסמה כלום. ברגע שתתחיל — זה יופיע כאן לבד.'}</span></div></div>
   </div>
   <div style="text-align:center;margin-top:1.1rem"><button class="btn" onclick="switchKnesset(25)">לראות איך זה נראה עם נתונים מלאים — כנסת 25 ←</button></div>`;
@@ -2638,6 +2683,7 @@ function mkSortPillsHTML(){
   const opts=[['list',mkFilter.faction?'מיקום ברשימה':'סיעה ומיקום ברשימה'],['alpha','שם משפחה א–ת'],
     ['votes',KN===26?'הכי הרבה הצבעות בכנסת 25':'הכי הרבה הצבעות'],
     ['initiated',KN===26?'הכי הרבה חוקים שיזמו בכנסת 25':'הכי הרבה חוקים שיזמו'],
+    ...(KN===26&&PRESENCE26&&presenceTrackedDays()?[['presence',`ימי נוכחות במשכן (מתוך ${presenceTrackedDays()} ימי מעקב)`]]:[]), // K26 only: presence history starts 2026-11-12; K25 has none and never will (the lobby feed serves only the current roster)
     ['agreement','הכי כמוני בהצבעות']];
   return `<div class="chips" role="group" aria-label="מיון"><span class="pill-lbl">מיון:</span>${opts.map(([k,v])=>`<button class="chip ${mkFilter.sort===k?'on':''}" ${k==='agreement'&&!hasMine?'disabled title="סמנו קודם ״אני הייתי מצביע״ על חוק" style="opacity:.45;cursor:not-allowed"':''} onclick="mkFilter.sort='${k}';renderMks()">${v}</button>`).join('')}</div>`;
 }
@@ -2685,6 +2731,7 @@ function renderMksKeep(inp){ keepSearchFocus(inp,renderMks) }
 function renderMks26(){
   if(!K26){ $('#app').innerHTML='<div class="card empty">אין נתוני כנסת 26</div>'; return }
   ensureLivePresence(); // highlights cards of MKs currently in the building; re-renders when it lands
+  ensurePresence26(); // workday-attendance layer + sort; re-renders when it lands
   // Same universe as the Now hemicycle: the official serving roster once it
   // exists (incl. Norwegian-law replacements), else the elected preview.
   const servingSeats=k26ServingSeats();
@@ -2698,6 +2745,7 @@ function renderMks26(){
     if(mkFilter.sort==='agreement'){ const x=myAgreement(a.n),y=myAgreement(b.n); return (y?.pct??-1)-(x?.pct??-1)||(y?.n||0)-(x?.n||0)||byList(a,b) }
     if(mkFilter.sort==='initiated') return initiatedCount(b.n)-initiatedCount(a.n)||byList(a,b);
     if(mkFilter.sort==='votes') return (IDX25[b.n]?.votes.length||0)-(IDX25[a.n]?.votes.length||0)||byList(a,b);
+    if(mkFilter.sort==='presence') return mkPresenceDays(b.n)-mkPresenceDays(a.n)||byList(a,b); // tracked workdays only — see PRESENCE26 note; not a % (tracking is young and grows daily)
     return byList(a,b);
   });
   const hasMine=Object.keys(S.myVotes).length>0;
@@ -2707,8 +2755,9 @@ function renderMks26(){
   <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.9rem"><input type="search" data-keep="mkQ" placeholder="חיפוש נבחר/ת…" value="${esc(mkFilter.q)}" style="flex:1;min-width:170px" oninput="mkFilter.q=this.value;renderMksKeep(this)">
   <select onchange="mkFilter.faction=this.value;if(this.value)mkFilter.sort='list';renderMks()" aria-label="סינון לפי סיעה"><option value="">כל הסיעות</option>${parties.map(f=>`<option ${mkFilter.faction===f?'selected':''}>${esc(f)}</option>`).join('')}</select></div>
   ${mkSortPillsHTML()}
-  <div class="mk-grid">${list.map(x=>{const rec=IDX25[x.n]; const initiated=initiatedCount(x.n); const present=livePresenceOf(x.n)===true; return `<div class="card mk-card${present?' present':''}" onclick="openMk('${jsq(x.n)}')">${avatar(x.n,x.p,62)}<div style="font-weight:800">${esc(disp(x.n))}${followedMk(x.n)?' ★':''}</div><div class="small" style="color:${x.color}">${esc(x.p)}</div>${presencePillHTML(x.n)}
-  <div class="small dim">מקום ${RANK26[x.n]??x.rank} ברשימת ${esc(x.p)}</div>${rec?`<div class="small" style="color:var(--accent)">כנסת 25: ${rec.votes.length} הצבעות${initiated?` · ${initiated} יוזמות חקיקה`:''}</div>`:'<div class="small dim">לא כיהן/ה בכנסת 25</div>'}</div>`}).join('')}</div>`;
+  <div class="mk-grid">${list.map(x=>{const rec=IDX25[x.n]; const initiated=initiatedCount(x.n); const present=livePresenceOf(x.n)===true; const pdays=mkPresenceDays(x.n); const todayArr=presenceTodayArrivals(); const tIdx=todayArr?todayArr.findIndex(a=>a.name===normName(x.n)):-1; return `<div class="card mk-card${present?' present':''}" onclick="openMk('${jsq(x.n)}')">${avatar(x.n,x.p,62)}<div style="font-weight:800">${esc(disp(x.n))}${followedMk(x.n)?' ★':''}</div><div class="small" style="color:${x.color}">${esc(x.p)}</div>${presencePillHTML(x.n)}
+  <div class="small dim">מקום ${RANK26[x.n]??x.rank} ברשימת ${esc(x.p)}</div>${PRESENCE26&&presenceTrackedDays()?`<div class="small" style="color:var(--for);font-weight:700">נוכחות: ${pdays} מתוך ${presenceTrackedDays()} ימי מעקב${tIdx>=0?` · היום מקום ${tIdx+1} בהגעה`:''}</div>`:''}${rec?`<div class="small" style="color:var(--accent)">כנסת 25: ${rec.votes.length} הצבעות${initiated?` · ${initiated} יוזמות חקיקה`:''}</div>`:'<div class="small dim">לא כיהן/ה בכנסת 25</div>'}</div>`}).join('')}</div>
+  ${PRESENCE26&&presenceTrackedDays()?`<p class="small dim" style="margin-top:.7rem;line-height:1.8">ימי נוכחות = ב־כמה מימי המעקב (ראשון–חמישי, מאז ${fmtDate(PRESENCE26._meta?.tracking_since||'')}, נדגם כל 5 דקות מאפליקציית לובי הח״כים) הח״כ נראה/תה במשכן לפחות פעם אחת — בלי קשר למשך השהות. המעקב צעיר וגדל מדי יום; אין נתוני נוכחות לכנסת 25, כי הלובי משרת רק את הסגל המכהן.</p>`:''}`;
 }
 /* Committee memberships on MK pages + member lists on committee pages. */
 function mkCommitteesHTML(name){
@@ -2857,7 +2906,7 @@ function lobbyBrowserHTML(){
   ${list.length>shown.length?`<div style="text-align:center;margin-top:1rem"><button class="btn" onclick="lobbyFilter.limit+=40;renderCommittees()">עוד שדלנים</button></div>`:''}`:'<div class="card empty"><div class="big">🔍</div>לא נמצאו שדלנים בסינון הזה.</div>'}`;
 }
 function renderMkDetail(){
-  ensureCmem(); ensureWiki(); ensureAnalytics(); ensureLivePresence(); ensureExtras(); ensureRoles();
+  ensureCmem(); ensureWiki(); ensureAnalytics(); ensureLivePresence(); ensureExtras(); ensureRoles(); if(KN===26) ensurePresence26();
   const name=viewArg, app=$('#app');
   if(KN===26){ const e=k26Entry(name); const rec=IDX25[name];
     if(!e){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצא/ה ברשימת הנבחרים לכנסת 26.</div>'; return }
@@ -2874,6 +2923,7 @@ function renderMkDetail(){
       <div style="flex:1"><h1 style="font-size:1.5rem">${esc(disp(name))} ${followedMk(name)?'★':''}</h1>
       <button class="chip" style="color:${e.party.color||fcol(e.party.name)};font-weight:700" onclick="openFaction('${jsq(e.party.name)}')">${esc(e.party.name)} · כנסת 26 ←</button>
       <div class="small dim">${e.rank?`מקום ${e.rank} ברשימת ${esc(e.party.name)} · `:''}${e.serving?'מכהן/ת בפועל':e.elected?'נבחר/ה לכנסת ה־26':'מועמד/ת ברשימה — לא נכנס/ה לכנסת ה־26'}</div>
+      ${mkPresenceLineHTML(name)}
       <span class="chip acc" style="margin-top:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> היסטוריית ההצבעות תתחיל עם הצבעות כנסת 26 הראשונות</span></div>${starBtn('mk',name,name)}</div>
     ${rec?`<div style="margin-top:1rem"><h3>בכנסת 25</h3><div class="small muted" style="line-height:1.9">${rec.votes.length} הצבעות מתועדות · סיעה אז: ${esc(shortF(rec.faction))} · <span style="color:var(--for)">${rec.votes.filter(v=>v.result===1).length} בעד</span> / <span style="color:var(--against)">${rec.votes.filter(v=>v.result===2).length} נגד</span> / <span style="color:var(--abstain)">${rec.votes.filter(v=>v.result===3).length} נמנע</span><br>איך הצביע/ה על ביטחון, כלכלה, זכויות — הכל שמור בכרטיס של כנסת 25.</div>
     <button class="btn primary" style="margin-top:.6rem" onclick="switchKnesset(25);openMk('${jsq(name)}')">לכל ההצבעות בכנסת 25 ←</button></div>`:'<p class="muted small" style="margin-top:1rem">לא כיהן/ה בכנסת 25. הכרטיס יתמלא מההצבעה הראשונה.</p>'}
@@ -3632,7 +3682,7 @@ function renderAbout(){
         <li>הנתונים מתרעננים אוטומטית מבוני־נתונים פתוחים (<span dir="ltr">build_*.py</span> בקוד המקור); האתר עצמו הוא דף סטטי שמציג תמונת־מצב (snapshot) של אותם נתונים.</li>
         <li>כל טענה מחושבת מסומנת בכיסוי שלה — למשל כמה מההצבעות כוללות תוצאות לפי ח״כ — כדי שאפשר יהיה להבחין בין מאגר מלא לחלקי.</li>
         <li><b>דמיון הצבעה</b> בניתוח הוא שיעור הסכמה בהצבעות משותפות בלבד. הוא אינו מודד אידאולוגיה, אינו מעיד על תיאום, ואין לקרוא בו סיבה ותוצאה.</li>
-        <li>״נוכח/ת בבניין״ נקרא <b>חי</b> מאפליקציית לובי הח״כים של הכנסת כשפותחים את כרטיס הח״כ או את מפת כנסת 26 (ומתרענן כל כמה דקות); אם הקריאה נכשלת לא מוצגת נוכחות כלל (אין צילום יומי — הוא היה מיושן כבר כשהתפרסם). זה מצב נוכחי בלבד, לא היסטוריית נוכחות. תקצירי ויקיפדיה בדפי ח״כים מובאים עם ייחוס למקור, וקישורי X שמקורם בוויקינתונים מסומנים ככאלה — בנפרד מהערוצים הרשמיים של הכנסת.</li>
+        <li>״נוכח/ת בבניין״ נקרא <b>חי</b> מאפליקציית לובי הח״כים של הכנסת כשפותחים את כרטיס הח״כ או את מפת כנסת 26 (ומתרענן כל כמה דקות); אם הקריאה נכשלת לא מוצגת נוכחות כלל (אין צילום יומי — הוא היה מיושן כבר כשהתפרסם). בנוסף, מאז 12 בנובמבר 2026 שרת המעקב שלנו קורא את אותה אפליקציה כל 5 דקות בימי ראשון–חמישי ובונה ממנה היסטוריית נוכחות לכנסת 26 בלבד: סדר הגעה לכל יום עבודה ומספר ימי הנוכחות של כל ח״כ. ״נראה/תה לראשונה״ היא הקריאה הראשונה שראתה את הח״כ — לא שעת כניסה בשער; לפני תחילת המעקב אין היסטוריה, והיא לא מומצאת בדיעבד. לכנסת 25 אין ולא תהיה היסטוריית נוכחות, כי הלובי משרת רק את הסגל המכהן. תקצירי ויקיפדיה בדפי ח״כים מובאים עם ייחוס למקור, וקישורי X שמקורם בוויקינתונים מסומנים ככאלה — בנפרד מהערוצים הרשמיים של הכנסת.</li>
       </ul>
     </div>
 

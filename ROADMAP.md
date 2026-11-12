@@ -86,6 +86,20 @@ Per MK it returns `IsPresent` (in the building *right now*), plus official
 - Only official, Knesset-published channels are shown (office email/phone,
   not personal data).
 
+**Presence history — DONE 2026-11-12 (K26 only).** Since no time series
+exists, we make one: `build_presence.py` is a single lobby poll merged
+into `data/k26_presence.json` (per-workday arrival order + derived
+per-MK workday counts), run every 5 min on Sun–Thu by
+`.github/workflows/presence-poll.yml` (UTC cron + a Jerusalem workday
+gate in the builder; knesset-daily also polls once per run as fallback).
+UI: collapsible "סדר ההגעה למשכן" under the K26 Now hemicycle (day
+picker, ranks, `at_first_poll` honestly flagged), a presence layer on
+K26 MK cards + a "ימי נוכחות במשכן" sort in the K26 MK view, and an
+attendance line on K26 MK pages. `first_seen` is labelled as the first
+poll that saw the MK, never a turnstile time; tracking starts
+2026-11-12 and nothing is backfilled. Irrelevant for K25 by
+construction — the feed serves only the current roster.
+
 ## Sprint 1 — DONE 2026-11-10 (A+B, owner's pick)
 
 **A. MK analytics** (`build_analytics.py` → `data/k25_analytics.json`, new

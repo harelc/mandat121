@@ -1,0 +1,65 @@
+# Knesset-26 presence polling — המנדט ה־121
+#
+# The MK-lobby API reports only who is in the building *right now*
+# (IsPresent, no timestamps), so arrival order and per-MK workday
+# attendance exist only if somebody polls it. This workflow is that
+# somebody: every 5 minutes during Israel work hours it runs ONE poll
+# (build_presence.py, a single ~60KB GET) and commits data/k26_presence.json
+# back — but the builder writes only when a poll adds an arrival or opens
+# a new workday, so most runs are one request and no commit.
+#
+# Cron is UTC: 04:00–18:55 UTC covers 07:00–21:00 Asia/Jerusalem across
+# DST. build_presence.py itself gates on the Jerusalem Sun–Thu workday,
+# so Fri/Sat or holiday-edge firings that slip through record nothing.
+# GitHub cron is best-effort (may fire minutes late, rarely dropped) —
+# that is exactly why first_seen is labelled "first poll that saw them",
+# never a turnstile time, and why knesset-daily also runs one poll per
+# run as a coarse fallback.
+#
+# Push race: the daily workflow commits data/ too. The commit step below
+# rebases the presence-only commit onto latest main and retries ×3,
+# failing loudly on conflict (same pattern as knesset-daily).
+name: presence-poll
+
+on:
+  workflow_dispatch:
+  schedule:
+    - cron: "*/5 4-18 * * 0-4" # Sun–Thu in UTC (Jerusalem gate is in the builder)
+
+permissions:
+  contents: write
+
+concurrency:
+  group: presence-poll
+  cancel-in-progress: false
+
+jobs:
+  poll:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Poll the MK lobby once
+        run: python3 -u build_presence.py
+
+      - name: Commit presence history if it changed
+        run: |
+          if git diff --quiet -- data/k26_presence.json; then
+            echo "no new arrivals — nothing to commit"
+            exit 0
+          fi
+          git config user.name "mandat121-data-bot"
+          git config user.email "actions@github.com"
+          git add data/k26_presence.json
+          git commit -m "data: presence poll ($(date -u +%FT%TZ))"
+          for i in 1 2 3; do
+            git pull --rebase origin main && git push && exit 0
+            echo "push attempt $i rejected — rebasing and retrying"
+          done
+          echo "::error::presence commit could not be pushed after 3 attempts"
+          exit 1
