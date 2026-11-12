@@ -757,7 +757,7 @@ try{ const raw=JSON.parse(localStorage.getItem(LS)||localStorage.getItem('openkn
 let S=STORE['26'];
 let prevSeen=S.lastSeen;
 function save(){S.lastSeen=new Date().toISOString().slice(0,10);localStorage.setItem(LS,JSON.stringify(STORE))}
-function switchKnesset(n){ KN=n; S=STORE[String(n)]; prevSeen=S.lastSeen; AGENDA=AG_CACHE[n]||null; agendaAnchor=null; agendaLastBody=''; save(); renderKSwitch(); buildTabs(); render(); window.scrollTo({top:0}); toast(n===26?'כנסת 26 — מתמלאת ככל שנתונים מתפרסמים':'כנסת 25 — כיסוי מלא') }
+function switchKnesset(n){ KN=n; S=STORE[String(n)]; prevSeen=S.lastSeen; AGENDA=AG_CACHE[n]||null; agendaAnchor=null; agendaLastBody=''; save(); renderKSwitch(); buildTabs(); if(n===25) ensureK25Archive(); render(); window.scrollTo({top:0}); toast(n===26?'כנסת 26 — מתמלאת ככל שנתונים מתפרסמים':'כנסת 25 — כיסוי מלא') }
 function renderKSwitch(){ const a=$('#ksw25'),b=$('#ksw26'); if(a)a.classList.toggle('on',KN===25); if(b)b.classList.toggle('on',KN===26) }
 const followedBill=id=>S.followBills.includes(String(id));
 const followedMk=n=>S.followMks.includes(n);
@@ -941,6 +941,7 @@ const AG_MAIN_LOADING=new Set(); // Knessets whose main agenda file is in flight
 let CMEM={by_mk:{},by_committee:{}}; // committee memberships (build_k25_committee_members.py)
 let HIST_SESS={}, cmtHist={id:null,list:null,loading:false,limit:40}; // committee history on demand: every session of one committee, pulled from the agenda month shards (build_agenda.py) — committees.json only details the recent window
 let ALLB=[], ALLB_BY_ID={}, VOTES_ALL=[], MK_INITIATED={};
+let K25_READY=false, K25_ARCHIVE_PROMISE=null; // K25 archive bulk is loaded on demand only (ensureK25Archive) — never on the default K26 Now paint
 let VOTE_RES={names:[],votes:{}}, VOTE_BY_ID={}; // full per-MK results (build_k25_vote_results.py)
 let VOTE_MODELS={}; // vote id -> normalised vote model (voteModel()); the only vote shape the UI renders
 let OFFICIAL_PHOTOS={}; // name -> official-portrait manifest entry (build_k25_photos_official.py); covers MKs absent from the roster file, notably those who left mid-term
@@ -1249,18 +1250,72 @@ function billDocsHTML(b){
   <div class="rows" style="margin:.5rem -.9rem 0">${groups.map(g=>g.items.length===1?row(g.items[0]):`<details><summary class="row" style="cursor:pointer"><span class="flex">${esc(g.label)} <span class="dim small">${g.items.length} מסמכים — הצגה</span></span><span class="chip acc">▾</span></summary>${g.items.map((d,i)=>row(d,`${g.label} ${i+1}`)).join('')}</details>`).join('')}</div></div>`;
 }
 
+/* ============ K25 archive — on demand only ============
+   The ~16 MB K25 bulk (k25_bills 7.4 MB, k25_vote_results 4.7 MB,
+   k25_votes 2.9 MB, committees 1 MB) plus its mkIndex build used to run
+   on every boot (old phase 2b), behind the default K26 Now page most
+   visitors land on. The K26 home never renders the K25 hemicycle — both
+   homes write the same #app, one at a time — so that cost bought the
+   first paint nothing. It now loads exactly once, on first actual need:
+   switching to Knesset 25, a K25 bill/vote deep link, an MK page (the
+   K25 record on a K26 card), the K26 MK grid / faction page, or global
+   search. Until it lands, renderers must not claim "לא כיהן/ה בכנסת 25"
+   (guarded on K25_READY below) — absence of the archive is not absence
+   of the person. On landing it re-renders the current route in place. */
+function ensureK25Archive(){
+  if(K25_READY) return Promise.resolve(true);
+  if(K25_ARCHIVE_PROMISE) return K25_ARCHIVE_PROMISE;
+  K25_ARCHIVE_PROMISE=(async()=>{
+    const [cr,abr,avr,vrr]=await Promise.all([fetch('data/committees.json').catch(()=>null),fetch('data/k25_bills.json').catch(()=>null),fetch('data/k25_votes.json').catch(()=>null),fetch('data/k25_vote_results.json').catch(()=>null)]);
+    if(abr&&abr.ok){ ALLB=await abr.json(); ALLB.forEach(b=>ALLB_BY_ID[b.id]=b); MK_INITIATED={}; ALLB.forEach(b=>(b.initiators||[]).forEach(i=>{ i.name=normName(i.name); if(i.initiator) MK_INITIATED[i.name]=(MK_INITIATED[i.name]||0)+1 })) }
+    if(avr&&avr.ok){ VOTES_ALL=await avr.json(); VOTES_ALL.forEach(v=>VOTE_BY_ID[v.id]=v) }
+    const vr=(vrr&&vrr.ok)?await vrr.json():null; if(vr){ vr.names=(vr.names||[]).map(normName); VOTE_RES=vr }
+    if(cr&&cr.ok){ CMT=await cr.json(); (CMT.committees||[]).forEach(c=>CMT_BY_ID[c.id]=c) }
+    if(!ALLB.length&&!VOTES_ALL.length){ K25_ARCHIVE_PROMISE=null; return false } // fetch failed — allow a later retry
+    /* There is exactly one kind of vote: a plenum vote (VOTES_ALL), keyed
+       everywhere — routes, "my vote", MK histories — by its vote id. A vote
+       may link to a bill (item_id -> ALLB); the bill layers on context
+       (topics, text, journey), never a second identity for the vote. */
+    migrateMyVotes();
+    // MK index over every vote with per-MK results.
+    const KIND_READING={reading3:3,reading2:2,reading1:1,pre1:0};
+    for(const v of VOTES_ALL){
+      const rows=VOTE_RES.votes[String(v.id)]; if(!rows?.length) continue;
+      const lite=v.item_id?ALLB_BY_ID[v.item_id]:null;
+      const billObj={id:String(v.id),bill_id:v.item_id||null,name:v.title,vote_date:v.date,vote_reading:KIND_READING[v.kind]??null,kind_label:v.kind_label,summary:null,topics:lite?.topics||[],mk_votes:rows.map(([i,c])=>({mk_name:VOTE_RES.names[i],result:c,faction:factionOn(VOTE_RES.names[i],v.date)}))};
+      for(const [i,c] of rows){
+        const nm=VOTE_RES.names[i];
+        const m=mkIndex[nm]??={name:nm,faction:'',votes:[]};
+        m.votes.push({bill:billObj,result:c});
+      }
+    }
+    for(const m of Object.values(mkIndex)){ if(!m.faction) m.faction=FACTION25[m.name]||'' }
+    for(const m of Object.values(mkIndex)){ if(!m.faction&&FACTION25[m.name]) m.faction=FACTION25[m.name] }
+    for(const m of Object.values(mkIndex)) m.votes.sort((a,b)=>(b.bill.vote_date||'').localeCompare(a.bill.vote_date||''));
+    for(const m of Object.values(mkIndex)){ const ds=m.votes.map(v=>v.bill.vote_date).filter(Boolean).sort(); if(ds.length) VOTE_TENURE[m.name]={from:ds[0],to:ds[ds.length-1]} }
+    IDX25=mkIndex;
+    computeFactionStats(); buildTabs(); save();
+    K25_READY=true;
+    // Re-render the current route now that the archive is in — preserving
+    // the scroll position (applyRoute scrolls to top; the user may already
+    // be reading the K26 page).
+    const y=window.scrollY; applyRoute(); window.scrollTo({top:y});
+    const gs=$('#globalSearch'); if(gs&&gs.value.trim()) renderSearchDrop();
+    return true;
+  })().catch(()=>{ K25_ARCHIVE_PROMISE=null; return false });
+  return K25_ARCHIVE_PROMISE;
+}
+
 /* ============ load ============ */
-/* Three phases. Phase 1 fetches only what the default Knesset-26 Now
-   page needs (~120 KB: preview, tenure, photos, contacts…) and paints
-   it. Phase 2a lands everything small (official portraits, contacts,
-   ranks, K26 layers) and re-renders. Phase 2b streams the K25 archive
-   bulk (~16 MB of bills/votes/results) in behind it — started only
-   after 2a has painted, via idle time — and re-renders the current
-   route when it lands. First paint used to wait for all 17 files, so
-   on load the browser sat on its restored snapshot of the previous
-   session (often the K25 view) for a visible second before K26
-   appeared; and 2a used to wait on the archive, so portraits arrived
-   minutes late on slow connections. */
+/* Two boot phases, then on-demand. Phase 1 fetches only what the
+   default Knesset-26 Now page needs (~120 KB: preview, tenure, photos…)
+   and paints it. Phase 2a lands everything small (official portraits,
+   contacts, ranks, K26 layers) and re-renders. The K25 archive bulk
+   (~16 MB) is not a boot phase at all — see ensureK25Archive() above.
+   First paint used to wait for all 17 files, so on load the browser sat
+   on its restored snapshot of the previous session (often the K25 view)
+   for a visible second before K26 appeared; and 2a used to wait on the
+   archive, so portraits arrived minutes late on slow connections. */
 async function load(){
   const _loadT0=performance.now();
   const _loadMark=phase=>console.info(`[load] ${phase} ${Math.round(performance.now()-_loadT0)}ms`);
@@ -1309,47 +1364,12 @@ async function load(){
   if(cor&&cor.ok){ const cj=await cor.json(); CONTACTS=normKeys(cj.by_name); CONTACTS_META=cj._meta||{}; ROSTER25=new Set(Object.keys(CONTACTS)) }
   _loadMark('phase2a small files in');
   { const y=window.scrollY; applyRoute(); window.scrollTo({top:y}); } // portraits/contacts/ranks now land on the already-painted page
-  // ---- phase 2b: the K25 archive bulk (~16 MB raw: bills, votes,
-  // vote-results, committees). Nothing above this line needs it, so it
-  // starts only after phase 2a has painted — yielded through idle time
-  // (with a timeout cap) so a hard refresh stays interactive instead of
-  // saturating the connection and main thread up front. K25 routes show
-  // their empty states until this lands and re-renders, as before.
-  await new Promise(r=>{ if(window.requestIdleCallback) requestIdleCallback(()=>r(),{timeout:1200}); else setTimeout(r,50) });
-  const [cr,abr,avr,vrr]=await Promise.all([fetch('data/committees.json').catch(()=>null),fetch('data/k25_bills.json').catch(()=>null),fetch('data/k25_votes.json').catch(()=>null),fetch('data/k25_vote_results.json').catch(()=>null)]);
-  if(abr&&abr.ok){ ALLB=await abr.json(); ALLB.forEach(b=>ALLB_BY_ID[b.id]=b); MK_INITIATED={}; ALLB.forEach(b=>(b.initiators||[]).forEach(i=>{ i.name=normName(i.name); if(i.initiator) MK_INITIATED[i.name]=(MK_INITIATED[i.name]||0)+1 })) }
-  if(avr&&avr.ok){ VOTES_ALL=await avr.json(); VOTES_ALL.forEach(v=>VOTE_BY_ID[v.id]=v) }
-  const vr=(vrr&&vrr.ok)?await vrr.json():null; if(vr){ vr.names=(vr.names||[]).map(normName); VOTE_RES=vr }
-  if(cr&&cr.ok){ CMT=await cr.json(); (CMT.committees||[]).forEach(c=>CMT_BY_ID[c.id]=c) }
-  _loadMark('phase2b archive in');
-  /* There is exactly one kind of vote: a plenum vote (VOTES_ALL), keyed
-     everywhere — routes, "my vote", MK histories — by its vote id. A vote
-     may link to a bill (item_id -> ALLB); the bill layers on context
-     (topics, text, journey), never a second identity for the vote. */
-  migrateMyVotes();
-  // MK index over every vote with per-MK results.
-  const KIND_READING={reading3:3,reading2:2,reading1:1,pre1:0};
-  for(const v of VOTES_ALL){
-    const rows=VOTE_RES.votes[String(v.id)]; if(!rows?.length) continue;
-    const lite=v.item_id?ALLB_BY_ID[v.item_id]:null;
-    const billObj={id:String(v.id),bill_id:v.item_id||null,name:v.title,vote_date:v.date,vote_reading:KIND_READING[v.kind]??null,kind_label:v.kind_label,summary:null,topics:lite?.topics||[],mk_votes:rows.map(([i,c])=>({mk_name:VOTE_RES.names[i],result:c,faction:factionOn(VOTE_RES.names[i],v.date)}))};
-    for(const [i,c] of rows){
-      const nm=VOTE_RES.names[i];
-      const m=mkIndex[nm]??={name:nm,faction:'',votes:[]};
-      m.votes.push({bill:billObj,result:c});
-    }
-  }
-  for(const m of Object.values(mkIndex)){ if(!m.faction) m.faction=FACTION25[m.name]||'' }
-  for(const m of Object.values(mkIndex)){ if(!m.faction&&FACTION25[m.name]) m.faction=FACTION25[m.name] }
-  for(const m of Object.values(mkIndex)) m.votes.sort((a,b)=>(b.bill.vote_date||'').localeCompare(a.bill.vote_date||''));
-  for(const m of Object.values(mkIndex)){ const ds=m.votes.map(v=>v.bill.vote_date).filter(Boolean).sort(); if(ds.length) VOTE_TENURE[m.name]={from:ds[0],to:ds[ds.length-1]} }
-  IDX25=mkIndex;
-  computeFactionStats(); buildTabs(); save();
-  _loadMark('phase2b indexed');
-  // Re-render the current route now that the archive is in — preserving
-  // the scroll position (applyRoute scrolls to top; the user may already
-  // be reading the phase-1 page).
-  const y=window.scrollY; applyRoute(); window.scrollTo({top:y});
+  // No phase 2b any more: the K25 archive bulk is NOT fetched here. It
+  // loads on first actual need via ensureK25Archive() (switching to
+  // Knesset 25, a K25 bill/vote deep link, an MK page, global search…),
+  // so a K26 Now visit — the default — never downloads, parses or
+  // indexes it, and never builds the K25 hemicycle.
+  _loadMark('boot done (K25 archive deferred)');
 }
 function computeFactionStats(){ // over every documented plenum vote — the same universe as the rebel counts
   const agg={};
@@ -1564,8 +1584,8 @@ function hemiCardHTML(s,ctx){
     const ini=initiatedCount(s.name); if(ini) rows.push(['הצעות חוק שיזם/ה',ini.toLocaleString('he-IL')]);
     const mine=myAgreement(s.name); if(mine) rows.push(['התאמה אליך',`${mine.pct}% (${mine.n} משותפות)`]);
     const ten=mkTenureText(s.name); if(ten&&!isCurrentMk(s.name)) rows.push(['כהונה בכנסת 25',ten]);
-  } else if(ctx.mode==='k26'){
-    rows.push(['בכנסת 25','לא כיהן/ה בכנסת 25']);
+  } else if(ctx.mode==='k26'&&K25_READY){
+    rows.push(['בכנסת 25','לא כיהן/ה בכנסת 25']); // only once the archive is in — before that, absence proves nothing
   }
   return `<div class="ht-head">${avatar(s.name,s.faction,44)}<div style="min-width:0"><div class="ht-name">${esc(disp(s.name))}${followedMk(s.name)?' ★':''}</div><div class="ht-fac"><i style="background:${s.color||fcol(s.faction)}"></i>${esc(fac)}${ctx.mode==='k26'?' · כנסת 26':ctx.mode==='k25'?' · כנסת 25':''}</div></div>${ctx.mode==='actual'&&s.result&&!s.absent?`<span class="vchip ${HEMI_VOTE[s.result][1]}" style="margin-inline-start:auto">${HEMI_VOTE[s.result][0]}</span>`:ctx.mode==='actual'&&s.absent?'<span class="vchip n" style="margin-inline-start:auto">נעדר/ה</span>':''}</div>
   ${rows.length?`<div class="ht-stats">${rows.map(([k,v])=>`<span class="k">${esc(k)}</span><span class="v">${esc(v)}</span>`).join('')}</div>`:''}
@@ -1653,6 +1673,7 @@ function navTo(hash,renderFn){ if(location.hash.slice(1)===hash){ renderFn() } e
 function applyRoute(){
   if(!appLoaded) return;
   const h=new URLSearchParams(location.hash.slice(1));
+  if(h.get('bill')||h.get('vote')||h.get('voterec')) ensureK25Archive(); // K25 deep links resolve only once the archive lands; ensureK25Archive re-applies this route then
   if(h.get('voterec')){ // legacy route: the id was a bill id whose chosen vote was shown; land on that vote if it still resolves, else its bill page
     const b=ALLB_BY_ID[h.get('voterec')];
     const bv=b&&(b.votes||[]).length?[...b.votes].sort((x,y)=>y.reading-x.reading||(y.date||'').localeCompare(x.date||''))[0]:null;
@@ -1799,8 +1820,8 @@ function searchPick(i){ const it=SEARCH_FLAT[i]; if(!it) return; hideSearchDrop(
 function searchFallback(){ const q=$('#globalSearch').value.trim(); allFilter.q=q; allFilter.limit=30; hideSearchDrop(); go('bills') }
 function setupGlobalSearch(){
   const gs=$('#globalSearch'); if(!gs) return;
-  gs.addEventListener('input',renderSearchDrop);
-  gs.addEventListener('focus',()=>{ if(gs.value.trim()) renderSearchDrop() });
+  gs.addEventListener('input',()=>{ ensureK25Archive(); renderSearchDrop() }); // bills/votes live in the K25 archive — pull it on first search, not on boot
+  gs.addEventListener('focus',()=>{ if(gs.value.trim()){ ensureK25Archive(); renderSearchDrop() } });
   gs.addEventListener('blur',()=>setTimeout(hideSearchDrop,150));
   gs.addEventListener('keydown',e=>{
     if(e.key==='ArrowDown'||e.key==='ArrowUp'){ e.preventDefault(); if(!SEARCH_FLAT.length)return; SEARCH_ACTIVE=(SEARCH_ACTIVE+(e.key==='ArrowDown'?1:-1)+SEARCH_FLAT.length)%SEARCH_FLAT.length; document.querySelectorAll('.sd-row').forEach((r,i)=>r.classList.toggle('on',i===SEARCH_ACTIVE)); document.querySelector('.sd-row.on')?.scrollIntoView({block:'nearest'}) }
@@ -2264,6 +2285,7 @@ function agendaHTML(){
 /* ============ NOW ============ */
 function renderNow(){
   if(KN===26){ renderNow26(); return }
+  ensureK25Archive(); // the K25 hemicycle below is built only in this branch — and only once its archive has been asked for
   ensureAgenda();
   ensurePlenumTv(); // live plenum TV block (#plenumTvBox); paints itself when the status read lands
   const app=$('#app');
@@ -2761,6 +2783,7 @@ function renderMks(){
 function renderMksKeep(inp){ keepSearchFocus(inp,renderMks) }
 function renderMks26(){
   if(!K26){ $('#app').innerHTML='<div class="card empty">אין נתוני כנסת 26</div>'; return }
+  ensureK25Archive(); // cards carry each MK's K25 record — on demand here, not on boot
   ensureLivePresence(); // highlights cards of MKs currently in the building; re-renders when it lands
   ensurePresence26(); // workday-attendance layer + sort; re-renders when it lands
   // Same universe as the Now hemicycle: the official serving roster once it
@@ -2787,7 +2810,7 @@ function renderMks26(){
   <select onchange="mkFilter.faction=this.value;if(this.value)mkFilter.sort='list';renderMks()" aria-label="סינון לפי סיעה"><option value="">כל הסיעות</option>${parties.map(f=>`<option ${mkFilter.faction===f?'selected':''}>${esc(f)}</option>`).join('')}</select></div>
   ${mkSortPillsHTML()}
   <div class="mk-grid">${list.map(x=>{const rec=IDX25[x.n]; const initiated=initiatedCount(x.n); const present=livePresenceOf(x.n)===true; const pdays=mkPresenceDays(x.n); const todayArr=presenceTodayArrivals(); const tIdx=todayArr?todayArr.findIndex(a=>a.name===normName(x.n)):-1; return `<div class="card mk-card${present?' present':''}" onclick="openMk('${jsq(x.n)}')">${avatar(x.n,x.p,62)}<div style="font-weight:800">${esc(disp(x.n))}${followedMk(x.n)?' ★':''}</div><div class="small" style="color:${x.color}">${esc(x.p)}</div>${presencePillHTML(x.n)}
-  <div class="small dim">מקום ${RANK26[x.n]??x.rank} ברשימת ${esc(x.p)}</div>${PRESENCE26&&presenceTrackedDays()?`<div class="small" style="color:var(--for);font-weight:700">נוכחות: ${pdays} מתוך ${presenceTrackedDays()} ימי מעקב${tIdx>=0?` · היום מקום ${tIdx+1} בהגעה`:''}</div>`:''}${rec?`<div class="small" style="color:var(--accent)">כנסת 25: ${rec.votes.length} הצבעות${initiated?` · ${initiated} יוזמות חקיקה`:''}</div>`:'<div class="small dim">לא כיהן/ה בכנסת 25</div>'}</div>`}).join('')}</div>
+  <div class="small dim">מקום ${RANK26[x.n]??x.rank} ברשימת ${esc(x.p)}</div>${PRESENCE26&&presenceTrackedDays()?`<div class="small" style="color:var(--for);font-weight:700">נוכחות: ${pdays} מתוך ${presenceTrackedDays()} ימי מעקב${tIdx>=0?` · היום מקום ${tIdx+1} בהגעה`:''}</div>`:''}${rec?`<div class="small" style="color:var(--accent)">כנסת 25: ${rec.votes.length} הצבעות${initiated?` · ${initiated} יוזמות חקיקה`:''}</div>`:K25_READY?'<div class="small dim">לא כיהן/ה בכנסת 25</div>':'<div class="small dim">היסטוריית כנסת 25 נטענת…</div>'}</div>`}).join('')}</div>
   ${PRESENCE26&&presenceTrackedDays()?`<p class="small dim" style="margin-top:.7rem;line-height:1.8">ימי נוכחות = ב־כמה מימי המעקב (ראשון–חמישי, מאז ${fmtDate(PRESENCE26._meta?.tracking_since||'')}, נדגם כל 5 דקות מאפליקציית לובי הח״כים) הח״כ נראה/תה במשכן לפחות פעם אחת — בלי קשר למשך השהות. המעקב צעיר וגדל מדי יום; אין נתוני נוכחות לכנסת 25, כי הלובי משרת רק את הסגל המכהן.</p>`:''}`;
 }
 /* Committee memberships on MK pages + member lists on committee pages. */
@@ -2829,7 +2852,7 @@ function mkKnStrip(name){
   if(KN===25){
     return `<div class="chips" style="margin-top:.7rem"><button class="chip on">כנסת 25 · מוצג כעת</button>${e26?`<button class="chip" onclick="switchKnesset(26);openMk('${jsq(name)}')">כנסת 26 · מקום ${e26.rank} ברשימת ${esc(e26.party.name)} ←</button>`:''}</div>`;
   }
-  return `<div class="chips" style="margin-top:.7rem">${rec25?`<button class="chip" onclick="switchKnesset(25);openMk('${jsq(name)}')">כנסת 25 · ${rec25.votes.length} הצבעות ←</button>`:'<span class="chip">לא כיהן/ה בכנסת 25</span>'}<button class="chip on">כנסת 26 · מוצג כעת</button></div>`;
+  return `<div class="chips" style="margin-top:.7rem">${rec25?`<button class="chip" onclick="switchKnesset(25);openMk('${jsq(name)}')">כנסת 25 · ${rec25.votes.length} הצבעות ←</button>`:`<span class="chip">${K25_READY?'לא כיהן/ה בכנסת 25':'היסטוריית כנסת 25 נטענת…'}</span>`}<button class="chip on">כנסת 26 · מוצג כעת</button></div>`;
 }
 function myAgreement(name){ const m=mkIndex[name]; if(!m)return null; let s=0,t=0;
   for(const v of m.votes){const mine=S.myVotes[String(v.bill.id)]; if(!mine)continue; t++; s+= v.result===mine?1:(v.result===3||mine===3?.5:0)}
@@ -2937,6 +2960,7 @@ function lobbyBrowserHTML(){
   ${list.length>shown.length?`<div style="text-align:center;margin-top:1rem"><button class="btn" onclick="lobbyFilter.limit+=40;renderCommittees()">עוד שדלנים</button></div>`:''}`:'<div class="card empty"><div class="big">🔍</div>לא נמצאו שדלנים בסינון הזה.</div>'}`;
 }
 function renderMkDetail(){
+  ensureK25Archive(); // an MK card carries the K25 record in both Knessets — load it here, not on the K26 home
   ensureCmem(); ensureWiki(); ensureAnalytics(); ensureLivePresence(); ensureExtras(); ensureRoles(); ensureMkHighlights(); if(KN===26) ensurePresence26();
   const name=viewArg, app=$('#app');
   if(KN===26){ const e=k26Entry(name); const rec=IDX25[name];
@@ -2957,7 +2981,7 @@ function renderMkDetail(){
       ${mkPresenceLineHTML(name)}
       <span class="chip acc" style="margin-top:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> היסטוריית ההצבעות תתחיל עם הצבעות כנסת 26 הראשונות</span></div>${starBtn('mk',name,name)}</div>
     ${rec?`<div style="margin-top:1rem"><h3>בכנסת 25</h3><div class="small muted" style="line-height:1.9">${rec.votes.length} הצבעות מתועדות · סיעה אז: ${esc(shortF(rec.faction))} · <span style="color:var(--for)">${rec.votes.filter(v=>v.result===1).length} בעד</span> / <span style="color:var(--against)">${rec.votes.filter(v=>v.result===2).length} נגד</span> / <span style="color:var(--abstain)">${rec.votes.filter(v=>v.result===3).length} נמנע</span><br>איך הצביע/ה על ביטחון, כלכלה, זכויות — הכל שמור בכרטיס של כנסת 25.</div>
-    <button class="btn primary" style="margin-top:.6rem" onclick="switchKnesset(25);openMk('${jsq(name)}')">לכל ההצבעות בכנסת 25 ←</button></div>`:'<p class="muted small" style="margin-top:1rem">לא כיהן/ה בכנסת 25. הכרטיס יתמלא מההצבעה הראשונה.</p>'}
+    <button class="btn primary" style="margin-top:.6rem" onclick="switchKnesset(25);openMk('${jsq(name)}')">לכל ההצבעות בכנסת 25 ←</button></div>`:K25_READY?'<p class="muted small" style="margin-top:1rem">לא כיהן/ה בכנסת 25. הכרטיס יתמלא מההצבעה הראשונה.</p>':'<p class="muted small" style="margin-top:1rem">טוען את היסטוריית כנסת 25…</p>'}
     </div>
     ${mkContactHTML(name)}
     ${mkKnStrip(name)}
@@ -3369,7 +3393,7 @@ function renderFactions(){
 }
 function renderFactionDetail(){
   const app=$('#app'), name=viewArg;
-  if(KN===26){
+  if(KN===26){ ensureK25Archive(); // rows carry each member's K25 record
     const p=K26?.parties.find(x=>x.name===name);
     if(!p){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="12" cy="17" r="2.6"/><path d="M9.3 8.6 10.6 14M14.7 8.6 13.4 14M9.6 7h4.8"/></svg></div>הסיעה לא נמצאה ברשימות כנסת 26.</div>'; return }
     app.innerHTML=`
@@ -3378,7 +3402,7 @@ function renderFactionDetail(){
       <h1 style="font-size:1.55rem;color:${p.color}">${esc(p.name)}</h1>
       <div class="progress" style="margin:.7rem 0"><i style="width:${p.seats/120*100}%;background:${p.color}"></i></div>
       <p class="small muted">הנבחרים לפי סדר הרשימה הרשמי. היסטוריית הצבעות תתחיל להיבנות עם הצבעות כנסת 26 הראשונות; מי שכיהנו בכנסת 25 מקושרים להיסטוריית ההצבעות שלהם.</p>
-      <div class="rows" style="margin:.6rem -.9rem 0">${p.elected.map(n=>{const r=(p.candidates||[]).indexOf(n)+1; return `<div class="row" onclick="openMk('${jsq(n)}')"><b style="width:1.7rem;color:${p.color}">${r}</b>${avatar(n,p.name,34)}<span class="flex">${esc(disp(n))}${IDX25[n]?`<br><span class="dim small">בכנסת 25: ${IDX25[n].votes.length} הצבעות</span>`:'<br><span class="dim small">לא כיהן/ה בכנסת 25</span>'}</span><span class="chip acc">לכרטיס ←</span></div>`}).join('')}</div>
+      <div class="rows" style="margin:.6rem -.9rem 0">${p.elected.map(n=>{const r=(p.candidates||[]).indexOf(n)+1; return `<div class="row" onclick="openMk('${jsq(n)}')"><b style="width:1.7rem;color:${p.color}">${r}</b>${avatar(n,p.name,34)}<span class="flex">${esc(disp(n))}${IDX25[n]?`<br><span class="dim small">בכנסת 25: ${IDX25[n].votes.length} הצבעות</span>`:`<br><span class="dim small">${K25_READY?'לא כיהן/ה בכנסת 25':'היסטוריית כנסת 25 נטענת…'}</span>`}</span><span class="chip acc">לכרטיס ←</span></div>`}).join('')}</div>
       ${p.elected.some((n,i)=>(p.candidates||[]).indexOf(n)!==i)?'<p class="small dim" style="margin-top:.6rem">המספרים הם המקומות ברשימת המועמדים הרשמית כפי שהוגשה לוועדת הבחירות; פער במספור הוא מועמד שפרש מהרשימה לפני ההשבעה, והבא אחריו נכנס במקומו.</p>':''}
     </article>`;
     return;
