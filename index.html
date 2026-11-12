@@ -945,6 +945,7 @@ let VOTE_RES={names:[],votes:{}}, VOTE_BY_ID={}; // full per-MK results (build_k
 let VOTE_MODELS={}; // vote id -> normalised vote model (voteModel()); the only vote shape the UI renders
 let OFFICIAL_PHOTOS={}; // name -> official-portrait manifest entry (build_k25_photos_official.py); covers MKs absent from the roster file, notably those who left mid-term
 let PROTO_IDX={}, PROTO_CUR=null, protoFilter={speaker:'',q:''}; // committee protocols (build_protocols.py)
+let MK_HIGHLIGHTS=null, protoFocusSpeaker=''; // per-MK protocol highlights (build_mk_highlights.py, TF-IDF — no LLM); protoFocusSpeaker: speaker filter to apply when a protocol finishes loading (set by openMkProtocol)
 let ANALYTICS=null; // MK analytics: correlation, close ties, ranks (build_analytics.py)
 let CONTACTS={}, CONTACTS_META={}; // official contact/social/presence snapshot, K25 (build_mk_contacts.py; data/mk_contacts.json is the frozen final-K25 roster)
 let CONTACTS26={}, CONTACTS26_META={}; // same, Knesset 26 (data/k26_contacts.json) — each Knesset's MK pages read their own roster's card
@@ -1175,6 +1176,36 @@ function ensureExtras(){ if(EXTRAS) return Promise.resolve(EXTRAS); return _lazy
 function ensureBillDocs(){ if(BILL_DOCS) return Promise.resolve(BILL_DOCS); return _lazyOnce('billDocs',async()=>{ const j=await _fetchJson(`data/k${KN}_bill_docs.json`); if(j){ BILL_DOCS=j; if(view==='billAll') renderBillLite(); else if(view==='vote') renderVote() } return BILL_DOCS }) }
 function ensureRoles(){ if(ROLES) return Promise.resolve(ROLES); return _lazyOnce('roles',async()=>{ const j=await _fetchJson(`data/k${KN}_roles.json`); if(j){ ROLES=j; if(view==='mk') renderMkDetail() } return ROLES }) }
 function ensurePresence26(){ if(PRESENCE26) return Promise.resolve(PRESENCE26); return _lazyOnce('presence26',async()=>{ const j=await _fetchJson('data/k26_presence.json'); if(j){ j.by_mk=_normKeys(j.by_mk); for(const d of Object.values(j.days||{})) (d.arrivals||[]).forEach(a=>a.name=normName(a.name)); PRESENCE26=j; if(KN===26&&(view==='now'||view==='mks'||view==='mk')) render() } return PRESENCE26 }) }
+function ensureMkHighlights(){ if(MK_HIGHLIGHTS) return Promise.resolve(MK_HIGHLIGHTS); return _lazyOnce('mkHighlights',async()=>{ const j=await _fetchJson('data/mk_highlights.json'); if(j){ j.by_mk=_normKeys(j.by_mk); MK_HIGHLIGHTS=j; if(view==='mk') renderMkDetail() } return MK_HIGHLIGHTS }) }
+/* Open a committee session's protocol already filtered to one MK — the
+   deep link behind every highlight/appearance on the MK page. The
+   filter can only be applied once the transcript lands, so it rides in
+   protoFocusSpeaker and toggleProtocol consumes it after rendering. */
+function openMkProtocol(sid,name){
+  protoFocusSpeaker=disp(name);
+  const apply=()=>{ const box=$('#protoBox'); if(!box) return false;
+    if(PROTO_CUR&&PROTO_CUR.id===String(sid)){ delete box.dataset.mkFocus;
+      if(protoFocusSpeaker){ protoFilter={speaker:protoFocusSpeaker,q:''}; protoFocusSpeaker=''; renderProtocol() }
+      box.scrollIntoView({block:'start',behavior:'smooth'}); return true }
+    if(!box.dataset.mkFocus){ box.dataset.mkFocus='1'; toggleProtocol(String(sid)) } // once — the transcript fetch is async and toggleProtocol consumes protoFocusSpeaker when it lands
+    return true };
+  if(view==='session'&&String(viewArg)===String(sid)){ apply(); return }
+  openSession(sid);
+  let tries=0; const iv=setInterval(()=>{ if(apply()||++tries>20) clearInterval(iv) },150);
+}
+/* The MK page's protocol card: where this MK actually spoke in committee
+   (appearances, by volume) and their highest-scoring turns (highlights).
+   Scores are TF-IDF over the transcripts — classic IR, no LLM — and the
+   excerpt is the turn's own opening words, verbatim. */
+function mkHighlightsHTML(name){
+  const h=MK_HIGHLIGHTS?.by_mk?.[normName(name)]; if(!h) return '';
+  const hl=h.highlights||[], apps=(h.appearances||[]).slice(0,6);
+  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> בפרוטוקולי הוועדות <small class="dim">דבריו/ה המתועדים — והקטעים הבולטים</small></h3>
+  <div class="small muted" style="margin-top:.35rem;line-height:1.9">דיבר/ה ב־<b>${h.sessions}</b> ישיבות ועדה מתועדות · <b>${h.turns.toLocaleString('he-IL')}</b> תורות · <b>${h.words.toLocaleString('he-IL')}</b> מילים</div>
+  ${hl.length?`<h4 style="margin-top:.7rem">הקטעים הבולטים</h4><div class="rows" style="margin:.35rem -.9rem 0">${hl.map(x=>`<div class="row" onclick="openMkProtocol('${x.sid}','${jsq(name)}')"><span class="flex" style="white-space:normal">״${esc(x.excerpt)}…״<br><span class="dim small">${esc(x.committee)} · ${fmtDate(x.date)} · ${x.words} מילים בתור</span></span><span class="chip acc">לפרוטוקול ←</span></div>`).join('')}</div>`:''}
+  ${apps.length?`<h4 style="margin-top:.7rem">ישיבות שדיבר/ה בהן הכי הרבה</h4><div class="rows" style="margin:.35rem -.9rem 0">${apps.map(a=>`<div class="row" onclick="openMkProtocol('${a.sid}','${jsq(name)}')"><span class="flex">${esc(a.committee)}<br><span class="dim small">${fmtDate(a.date)} · ${a.turns} תורות · ${a.words.toLocaleString('he-IL')} מילים</span></span><span class="chip acc">לפרוטוקול ←</span></div>`).join('')}</div>${h.sessions>apps.length?`<div class="small dim" style="margin-top:.4rem">ועוד ${h.sessions-apps.length} ישיבות — פתחו אחת מהרשימה או חפשו את שמו/ה בכל ישיבה דרך לשונית הוועדות.</div>`:''}`:''}
+  <p class="small dim" style="margin-top:.55rem">״בולטים״ נבחרו אוטומטית לפי ניקוד TF-IDF על טקסט הפרוטוקולים (מילים ייחודיות וספציפיות שוקלות יותר; מינימום 30 מילים לתור) — בלי מודל שפה. לחיצה פותחת את הפרוטוקול מסונן לדברי הח״כ.</p></div>`;
+}
 const presenceTrackedDays=()=>PRESENCE26?Object.keys(PRESENCE26.days||{}).length:0;
 const mkPresenceDays=n=>PRESENCE26?.by_mk?.[normName(n)]?.days||0;
 function presenceTodayArrivals(){ // today's (Asia/Jerusalem) arrival list, or null before tracking opens today
@@ -1836,7 +1867,7 @@ async function toggleProtocol(id){
   const box=$('#protoBox'); if(!box) return;
   if(PROTO_CUR&&PROTO_CUR.id===String(id)){ PROTO_CUR=null; box.innerHTML=''; return }
   box.innerHTML='<p class="muted small">טוען פרוטוקול…</p>';
-  try{ const r=await fetch(`data/protocols/${id}.json`); PROTO_CUR=await r.json(); PROTO_CUR.id=String(id); protoFilter={speaker:'',q:''}; renderProtocol() }
+  try{ const r=await fetch(`data/protocols/${id}.json`); PROTO_CUR=await r.json(); PROTO_CUR.id=String(id); protoFilter={speaker:protoFocusSpeaker,q:''}; protoFocusSpeaker=''; renderProtocol(); const b2=$('#protoBox'); if(b2&&protoFilter.speaker) b2.scrollIntoView({block:'start',behavior:'smooth'}) }
   catch(e){ box.innerHTML='<p class="muted small">הפרוטוקול לא נטען.</p>' }
 }
 /* Highlight query matches inside protocol text. Works on the RAW string
@@ -2906,7 +2937,7 @@ function lobbyBrowserHTML(){
   ${list.length>shown.length?`<div style="text-align:center;margin-top:1rem"><button class="btn" onclick="lobbyFilter.limit+=40;renderCommittees()">עוד שדלנים</button></div>`:''}`:'<div class="card empty"><div class="big">🔍</div>לא נמצאו שדלנים בסינון הזה.</div>'}`;
 }
 function renderMkDetail(){
-  ensureCmem(); ensureWiki(); ensureAnalytics(); ensureLivePresence(); ensureExtras(); ensureRoles(); if(KN===26) ensurePresence26();
+  ensureCmem(); ensureWiki(); ensureAnalytics(); ensureLivePresence(); ensureExtras(); ensureRoles(); ensureMkHighlights(); if(KN===26) ensurePresence26();
   const name=viewArg, app=$('#app');
   if(KN===26){ const e=k26Entry(name); const rec=IDX25[name];
     if(!e){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצא/ה ברשימת הנבחרים לכנסת 26.</div>'; return }
@@ -2934,6 +2965,7 @@ function renderMkDetail(){
     ${mkInitiatedHTML(name,true)}
     ${mkRolesHTML(name)}
     ${mkCommitteesHTML(name)}
+    ${mkHighlightsHTML(name)}
     <div class="card pad" style="margin-top:.85rem"><h3>${esc(e.party.name)} — חברי הכנסת של הסיעה (${partyMks26.length})</h3><div class="rows" style="margin:.5rem -.9rem 0">${partyMks26.map(n=>{const r=e.party.candidates.indexOf(n)+1, srv=(K26_TENURE[n]||[]).some(x=>!x[1]); return `<div class="row" style="cursor:pointer;${n===name?'background:var(--surface2)':''}" onclick="openMk('${jsq(n)}')"><b style="width:1.6rem;color:var(--accent)">${r}</b><span class="flex">${esc(disp(n))} ${n===name?'← כאן':''}</span><span class="chip for">${srv?'מכהן/ת':'נבחר/ה'}</span></div>`}).join('')}</div>${partyMks26.some((n,i)=>e.party.candidates.indexOf(n)!==i)?'<p class="small dim" style="margin-top:.6rem">המספר הוא המקום ברשימת המועמדים המקורית; מקומות שדולגו הם מועמדים שפרשו לפני ההשבעה, והבאים אחריהם נכנסו במקומם.</p>':''}</div>`;
     window.scrollTo(0,0); return }
   const m=mkIndex[name]; if(!m){app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצאו הצבעות מתועדות לח״כ הזה/זו באתר — לא בכנסת 25 ולא בכנסת 26.</div>';return}
@@ -3005,6 +3037,7 @@ function renderMkDetail(){
   ${mkRebelHTML(name,deviations)}
   ${mkRolesHTML(name)}
   ${mkCommitteesHTML(name)}
+  ${mkHighlightsHTML(name)}
   ${mkAnalyticsHTML(name)}
   ${mkExtrasHTML(name)}
   <div class="sec-title">ההצבעות האחרונות <small>לחצו לדף ההצבעה</small></div>
