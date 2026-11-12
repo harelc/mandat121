@@ -1292,7 +1292,7 @@ function ensureMkHighlights(){ if(MK_HIGHLIGHTS) return Promise.resolve(MK_HIGHL
    Highlight rows promise THIS turn, not just the sitting — anything less
    is a misleading button. Returns false when the turn isn't rendered
    (wrong filter / not loaded yet). */
-let protoFocusTurn=null, plenumFocusTurn=null;
+let protoFocusTurn=null, protoFocusExcerpt=null, plenumFocusTurn=null;
 function flashTurn(ti){
   if(ti==null) return false;
   const el=document.querySelector(`[data-turn="${ti}"]`);
@@ -1302,17 +1302,32 @@ function flashTurn(ti){
   setTimeout(()=>el.classList.remove('turn-target'),2800);
   return true;
 }
+/* A highlight's turn index was counted by whichever parser harvested
+   it (static build vs on-demand function parse can tokenize the same
+   .doc slightly differently), so verify the index against the excerpt
+   before trusting it: if the turn at that index doesn't start with
+   the excerpt, find the turn that does. */
+function locateProtoTurn(doc,idx,excerpt){
+  if(idx==null||!doc?.turns?.length) return idx;
+  const norm=s=>String(s||'').replace(/\s+/g,' ').trim();
+  const head=norm(String(excerpt||'').replace(/…$/,'')).slice(0,60);
+  if(!head) return idx;
+  const probe=head.slice(0,40);
+  if(norm(doc.turns[idx]?.text).includes(probe)) return idx;
+  const found=doc.turns.findIndex(t=>norm(t.text).includes(probe));
+  return found>=0?found:idx;
+}
 /* Open a committee session's protocol filtered to one MK — and, when a
    turn index rides along (highlight rows), land on that exact turn.
    The filter can only be applied once the transcript lands, so it rides
    in protoFocusSpeaker/protoFocusTurn and the loader consumes them. */
-function openMkProtocol(sid,name,turn=null){
-  protoFocusSpeaker=disp(name); protoFocusTurn=turn;
+function openMkProtocol(sid,name,turn=null,excerpt=null){
+  protoFocusSpeaker=disp(name); protoFocusTurn=turn; protoFocusExcerpt=excerpt;
   const apply=()=>{ const box=$('#protoBox'); if(!box) return false;
     if(PROTO_CUR&&PROTO_CUR.id===String(sid)){ delete box.dataset.mkFocus;
       if(protoFocusSpeaker){ protoFilter={speaker:protoFocusSpeaker,q:''}; protoFocusSpeaker=''; renderProtocol() }
-      if(!flashTurn(protoFocusTurn)) box.scrollIntoView({block:'start',behavior:'smooth'});
-      protoFocusTurn=null; return true }
+      if(!flashTurn(locateProtoTurn(PROTO_CUR,protoFocusTurn,protoFocusExcerpt))) box.scrollIntoView({block:'start',behavior:'smooth'});
+      protoFocusTurn=null; protoFocusExcerpt=null; return true }
     if(!box.dataset.mkFocus){ box.dataset.mkFocus='1'; toggleProtocol(String(sid)) } // once — the transcript fetch is async and toggleProtocol consumes the focus globals when it lands
     return true };
   if(view==='session'&&String(viewArg)===String(sid)){ apply(); return }
@@ -1328,9 +1343,13 @@ function openMkPlenum(sid,name,turn=null){
   openPlenum(sid);
   setTimeout(()=>{ if(!apply()) togglePlenumProtocol(String(sid)).then(()=>apply()) },60);
 }
-const openMkTurn=(x,name)=>x.kind==='plenum'?`openMkPlenum('${x.sid}','${jsq(name)}',${x.turn??'null'})`:x.kind==='committee_archive'?`window.open('${jsq(x.doc||'')}','_blank','noopener')`:`openMkProtocol('${x.sid}','${jsq(name)}',${x.turn??'null'})`; // archive sittings have no in-app reader — their official document instead
-const mkTurnPill=x=>x.kind==='committee_archive'?'<span class="chip acc">למסמך הפרוטוקול הרשמי ↗</span>':`<span class="chip acc">${x.kind==='plenum'?'לקטע המדויק בפרוטוקול המליאה':'לקטע המדויק בפרוטוקול הוועדה'} ←</span>`;
-const mkSessPill=a=>a.kind==='committee_archive'?'<span class="chip acc">למסמך הפרוטוקול הרשמי ↗</span>':`<span class="chip acc">${a.kind==='plenum'?'לדבריו/ה בישיבת המליאה':'לדבריו/ה בישיבת הוועדה'} ←</span>`;
+function openMkArchiveTurn(sid,name,turn,excerpt,committee,date,doc){ // old sittings aren't in the session data the session page reads — stash just enough for it to paint a shell (with the official document linked on it)
+  try{ sessionStorage.setItem('archSess:'+sid,JSON.stringify({committee:committee||'',date:date||'',doc:doc||''})) }catch(e){}
+  openMkProtocol(sid,name,turn,excerpt);
+}
+const openMkTurn=(x,name)=>x.kind==='plenum'?`openMkPlenum('${x.sid}','${jsq(name)}',${x.turn??'null'})`:x.kind==='committee_archive'?`openMkArchiveTurn('${x.sid}','${jsq(name)}',${x.turn??'null'},'${jsq(x.excerpt||'')}','${jsq(x.committee||'')}','${jsq(x.date||'')}','${jsq(x.doc||'')}')`:`openMkProtocol('${x.sid}','${jsq(name)}',${x.turn??'null'},'${jsq(x.excerpt||'')}')`;
+const mkTurnPill=x=>`<span class="chip acc">${x.kind==='plenum'?'לקטע המדויק בפרוטוקול המליאה':'לקטע המדויק בפרוטוקול הוועדה'} ←</span>`;
+const mkSessPill=a=>`<span class="chip acc">${a.kind==='plenum'?'לדבריו/ה בישיבת המליאה':'לדבריו/ה בישיבת הוועדה'} ←</span>`;
 /* The MK page's protocol card: where this MK actually spoke — committee
    protocols (full text in the repo) and plenum sittings (דברי הכנסת,
    scored at parse time into data/plenum_hl/) — and their
@@ -1346,7 +1365,7 @@ function mkHighlightsHTML(name){
   <div class="small muted" style="margin-top:.35rem;line-height:1.9">דיבר/ה ב־${sessLine} מתועדות · <b>${h.turns.toLocaleString('he-IL')}</b> קטעים · <b>${h.words.toLocaleString('he-IL')}</b> מילים</div>
   ${hl.length?`<h4 style="margin-top:.7rem">הקטעים הבולטים</h4><div class="rows" style="margin:.35rem -.9rem 0">${hl.map(x=>`<div class="row" onclick="${openMkTurn(x,name)}"><span class="flex" style="white-space:normal">״${esc(x.excerpt)}…״<br><span class="dim small">${esc(x.committee)} · ${fmtDate(x.date)} · ${x.words} מילים בקטע</span></span>${mkTurnPill(x)}</div>`).join('')}</div>`:''}
   ${apps.length?`<h4 style="margin-top:.7rem">ישיבות שדיבר/ה בהן הכי הרבה</h4><div class="rows" style="margin:.35rem -.9rem 0">${apps.map(a=>`<div class="row" onclick="${openMkTurn(a,name)}"><span class="flex">${esc(a.committee)}<br><span class="dim small">${fmtDate(a.date)} · ${a.turns} קטעים · ${a.words.toLocaleString('he-IL')} מילים</span></span>${mkSessPill(a)}</div>`).join('')}</div>${h.sessions>apps.length?`<div class="small dim" style="margin-top:.4rem">ועוד ${h.sessions-apps.length} ישיבות מתועדות.</div>`:''}`:''}
-  <p class="small dim" style="margin-top:.55rem">״בולטים״ נבחרו אוטומטית לפי ניקוד TF-IDF על טקסט הפרוטוקולים (מילים ייחודיות וספציפיות שוקלות יותר; מינימום 30 מילים לקטע) — בלי מודל שפה. לחיצה על קטע בולט קופצת ישר אליו בפרוטוקול; קטעי ״ועדה · ארכיון״ פותחים את המסמך הרשמי (אין להם קורא בתוך האתר); לחיצה על ישיבה פותחת את דברי הח״כ בה.</p></div>`;
+  <p class="small dim" style="margin-top:.55rem">״בולטים״ נבחרו אוטומטית לפי ניקוד TF-IDF על טקסט הפרוטוקולים (מילים ייחודיות וספציפיות שוקלות יותר; מינימום 30 מילים לקטע) — בלי מודל שפה. לחיצה על קטע בולט קופצת ישר אליו בפרוטוקול (בישיבות ותיקות הפרוטוקול נטען לפי דרישה); לחיצה על ישיבה פותחת את דברי הח״כ בה.</p></div>`;
 }
 const presenceTrackedDays=()=>PRESENCE26?Object.keys(PRESENCE26.days||{}).length:0;
 const mkPresenceDays=n=>PRESENCE26?.by_mk?.[normName(n)]?.days||0;
@@ -2033,7 +2052,12 @@ function openSession(id){ navTo('session='+id,()=>{viewArg=String(id); view='ses
 function renderSessionDetail(){
   ensureAgenda(); ensureExtras();
   const app=$('#app'), id=viewArg;
-  const s=(CMT? CMT.recent_sessions.find(x=>String(x.id)===String(id)) : null) || (AGENDA? (AGENDA.committees||[]).find(x=>String(x.id)===String(id)) : null) || HIST_SESS[String(id)] || null;
+  let s=(CMT? CMT.recent_sessions.find(x=>String(x.id)===String(id)) : null) || (AGENDA? (AGENDA.committees||[]).find(x=>String(x.id)===String(id)) : null) || HIST_SESS[String(id)] || null;
+  if(!s){ // deep link from an MK highlight to an old sitting: not in any session index, but the click stashed committee/date/official-doc — enough for a shell whose protocol loads on demand
+    try{ const meta=JSON.parse(sessionStorage.getItem('archSess:'+id)||'null');
+      if(meta&&(meta.committee||meta.date)) s={committee:meta.committee||'',start:meta.date||'',items:[],docs:meta.doc?[{group:'פרוטוקול הוועדה — המסמך הרשמי',path:meta.doc}]:[]};
+    }catch(e){}
+  }
   // Bills discussed in this session, from per-bill committee histories.
   const bills=[]; if(CMT) for(const [bid,hist] of Object.entries(CMT.bill_committees)) for(const h of hist) if(String(h.session_id)===String(id)) bills.push({bid,h});
   if(!s && !bills.length){ app.innerHTML=backBtnHTML('committees','› ועדות')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>הישיבה לא נמצאה במאגר.</div>'; return }
@@ -2044,7 +2068,7 @@ function renderSessionDetail(){
   app.innerHTML=`
   ${backBtnHTML('committees','› ועדות')}
   <article class="card pad rise" style="margin-top:.6rem">
-    <div class="card-top">${(s?.committee_id||h0?.committee_id)?`<button class="chip acc" onclick="openCommittee('${s?.committee_id||h0.committee_id}')">${esc(cname)} ←</button>`:`<span class="chip acc">${esc(cname)}</span>`}${s?`<span class="chip">${esc(s.type||'')}</span><span class="chip">${esc(s.status||'')}</span>`:''}<span class="date">${fmtDate(date)}${time?` · ${time}`:''}</span></div>
+    <div class="card-top">${(s?.committee_id||h0?.committee_id)?`<button class="chip acc" onclick="openCommittee('${s?.committee_id||h0.committee_id}')">${esc(cname)} ←</button>`:`<span class="chip acc">${esc(cname)}</span>`}${s?.type?`<span class="chip">${esc(s.type)}</span>`:''}${s?.status?`<span class="chip">${esc(s.status)}</span>`:''}<span class="date">${fmtDate(date)}${time?` · ${time}`:''}</span></div>
     <h1 style="font-size:1.35rem;line-height:1.35">ישיבת ועדה · ${fmtDate(date)}</h1>
     ${s?.location?`<div class="small muted"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.4-6.5-10.3A6.5 6.5 0 0 1 12 4a6.5 6.5 0 0 1 6.5 6.7C18.5 15.6 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg> ${esc(s.location)}</div>`:''}
     ${s&&s.items.length?`<h3 style="margin-top:1rem">על סדר היום</h3><div class="rows" style="margin:.4rem -.9rem 0">${s.items.map(it=>`<div class="row" ${it.in_dataset?`onclick="openBillPage('${it.item_id}')"`:'style="cursor:default"'}><span class="flex">${esc(it.name)}${it.status?`<br><span class="dim small">${esc(it.status)}</span>`:''}</span>${it.in_dataset?'<span class="chip acc">לחוק ←</span>':''}</div>`).join('')}</div>`:''}
@@ -2073,7 +2097,7 @@ async function toggleProtocol(id){
       if(!r2.ok) throw 0;
       doc=await r2.json();
     }
-    PROTO_CUR=doc; PROTO_CUR.id=String(id); protoFilter={speaker:protoFocusSpeaker,q:''}; protoFocusSpeaker=''; renderProtocol(); if(!flashTurn(protoFocusTurn)){ const b2=$('#protoBox'); if(b2&&protoFilter.speaker) b2.scrollIntoView({block:'start',behavior:'smooth'}) } protoFocusTurn=null }
+    PROTO_CUR=doc; PROTO_CUR.id=String(id); protoFilter={speaker:protoFocusSpeaker,q:''}; protoFocusSpeaker=''; renderProtocol(); const focusTi=locateProtoTurn(doc,protoFocusTurn,protoFocusExcerpt); protoFocusExcerpt=null; if(!flashTurn(focusTi)){ const b2=$('#protoBox'); if(b2&&protoFilter.speaker) b2.scrollIntoView({block:'start',behavior:'smooth'}) } protoFocusTurn=null }
   catch(e){ box.innerHTML='<p class="muted small">הפרוטוקול לא נטען.</p>' }
 }
 /* Highlight query matches inside protocol text. Works on the RAW string
