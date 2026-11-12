@@ -38,6 +38,7 @@ on:
 
 permissions:
   contents: write
+  issues: write # post-push change-summary issue (mentions the owner -> GitHub emails it; no mail secrets needed)
 
 concurrency:
   group: knesset-daily
@@ -163,12 +164,14 @@ jobs:
           python3 -u build_mk_highlights.py           # new K26 protocols change the highlights too (shared protocol store)
 
       - name: Commit refreshed data
+        id: commit
         run: |
           git config user.name "mandat121-data-bot"
           git config user.email "actions@github.com"
           git add data/
           if git diff --cached --quiet; then
             echo "No data changes."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           # Every commit to main triggers a Netlify deploy, so don't let
@@ -179,6 +182,7 @@ jobs:
           python3 meaningful_diff.py
           if git diff --cached --quiet; then
             echo "Only timestamps/formatting changed — no commit, no deploy."
+            echo "changed=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
           git commit -m "data: daily OData refresh ($(date -u +%Y-%m-%d))"
@@ -197,9 +201,39 @@ jobs:
             fi
             if git push origin main; then
               echo "Pushed on attempt $attempt."
+              echo "changed=true" >> "$GITHUB_OUTPUT"
+              echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
               exit 0
             fi
             echo "Push rejected (main moved again), retrying…"
           done
           echo "::error::Could not push after 3 attempts — main kept moving."
           exit 1
+
+      # Mail without mail secrets: GitHub emails issue mentions to the
+      # owner under their normal notification settings. The issue is
+      # closed immediately — it exists only to carry the summary into
+      # the inbox and leave a searchable archive. Non-fatal: the data
+      # is already pushed, a notification failure must not fail the run.
+      - name: Notify owner of the data commit (summary issue)
+        if: ${{ steps.commit.outputs.changed == 'true' }}
+        continue-on-error: true
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sha="${{ steps.commit.outputs.sha }}"
+          {
+            echo "@${{ github.repository_owner }} — \`knesset-daily\` just pushed a data commit to \`main\`."
+            echo
+            python3 summarize_commit.py "$sha"
+            echo
+            echo "**Commit:** ${{ github.server_url }}/${{ github.repository }}/commit/$sha"
+            echo "**Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
+            echo
+            echo "_Auto-closed: this issue is only an email notification + archive._"
+          } > notify-body.md
+          title="data refresh $(git log -1 --format=%cs "$sha") — pushed to main"
+          url=$(gh issue create --title "$title" --body-file notify-body.md)
+          echo "Notification issue: $url"
+          gh issue close "$url" --comment "Data already on main — closing; this issue was the email notification." \
+            || echo "::warning::Could not auto-close $url — close it manually."
