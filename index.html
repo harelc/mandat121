@@ -1683,9 +1683,41 @@ function render(){({now:renderNow,bills:renderBills,votes:renderVotes,plenum:ren
    view stayed put and only in-site "back" buttons re-rendered. */
 let appLoaded=false;
 function navTo(hash,renderFn){ if(location.hash.slice(1)===hash){ renderFn() } else { location.hash=hash } }
+/* In-app navigation trail, reconciled with the hash in applyRoute().
+   Detail pages used to hardcode their back button (every MK page went to
+   the MK list, every bill to the bill list…), so paths like
+   Now → committees → a committee → an MK dead-ended at the wrong list:
+   the page you came from was in browser history but no button used it.
+   The trail mirrors that history: backBtnHTML() labels the button with
+   the actual previous page and goBack() walks history; with no in-app
+   previous page (a deep link opened cold) it falls back to the old
+   parent list, so a back path always exists. Browser Back/Forward are
+   reconciled too: landing on the trail's second-from-top hash pops it,
+   anything else pushes. */
+let NAV_TRAIL=[];
+function navTrack(hash){
+  if(NAV_TRAIL[NAV_TRAIL.length-1]===hash) return;
+  if(NAV_TRAIL.length>1&&NAV_TRAIL[NAV_TRAIL.length-2]===hash) NAV_TRAIL.pop();
+  else { NAV_TRAIL.push(hash); if(NAV_TRAIL.length>60) NAV_TRAIL.shift() }
+}
+const navBackHash=()=>NAV_TRAIL.length>1?NAV_TRAIL[NAV_TRAIL.length-2]:null;
+function backLabelFor(hash){
+  const h=new URLSearchParams(hash||'');
+  if(h.get('committee')) return '› חזרה ל'+cmtName(h.get('committee'));
+  if(h.get('mk')) return '› חזרה ל'+disp(h.get('mk'));
+  if(h.get('faction')) return '› חזרה ל'+h.get('faction');
+  if(h.get('bill')) return '› חזרה להצעת החוק';
+  if(h.get('vote')) return '› חזרה להצבעה';
+  if(h.get('session')) return '› חזרה לישיבת הוועדה';
+  if(h.get('plenum')) return '› חזרה לישיבת המליאה';
+  return {now:'› חזרה לעכשיו',bills:'› חזרה לחוקים',votes:'› חזרה להצבעות',mks:'› חזרה לח״כים',factions:'› חזרה לסיעות',committees:'› חזרה לוועדות',plenum:'› חזרה לדברי הכנסת',analysis:'› חזרה לניתוח',mine:'› חזרה ל״שלי״',about:'› חזרה לאודות'}[h.get('tab')]||'› חזרה';
+}
+function backBtnHTML(fallback,label){ const prev=navBackHash(); return `<button class="btn ghost" onclick="goBack('${fallback}')">${prev?esc(backLabelFor(prev)):label}</button>` }
+function goBack(fallback){ if(navBackHash()!=null) history.back(); else go(fallback) }
 function applyRoute(){
   if(!appLoaded) return;
   const h=new URLSearchParams(location.hash.slice(1));
+  if(!h.get('voterec')) navTrack(location.hash.slice(1)); // legacy redirect-only hash: never a back target (it would bounce forward again)
   if(h.get('bill')||h.get('vote')||h.get('voterec')) ensureK25Archive(); // K25 deep links resolve only once the archive lands; ensureK25Archive re-applies this route then
   if(h.get('voterec')){ // legacy route: the id was a bill id whose chosen vote was shown; land on that vote if it still resolves, else its bill page
     const b=ALLB_BY_ID[h.get('voterec')];
@@ -1876,13 +1908,13 @@ function renderSessionDetail(){
   const s=(CMT? CMT.recent_sessions.find(x=>String(x.id)===String(id)) : null) || (AGENDA? (AGENDA.committees||[]).find(x=>String(x.id)===String(id)) : null) || HIST_SESS[String(id)] || null;
   // Bills discussed in this session, from per-bill committee histories.
   const bills=[]; if(CMT) for(const [bid,hist] of Object.entries(CMT.bill_committees)) for(const h of hist) if(String(h.session_id)===String(id)) bills.push({bid,h});
-  if(!s && !bills.length){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>הישיבה לא נמצאה במאגר.</div>'; return }
+  if(!s && !bills.length){ app.innerHTML=backBtnHTML('committees','› ועדות')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>הישיבה לא נמצאה במאגר.</div>'; return }
   const h0=bills[0]?.h;
   const cname=s?.committee||(h0?cmtName(h0.committee_id):'');
   const date=s? (s.start||'').slice(0,10) : h0?.date;
   const time=s? (s.start||'').slice(11,16) : '';
   app.innerHTML=`
-  <button class="btn ghost" onclick="go('committees')">› ועדות</button>
+  ${backBtnHTML('committees','› ועדות')}
   <article class="card pad rise" style="margin-top:.6rem">
     <div class="card-top">${(s?.committee_id||h0?.committee_id)?`<button class="chip acc" onclick="openCommittee('${s?.committee_id||h0.committee_id}')">${esc(cname)} ←</button>`:`<span class="chip acc">${esc(cname)}</span>`}${s?`<span class="chip">${esc(s.type||'')}</span><span class="chip">${esc(s.status||'')}</span>`:''}<span class="date">${fmtDate(date)}${time?` · ${time}`:''}</span></div>
     <h1 style="font-size:1.35rem;line-height:1.35">ישיבת ועדה · ${fmtDate(date)}</h1>
@@ -2449,7 +2481,7 @@ function renderBillLite(){
   // those live on each vote's own page, reached from the vote list below.
   const eraVotes=VOTES_ALL.filter(v=>v.item_id===b.id);
   app.innerHTML=`
-  <button class="btn ghost" onclick="go('bills')">› חזרה</button>
+  ${backBtnHTML('bills','› חזרה')}
   <article class="card pad rise" style="margin-top:.6rem">
     <div style="display:flex;gap:.6rem;align-items:flex-start"><div style="flex:1">
     <div class="card-top"><span class="chip acc">${esc(statusBucket(b))}</span><span class="chip">${esc(b.type||'')}</span>${b.committee?`<span class="chip cmt" title="${esc(b.committee)}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(b.committee)}</span>`:''}<span class="date">עודכן ${b.updated?fmtDate(b.updated):''}</span></div>
@@ -2580,7 +2612,7 @@ function absentSummaryHTML(absent){
 function renderVote(){
   ensurePlenumSearch();
   const app=$('#app'), b=viewArg?voteModel(viewArg):null;
-  if(!b){ app.innerHTML='<button class="btn ghost" onclick="go(\'votes\')">› חזרה להצבעות</button><div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg></div>ההצבעה לא נמצאה.</div>'; return }
+  if(!b){ app.innerHTML=backBtnHTML('votes','› חזרה להצבעות')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg></div>ההצבעה לא נמצאה.</div>'; return }
   voteMkVotes(b);
   if(!b.sub) b.sub=summaryText(b);
   const reb=rebels(b);
@@ -2599,7 +2631,7 @@ function renderVote(){
   const nouns=b.kind==='noconfidence'?['הצעת אי־האמון התקבלה','הצעת אי־האמון נדחתה']:b.kind==='reservation'?['ההסתייגות התקבלה','ההסתייגות נדחתה']:['ההצעה התקבלה','ההצעה נדחתה'];
   const plnSess=plenumForDate(b.vote_date);
   app.innerHTML=`
-  <button class="btn ghost" onclick="go('votes')">› חזרה להצבעות</button>
+  ${backBtnHTML('votes','› חזרה להצבעות')}
   <div class="sec-title" style="margin-top:.4rem">הצבעה במליאה <small>דף הצבעה — מפת המליאה, פירוט לפי ח״כ ו״אני הייתי מצביע״ מתייחסים להצבעה הזאת בלבד</small></div>
   <article class="card pad rise" style="margin-top:.6rem">
     <div style="display:flex;gap:.6rem;align-items:flex-start">
@@ -2977,7 +3009,7 @@ function renderMkDetail(){
   ensureCmem(); ensureWiki(); ensureAnalytics(); ensureLivePresence(); ensureExtras(); ensureRoles(); ensureMkHighlights(); if(KN===26) ensurePresence26();
   const name=viewArg, app=$('#app');
   if(KN===26){ const e=k26Entry(name); const rec=IDX25[name];
-    if(!e){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצא/ה ברשימת הנבחרים לכנסת 26.</div>'; return }
+    if(!e){ app.innerHTML=backBtnHTML('mks','› כל הנבחרים')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצא/ה ברשימת הנבחרים לכנסת 26.</div>'; return }
     location.hash='mk='+encodeURIComponent(name);
     /* The party card lists the party's actual MKs, not the first `seats`
        candidates: after pre-swearing resignations the elected are not a
@@ -2986,7 +3018,7 @@ function renderMkDetail(){
        wins — Norwegian-law replacements are beyond the elected cut. */
     const srv26=e.party.candidates.filter(n=>(K26_TENURE[n]||[]).some(x=>!x[1]));
     const partyMks26=srv26.length?srv26:e.party.candidates.filter(n=>(e.party.elected||[]).includes(n));
-    app.innerHTML=`<button class="btn ghost" onclick="go('mks')">› כל הנבחרים</button>
+    app.innerHTML=`${backBtnHTML('mks','› כל הנבחרים')}
     <div class="card pad rise" style="margin-top:.6rem"><div style="display:flex;gap:1rem;align-items:center">${avatar(name,e.party.name,84)}
       <div style="flex:1"><h1 style="font-size:1.5rem">${esc(disp(name))} ${followedMk(name)?'★':''}</h1>
       <button class="chip" style="color:${e.party.color||fcol(e.party.name)};font-weight:700" onclick="openFaction('${jsq(e.party.name)}')">${esc(e.party.name)} · כנסת 26 ←</button>
@@ -3005,7 +3037,7 @@ function renderMkDetail(){
     ${mkHighlightsHTML(name)}
     <div class="card pad" style="margin-top:.85rem"><h3>${esc(e.party.name)} — חברי הכנסת של הסיעה (${partyMks26.length})</h3><div class="rows" style="margin:.5rem -.9rem 0">${partyMks26.map(n=>{const r=e.party.candidates.indexOf(n)+1, srv=(K26_TENURE[n]||[]).some(x=>!x[1]); return `<div class="row" style="cursor:pointer;${n===name?'background:var(--surface2)':''}" onclick="openMk('${jsq(n)}')"><b style="width:1.6rem;color:var(--accent)">${r}</b><span class="flex">${esc(disp(n))} ${n===name?'← כאן':''}</span><span class="chip for">${srv?'מכהן/ת':'נבחר/ה'}</span></div>`}).join('')}</div>${partyMks26.some((n,i)=>e.party.candidates.indexOf(n)!==i)?'<p class="small dim" style="margin-top:.6rem">המספר הוא המקום ברשימת המועמדים המקורית; מקומות שדולגו הם מועמדים שפרשו לפני ההשבעה, והבאים אחריהם נכנסו במקומם.</p>':''}</div>`;
     window.scrollTo(0,0); return }
-  const m=mkIndex[name]; if(!m){app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצאו הצבעות מתועדות לח״כ הזה/זו באתר — לא בכנסת 25 ולא בכנסת 26.</div>';return}
+  const m=mkIndex[name]; if(!m){app.innerHTML=backBtnHTML('mks','› כל הח״כים')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצאו הצבעות מתועדות לח״כ הזה/זו באתר — לא בכנסת 25 ולא בכנסת 26.</div>';return}
   const pfaction=realFaction(MKP[name]?.faction||m.faction||FACTION25[name]||'');
   const pshort=shortF(pfaction);
   // RANK25 is the place in this faction's own list sequence (see
@@ -3037,7 +3069,7 @@ function renderMkDetail(){
   const topics={}; m.votes.forEach(v=>(v.bill.topics||[]).forEach(t=>topics[t]=(topics[t]||0)+1));
   const topTopics=Object.entries(topics).sort((a,b)=>b[1]-a[1]).slice(0,6);
   app.innerHTML=`
-  <button class="btn ghost" onclick="go('mks')">› כל הח״כים</button>
+  ${backBtnHTML('mks','› כל הח״כים')}
   <div class="card pad rise" style="margin-top:.6rem">
     <div style="display:flex;gap:1rem;align-items:center">
       ${avatar(name,pfaction,84)}
@@ -3408,9 +3440,9 @@ function renderFactionDetail(){
   const app=$('#app'), name=viewArg;
   if(KN===26){ ensureK25Archive(); // rows carry each member's K25 record
     const p=K26?.parties.find(x=>x.name===name);
-    if(!p){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="12" cy="17" r="2.6"/><path d="M9.3 8.6 10.6 14M14.7 8.6 13.4 14M9.6 7h4.8"/></svg></div>הסיעה לא נמצאה ברשימות כנסת 26.</div>'; return }
+    if(!p){ app.innerHTML=backBtnHTML('factions','› סיעות')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="12" cy="17" r="2.6"/><path d="M9.3 8.6 10.6 14M14.7 8.6 13.4 14M9.6 7h4.8"/></svg></div>הסיעה לא נמצאה ברשימות כנסת 26.</div>'; return }
     app.innerHTML=`
-    <button class="btn ghost" onclick="go('factions')">› סיעות</button>
+    ${backBtnHTML('factions','› סיעות')}
     <article class="card pad rise" style="margin-top:.6rem"><div class="card-top"><span class="chip acc">${p.seats} מושבים</span><span class="chip">כנסת 26</span></div>
       <h1 style="font-size:1.55rem;color:${p.color}">${esc(p.name)}</h1>
       <div class="progress" style="margin:.7rem 0"><i style="width:${p.seats/120*100}%;background:${p.color}"></i></div>
@@ -3421,7 +3453,7 @@ function renderFactionDetail(){
     return;
   }
   const f=currentFactions().find(x=>x.name===name);
-  if(!f){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="12" cy="17" r="2.6"/><path d="M9.3 8.6 10.6 14M14.7 8.6 13.4 14M9.6 7h4.8"/></svg></div>הסיעה לא נמצאה בהרכב הנוכחי של כנסת 25.</div>'; return }
+  if(!f){ app.innerHTML=backBtnHTML('factions','› סיעות')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="12" cy="17" r="2.6"/><path d="M9.3 8.6 10.6 14M14.7 8.6 13.4 14M9.6 7h4.8"/></svg></div>הסיעה לא נמצאה בהרכב הנוכחי של כנסת 25.</div>'; return }
   const st=factionStatFor(f.name), coh=st?Math.round(st.majShare/st.bills*100):null, agree=factionAgreementFor(f.name);
   const memberSet=new Set(f.members);
   const topics={}; const recent=[];
@@ -3454,7 +3486,7 @@ function renderFactionDetail(){
       period:stints.map(([a,b])=>`${fmtDate(a)} – ${b?fmtDate(b):'היום'}`).join(' · ')};
   }).filter(Boolean).sort((a,b)=>(b.left||'9999').localeCompare(a.left||'9999')||b.votes-a.votes);
   app.innerHTML=`
-  <button class="btn ghost" onclick="go('factions')">› סיעות</button>
+  ${backBtnHTML('factions','› סיעות')}
   <article class="card pad rise" style="margin-top:.6rem">
     <div class="card-top"><span class="chip acc">${f.members.length} ח״כים כיום</span>${st?`<span class="chip">${st.members.size} כיהנו לאורך הקדנציה</span>`:''}${agree?`<span class="chip"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3S4 15.4 2.6 10.6C1.7 7.4 3.9 4.5 6.9 4.5c2 0 3.9 1.2 5.1 3 1.2-1.8 3.1-3 5.1-3 3 0 5.2 2.9 4.3 6.1C20 15.4 12 20.3 12 20.3z"/></svg> ${agree.pct}% כמוך</span>`:''}</div>
     <h1 style="font-size:1.55rem;color:${f.color}">${esc(f.name)}</h1>
@@ -3521,12 +3553,12 @@ function renderPlenum(){
 function renderPlenumSession(){
   ensurePlenumSearch();
   const app=$('#app'), p=PLENUM_SEARCH[String(viewArg)];
-  if(!p){ app.innerHTML='<button class="btn ghost" onclick="go(\'plenum\')">› כל ישיבות המליאה</button><div class="card empty" style="margin-top:.6rem"><div class="big">🗳️</div>הישיבה לא נמצאה באינדקס דברי הכנסת.</div>'; return }
+  if(!p){ app.innerHTML=backBtnHTML('plenum','› כל ישיבות המליאה')+'<div class="card empty" style="margin-top:.6rem"><div class="big">🗳️</div>הישיבה לא נמצאה באינדקס דברי הכנסת.</div>'; return }
   const entries=plenumEntries(), idx=entries.findIndex(e=>e.sid===String(viewArg));
   const newer=entries[idx-1], older=entries[idx+1]; // entries sorted newest-first
   const votes=VOTES_ALL.filter(v=>v.date===p.date).sort((a,b)=>(a.id||0)-(b.id||0));
   app.innerHTML=`
-  <button class="btn ghost" onclick="go('plenum')">› כל ישיבות המליאה</button>
+  ${backBtnHTML('plenum','› כל ישיבות המליאה')}
   <article class="card pad rise" style="margin-top:.6rem">
     <div class="card-top"><span class="chip acc">דברי הכנסת</span><span class="date">${fmtDate(p.date)}</span></div>
     <h1 style="font-size:1.4rem;line-height:1.35">ישיבת מליאה מס׳ ${p.number}</h1>
@@ -3655,14 +3687,14 @@ async function loadCommitteeHistory(id){
 }
 function renderCommitteeDetail26(){
   const app=$('#app'), c=(K26CMT?.committees||[]).find(x=>String(x.id)===String(viewArg));
-  if(!c){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>הוועדה לא נמצאה במאגר כנסת 26 — ייתכן שנתוני הוועדות עוד לא נטענו או שהיא טרם הוקמה.<br><button class="btn primary" style="margin-top:.8rem" onclick="go(\'committees\')">› כל ועדות כנסת 26</button></div>'; return }
+  if(!c){ app.innerHTML=backBtnHTML('committees','› ועדות')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>הוועדה לא נמצאה במאגר כנסת 26 — ייתכן שנתוני הוועדות עוד לא נטענו או שהיא טרם הוקמה.</div>'; return }
   const recent=(K26CMT.recent_sessions||[]).filter(s=>String(s.committee_id)===String(c.id)).sort((a,b)=>(b.start||'').localeCompare(a.start||''));
   const members=(K26CMEM.by_committee[String(c.id)]||[]);
   const chair=members.find(m=>!m.to&&m.role==='chair');
   const memberN=new Set(members.filter(m=>!m.to).map(m=>m.name)).size;
   const docs=recent.flatMap(s=>(s.docs||[]).map(d=>({...d,date:(s.start||'').slice(0,10)}))).slice(0,18);
   app.innerHTML=`
-  <button class="btn ghost" onclick="go('committees')">› ועדות</button>
+  ${backBtnHTML('committees','› ועדות')}
   <article class="card pad rise" style="margin-top:.6rem">
     <div style="display:flex;gap:.6rem;align-items:flex-start"><div style="flex:1"><div class="card-top">${c.type?`<span class="chip acc">${esc(c.type)}</span>`:''}${c.category&&c.category!==c.type?`<span class="chip">${esc(c.category)}</span>`:''}${c.current?'<span class="chip acc">פעילה</span>':'<span class="chip against">סיימה את פעילותה</span>'}<span class="chip">כנסת 26</span></div>
     <h1 style="font-size:1.45rem;line-height:1.35">${esc(c.name)}</h1></div>${starBtn('committee',c.id,c.name)}</div>
@@ -3678,7 +3710,7 @@ function renderCommitteeDetail(){
   if(KN===26){ renderCommitteeDetail26(); return }
   ensureCmem(); ensureExtras();
   const app=$('#app'), c=CMT_BY_ID[viewArg];
-  if(!c){ app.innerHTML='<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>הוועדה לא נמצאה במאגר כנסת 25.</div>'; return }
+  if(!c){ app.innerHTML=backBtnHTML('committees','› ועדות')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>הוועדה לא נמצאה במאגר כנסת 25.</div>'; return }
   const recent=(CMT?.recent_sessions||[]).filter(s=>String(s.committee_id)===String(c.id)).sort((a,b)=>(b.start||'').localeCompare(a.start||''));
   const bills=[]; if(CMT) for(const [bid,hist] of Object.entries(CMT.bill_committees)){
     const rel=hist.filter(h=>String(h.committee_id)===String(c.id)); if(!rel.length)continue;
@@ -3687,7 +3719,7 @@ function renderCommitteeDetail(){
   bills.sort((a,b)=>(b.h.date||'').localeCompare(a.h.date||''));
   const docs=recent.flatMap(s=>(s.docs||[]).map(d=>({...d,date:(s.start||'').slice(0,10)}))).slice(0,18);
   app.innerHTML=`
-  <button class="btn ghost" onclick="go('committees')">› ועדות</button>
+  ${backBtnHTML('committees','› ועדות')}
   <article class="card pad rise" style="margin-top:.6rem">
     <div style="display:flex;gap:.6rem;align-items:flex-start"><div style="flex:1"><div class="card-top"><span class="chip ${CMT_TIER(c)==='perm'?'acc':''}">${{perm:'שכבה א׳ · ועדה קבועה',sub:'שכבה ב׳ · ועדת משנה',special:'שכבה ג׳ · ועדה מיוחדת',joint:'שכבה ד׳ · ועדה משותפת'}[CMT_TIER(c)]}</span>${c.type?`<span class="chip">${esc(c.type)}</span>`:''}${c.category&&c.category!==c.type?`<span class="chip">${esc(c.category)}</span>`:''}${c.current?'<span class="chip acc">פעילה</span>':'<span class="chip against">סיימה את פעילותה</span>'}</div>
     <h1 style="font-size:1.45rem;line-height:1.35">${esc(c.name)}</h1></div>${starBtn('committee',c.id,c.name)}</div>
