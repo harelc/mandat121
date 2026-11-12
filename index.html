@@ -427,6 +427,14 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 .arrival-card summary .chev{margin-inline-start:auto;color:var(--dim);transition:transform .15s}
 .arrival-card[open ] summary .chev{transform:rotate(90deg)}
 .arrival-rank{width:1.7rem;text-align:center;color:var(--accent);font-weight:800;flex:none}
+/* Presence matrix (120 MK columns x day/week rows): canvas, not DOM —
+   daily rows grow ~250/year, so cells are drawn and hit-tested by
+   coordinates; nothing in the DOM scales with the number of days. */
+.pg-scroll{overflow-x:auto;margin-top:.6rem}
+.pg-stage{position:relative;min-width:700px}
+#pgCanvas{display:block;width:100%}
+.pg-tip{position:absolute;pointer-events:none;background:var(--card,#fff);border:1px solid var(--line);border-radius:.55rem;box-shadow:var(--shadow);padding:.35rem .6rem;font-size:.75rem;line-height:1.5;white-space:nowrap;z-index:5;display:none}
+.pg-tip b{font-size:.8rem}
 .progress{height:7px;background:#e7ddc6;border-radius:99px;overflow:hidden;direction:ltr}
 .progress i{display:block;height:100%;border-radius:99px}
 .rows{display:flex;flex-direction:column}
@@ -2165,6 +2173,84 @@ function presenceArrivalsHTML(seats){
   <p class="small dim" style="margin-top:.6rem">המעקב החל ב־${fmtDate(PRESENCE26._meta?.tracking_since||'')} · ״נראה/תה לראשונה״ = קריאת הלובי הראשונה שראתה את הח״כ (נדגם כל 5 דקות).</p>
   </details>`;
 }
+/* Presence matrix: the 120 serving MKs as columns (hemicycle order,
+   faction colour), tracked workdays as rows. Scaling plan, because
+   rows grow ~250/year for as long as tracking runs: cells are drawn
+   on a canvas and hit-tested by coordinates (no per-cell DOM), the
+   daily view paints the newest pgLimit days with a "show earlier"
+   step, and the weekly view aggregates Sun–Sat weeks (cell intensity
+   = share of that week's tracked days attended) at ~50 rows/year. */
+let pgMode='day', pgLimit=60, PG_SEATS=null, PG=null, pgRaf=false;
+const pgShortDate=d=>new Date(d+'T12:00:00').toLocaleDateString('he-IL',{day:'numeric',month:'short'});
+function pgModel(seats){
+  const daysAsc=Object.keys(PRESENCE26.days||{}).sort();
+  const present={}; for(const d of daysAsc) present[d]=new Set((PRESENCE26.days[d].arrivals||[]).map(a=>normName(a.name)));
+  const cols=(seats||[]).map(s=>({name:normName(s.name),raw:s.name,faction:s.faction,color:s.color||fcol(s.faction),total:daysAsc.filter(d=>present[d].has(normName(s.name))).length}));
+  return {daysAsc,present,cols,totalDays:daysAsc.length};
+}
+function pgRows(m){
+  if(pgMode==='day') return m.daysAsc.slice(-pgLimit).reverse().map(d=>({label:pgShortDate(d),date:d,cells:m.cols.map(c=>m.present[d].has(c.name)?1:0)}));
+  const weeks=new Map();
+  for(const d of m.daysAsc){ const dt=new Date(d+'T12:00:00'); const sun=new Date(dt); sun.setDate(dt.getDate()-dt.getDay()); const key=sun.toISOString().slice(0,10); if(!weeks.has(key)) weeks.set(key,[]); weeks.get(key).push(d) }
+  return [...weeks.entries()].sort((a,b)=>b[0].localeCompare(a[0])).map(([sun,ds])=>({label:pgShortDate(sun),weekOf:sun,ndays:ds.length,cells:m.cols.map(c=>ds.filter(d=>m.present[d].has(c.name)).length/Math.max(1,ds.length))}));
+}
+function presenceGridHTML(seats){
+  if(!PRESENCE26||!presenceTrackedDays()||!(seats||[]).length) return '';
+  PG_SEATS=seats;
+  const total=presenceTrackedDays();
+  return `<section class="card pad arrival-card rise"><h3>מי הגיע מתי <small class="dim">כל ח״כ/ית הוא עמודה, כל שורה היא ${pgMode==='day'?'יום עבודה':'שבוע'} · צבע = סיעה</small></h3>
+  <div class="chips" role="group" aria-label="קנה מידה" style="margin-top:.55rem"><span class="pill-lbl">שורות:</span>
+  <button class="chip ${pgMode==='day'?'on':''}" onclick="pgMode='day';renderNow26()">יומי</button>
+  <button class="chip ${pgMode==='week'?'on':''}" onclick="pgMode='week';renderNow26()">שבועי</button>
+  <span class="small dim">${pgMode==='week'?'עוצמת התא = שיעור ימי המעקב באותו שבוע שבהם נכח/ה':'מוצגים '+Math.min(pgLimit,total)+' הימים האחרונים מתוך '+total+' ימי מעקב'}</span></div>
+  <div class="pg-scroll"><div class="pg-stage" id="pgStage"><canvas id="pgCanvas"></canvas><div class="pg-tip" id="pgTip"></div></div></div>
+  ${pgMode==='day'&&total>pgLimit?`<div style="margin-top:.55rem"><button class="btn ghost small" onclick="pgLimit+=60;renderNow26()">הצגת 60 ימים קודמים נוספים</button></div>`:''}
+  <p class="small dim" style="margin-top:.55rem">ריחוף מציג ח״כ ותאריך, לחיצה על תא פותחת את דף הח״כ/ית. העמודות בסדר המפה למעלה; מי שעזב/ה את הכנסת אינו בעמודות, אבל ימי הנוכחות שלו/ה נשמרים בדף האישי.</p></section>`;
+}
+function drawPresenceGrid(hover){
+  const cv=document.getElementById('pgCanvas'); if(!cv||!PG_SEATS||!PRESENCE26) return;
+  const stage=document.getElementById('pgStage'), W=stage.clientWidth; if(!W) return;
+  if(!window._pgResize){ window._pgResize=true; addEventListener('resize',()=>{ if(document.getElementById('pgCanvas')) drawPresenceGrid() }) }
+  const m=pgModel(PG_SEATS), rows=pgRows(m), cs=getComputedStyle(document.documentElement);
+  const ink=cs.getPropertyValue('--ink').trim()||'#222', dim=cs.getPropertyValue('--dim').trim()||'#888', line=cs.getPropertyValue('--line').trim()||'#ddd';
+  const labelW=64, headH=22, footH=22, ncols=Math.max(1,m.cols.length);
+  const pitch=Math.max(3,(W-labelW)/ncols), cellH=Math.max(4,Math.min(11,pitch)), rowH=cellH+1;
+  const H=headH+rows.length*rowH+footH+4, dpr=window.devicePixelRatio||1;
+  cv.width=W*dpr; cv.height=H*dpr; cv.style.height=H+'px';
+  const x=cv.getContext('2d'); x.scale(dpr,dpr); x.clearRect(0,0,W,H);
+  const gridR=W-labelW, cellX=c=>gridR-(c+1)*pitch; // RTL: MK #1 at the right
+  PG={m,rows,pitch,cellH,rowH,headH,labelW,gridR,ncols,W,H};
+  // faction blocks on the top axis
+  let i=0; x.textAlign='center'; x.textBaseline='middle';
+  while(i<m.cols.length){ let j=i; while(j+1<m.cols.length&&m.cols[j+1].faction===m.cols[i].faction) j++;
+    const xa=cellX(j), xb=cellX(i)+pitch; x.fillStyle=m.cols[i].color; x.globalAlpha=.85; x.fillRect(xa,2,xb-xa,6); x.globalAlpha=1;
+    if(xb-xa>34){ x.fillStyle=ink; x.font='9px system-ui'; x.fillText(shortF(m.cols[i].faction),(xa+xb)/2,16, xb-xa-2) } i=j+1 }
+  // cells + row labels
+  x.font='9px system-ui';
+  rows.forEach((r,ri)=>{ const y=headH+ri*rowH;
+    x.fillStyle=dim; x.textAlign='right'; x.fillText(r.label,W-2,y+cellH/2);
+    r.cells.forEach((v,c)=>{ x.fillStyle=v?m.cols[c].color:line; x.globalAlpha=v?(v>=1?1:.25+.75*v):.55; x.fillRect(cellX(c)+.5,y,pitch-1,cellH) });
+    x.globalAlpha=1 });
+  // per-MK totals strip along the bottom
+  const fy=headH+rows.length*rowH+5;
+  x.fillStyle=dim; x.textAlign='right'; x.fillText('סה״כ ימים',W-2,fy+(footH-8)/2);
+  m.cols.forEach((c,ci)=>{ const h=Math.max(1,(footH-9)*(m.totalDays?c.total/m.totalDays:0)); x.fillStyle=c.color; x.globalAlpha=.9; x.fillRect(cellX(ci)+.5,fy+footH-8-h,pitch-1,h) });
+  x.globalAlpha=1;
+  if(hover){ x.strokeStyle=ink; x.lineWidth=1.4; x.strokeRect(cellX(hover.c)+.5,headH+hover.r*rowH,pitch-1,cellH) }
+  if(!cv._pgBound){ cv._pgBound=true;
+    cv.addEventListener('mousemove',e=>{ if(!PG) return; const rect=cv.getBoundingClientRect(), mx=e.clientX-rect.left, my=e.clientY-rect.top;
+      const c=Math.floor((PG.gridR-mx)/PG.pitch), r=Math.floor((my-PG.headH)/PG.rowH), tip=document.getElementById('pgTip');
+      if(mx>PG.gridR||c<0||c>=PG.ncols||r<0||r>=PG.rows.length){ if(tip) tip.style.display='none'; if(!pgRaf){pgRaf=true; requestAnimationFrame(()=>{pgRaf=false; drawPresenceGrid()})} return }
+      if(!pgRaf){ pgRaf=true; requestAnimationFrame(()=>{ pgRaf=false; drawPresenceGrid({c,r}) }) }
+      if(tip){ const col=PG.m.cols[c], row=PG.rows[r], val=row.cells[c];
+        tip.innerHTML=`<b>${esc(disp(col.raw))}</b> · ${esc(shortF(col.faction))}<br>${row.date?`${fmtDate(row.date)} — ${val?'נכח/ה במשכן':'לא נכח/ה'}`:`שבוע ${fmtDate(row.weekOf)} — נכח/ה ${Math.round(val*row.ndays)} מתוך ${row.ndays} ימי מעקב`} · סה״כ ${col.total} ימי נוכחות`;
+        tip.style.display='block'; const tw=tip.offsetWidth; tip.style.left=Math.max(0,Math.min(mx+14,PG.W-tw-4))+'px'; tip.style.top=(my+16)+'px' } });
+    cv.addEventListener('mouseleave',()=>{ const tip=document.getElementById('pgTip'); if(tip) tip.style.display='none'; drawPresenceGrid() });
+    cv.addEventListener('click',e=>{ if(!PG) return; const rect=cv.getBoundingClientRect(), mx=e.clientX-rect.left, my=e.clientY-rect.top;
+      const c=Math.floor((PG.gridR-mx)/PG.pitch), r=Math.floor((my-PG.headH)/PG.rowH);
+      if(mx<=PG.gridR&&c>=0&&c<PG.ncols&&r>=0&&r<PG.rows.length) openMk(PG.m.cols[c].raw) });
+  }
+}
 function renderNow26(){
   ensureLivePresence(); // live in-the-building overlay; re-renders when it lands
   ensurePresence26(); // arrival-order history under the hemicycle; re-renders when it lands
@@ -2196,6 +2282,7 @@ function renderNow26(){
   ${presenceKnown?`<div class="small" style="margin-top:.35rem"><span class="pdot" style="background:var(--for)"></span> <b>${presentN} מתוך ${seats.length}</b> כעת במשכן הכנסת — מושב בטבעת ירוקה = במשכן, מושב כהה = לא במשכן · קריאה חיה מאפליקציית לובי הח״כים של הכנסת, נכון ל־${esc(presenceWhen)} · מתרענן כל כמה דקות</div>`:''}
   </div>
   ${presenceArrivalsHTML(seats)}
+  ${presenceGridHTML(seats)}
   <div class="sec-title">מה כבר יש, ומה יגיע</div>
   <div class="grid c2">
     <div class="card pad"><h3>✓ כבר כאן</h3><div class="small muted" style="line-height:2">תוצאות הבחירות הרשמיות ומנדטים<br>רשימות המועמדים בסדר הרשמי (466)<br>120 הנבחרים וצבעי הסיעות של כנסת 26<br>${serving?'מי מכהן/ת בפועל — מעל המפה<br>':''}${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?'סדר היום — ישיבות שפורסמו כבר כאן, מעל המפה<br>':''}${PRESENCE26&&presenceTrackedDays()?'סדר ההגעה למשכן וימי נוכחות — מתחת למפה, מתעדכן כל 5 דקות בימי עבודה<br>':''}קישור מהנבחרים להיסטוריית ההצבעות שלהם בכנסת 25</div></div>
@@ -2203,6 +2290,7 @@ function renderNow26(){
   </div>
   <div style="text-align:center;margin-top:1.1rem"><button class="btn" onclick="switchKnesset(25)">לראות איך זה נראה עם נתונים מלאים — כנסת 25 ←</button></div>`;
   renderPlenumTv(); // repaint into the fresh #plenumTvBox (the innerHTML above replaced it)
+  drawPresenceGrid(); // presence matrix canvas (fresh element from the innerHTML above)
   if(K26) setTimeout(()=>{document.querySelectorAll('#k26plenum .seat').forEach((el,i)=>el.addEventListener('click',()=>openMk(seats[i].name)))},0);
 }
 
