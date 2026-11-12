@@ -13,6 +13,27 @@ import { getStore } from "@netlify/blobs";
 //
 // Report: GET with header x-hit-token: <HIT_READ_TOKEN> returns the
 // stored hour buckets, newest first. Without the token: 403.
+//
+// Retention: 90 days of hour buckets. Pruning is opportunistic — the
+// first hit that opens a new hour bucket deletes older ones — so the
+// store (and the token report, which reads every bucket) stays
+// bounded with no separate cleanup job to babysit.
+
+const RETENTION_DAYS = 90;
+
+async function pruneOldHours(store, todayDay) {
+  const cutoff = new Date(`${todayDay}T12:00:00Z`);
+  cutoff.setUTCDate(cutoff.getUTCDate() - RETENTION_DAYS);
+  const cutoffDay = cutoff.toISOString().slice(0, 10); // keys sort by date, so compare the date part lexically
+  let cursor;
+  do {
+    const page = await store.list({ prefix: "h:", cursor });
+    for (const { key } of page.blobs) {
+      if (key.slice(2, 12) < cutoffDay) await store.delete(key).catch(() => {});
+    }
+    cursor = page.cursor;
+  } while (cursor);
+}
 
 const BOT_UA = /bot|crawler|spider|headless|preview|monitor/i;
 
@@ -100,7 +121,9 @@ export default async function handler(request) {
   const ipHash = ip ? createHash("sha256").update(`${ip}|${day}|${salt}`).digest("hex").slice(0, 16) : null;
 
   const key = `h:${day}T${hour}`;
-  const data = (await store.get(key, { type: "json" }).catch(() => null)) || { pv: 0, pages: {}, ips: [] };
+  const existing = await store.get(key, { type: "json" }).catch(() => null);
+  if (!existing) await pruneOldHours(store, day).catch(() => {}); // first hit of a new hour: sweep expired buckets (never block the hit on it)
+  const data = existing || { pv: 0, pages: {}, ips: [] };
   data.pv += 1;
   const pg = data.pages[page] || (data.pages[page] = { pv: 0, ips: [] });
   pg.pv += 1;
