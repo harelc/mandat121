@@ -2244,7 +2244,12 @@ function drawPresenceGrid(hover){
       if(!pgRaf){ pgRaf=true; requestAnimationFrame(()=>{ pgRaf=false; drawPresenceGrid({c,r}) }) }
       if(tip){ const col=PG.m.cols[c], row=PG.rows[r], val=row.cells[c];
         tip.innerHTML=`<b>${esc(disp(col.raw))}</b> · ${esc(shortF(col.faction))}<br>${row.date?`${fmtDate(row.date)} — ${val?'נכח/ה במשכן':'לא נכח/ה'}`:`שבוע ${fmtDate(row.weekOf)} — נכח/ה ${Math.round(val*row.ndays)} מתוך ${row.ndays} ימי מעקב`} · סה״כ ${col.total} ימי נוכחות`;
-        tip.style.display='block'; const tw=tip.offsetWidth; tip.style.left=Math.max(0,Math.min(mx+14,PG.W-tw-4))+'px'; tip.style.top=(my+16)+'px' } });
+        tip.style.display='block'; const tw=tip.offsetWidth, th=tip.offsetHeight;
+        tip.style.left=Math.max(0,Math.min(mx+14,PG.W-tw-4))+'px';
+        // Flip above the cursor when below would clip — with a single
+        // tracked day the canvas is shorter than the tooltip itself.
+        let ty=my+16; if(ty+th>PG.H) ty=my-th-10;
+        tip.style.top=Math.max(0,Math.min(ty,Math.max(0,PG.H-th)))+'px' } });
     cv.addEventListener('mouseleave',()=>{ const tip=document.getElementById('pgTip'); if(tip) tip.style.display='none'; drawPresenceGrid() });
     cv.addEventListener('click',e=>{ if(!PG) return; const rect=cv.getBoundingClientRect(), mx=e.clientX-rect.left, my=e.clientY-rect.top;
       const c=Math.floor((PG.gridR-mx)/PG.pitch), r=Math.floor((my-PG.headH)/PG.rowH);
