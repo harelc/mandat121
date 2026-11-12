@@ -34,6 +34,9 @@ jobs:
       - name: Presence merge tests (Netlify function, plain node — no deps)
         run: node tests/test_presence_merge.mjs
 
+      - name: Protocol parser tests (paragraphs/continuations, plain node)
+        run: node tests/test_proto_parse.mjs
+
       - name: data/*.json parses
         run: |
           python3 - <<'EOF'

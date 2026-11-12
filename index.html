@@ -2150,7 +2150,7 @@ function protoTurnsHTML(doc=PROTO_CUR, filter=protoFilter){
       <div style="flex:1;min-width:0"><div style="display:flex;gap:.45rem;align-items:center;flex-wrap:wrap">
         ${key?`<a href="#" onclick="event.preventDefault();openMk('${jsq(key)}')" style="color:${col};font-weight:800">${hlText(t.speaker,HL)}</a>`:`<b style="color:${col}">${hlText(t.speaker,HL)}</b>`}
         ${t.role==='chair'?'<span class="chip" style="color:#96700f;border-color:#dcc175">יו״ר</span>':t.role==='guest'?'<span class="chip">אורח/ת</span>':t.faction_hint?`<span class="small dim">${esc(t.faction_hint)}</span>`:''}
-      </div><p style="margin-top:.25rem;line-height:1.65">${hlText(t.text,HL)}</p></div></div>`;
+      </div>${t.text.split(/\n\n+/).map(p=>`<p style="margin-top:.25rem;line-height:1.65">${hlText(p,HL)}</p>`).join('')}</div></div>`;
   }).join('')||'<p class="muted small">אין קטעים בסינון הזה.</p>';
 }
 function renderProtocol(){

@@ -24,8 +24,16 @@ from pathlib import Path
 
 OUT = Path("data/protocols")
 HDR = {"User-Agent": "Mozilla/5.0 mandat121-build"}
-MARK = re.compile(r"<<\s*(יור|דובר|אורח|קריאה|נושא|סיום)\s*>>\s*(.*?)<<\s*(יור|דובר|אורח|קריאה|נושא|סיום)\s*>>", re.S)
-ROLE = {"יור": "chair", "דובר": "speaker", "אורח": "guest", "קריאה": "interjection", "נושא": "topic", "סיום": "end"}
+MARK = re.compile(r"<<\s*(יו\"ר|יור|דובר|אורח|קריאה|נושא|סיום|דובר_המשך|הפסקה|מנהל)\s*>>\s*(.*?)<<\s*(יו\"ר|יור|דובר|אורח|קריאה|נושא|סיום|דובר_המשך|הפסקה|מנהל)\s*>>", re.S)
+ROLE = {"יור": "chair", 'יו"ר': "chair", "דובר": "speaker", "אורח": "guest", "קריאה": "interjection", "נושא": "topic", "סיום": "end", "דובר_המשך": "cont", "הפסקה": "topic", "מנהל": "chair"}
+
+def paras_of(body):
+    """Turn text with its paragraphs intact. docx paragraphs arrive as
+    lines (docx_text maps </w:p> to \\n); collapsing all whitespace —
+    the pre-fix behaviour — fused a whole speech, including every
+    same-speaker continuation, into one wall of text. Paragraphs are
+    stored joined by a blank line and rendered as separate <p>s."""
+    return "\n\n".join(p for p in (" ".join(x.split()) for x in body.split("\n")) if p)
 
 def docx_text(url):
     for attempt in range(3):
@@ -55,14 +63,31 @@ def parse_text(session, text):
         role = ROLE[m.group(1)]
         header = " ".join(m.group(2).split()).rstrip(":").strip()
         body = text[m.end(): matches[i + 1].start() if i + 1 < len(matches) else len(text)]
-        body = " ".join(body.split()).strip()
+        body = paras_of(re.sub(r"\s*<<\s*סיום\s*>>\s*$", "", body))  # a lone trailing end-marker has no pair to match
+        if role == "cont":
+            # << דובר_המשך >>: the same speaker continues — another
+            # paragraph of the previous turn, not a new turn. (The
+            # pre-fix marker set didn't know it, so continuations and
+            # the marker itself leaked into the previous turn's text.)
+            if turns and turns[-1]["role"] in ("speaker", "chair", "guest") and body:
+                turns[-1]["text"] += "\n\n" + body
+                prev = speakers.get(turns[-1]["speaker"])
+                if prev:
+                    prev["words"] += len(body.split())
+                continue
+            role = "speaker"  # a continuation with nothing before it
         if role == "topic":
             turns.append({"role": "topic", "speaker": "", "text": header or body})
             continue
         if role == "end":
             continue
         faction = ""
-        fm = re.match(r"^(.*?)\s*\(([^)]*)\)\s*$", header)
+        if header.startswith("(") and header.endswith(")"):
+            # << מנהל >> headers wrap the whole name: (היו"ר שם, 14:08)
+            header = re.sub(r",\s*\d{1,2}:\d{2}\s*$", "", header[1:-1]).strip()
+            fm = None
+        else:
+            fm = re.match(r"^(.*?)\s*\(([^)]*)\)\s*$", header)
         if fm:
             header, faction = fm.group(1).strip(), fm.group(2).strip()
         speaker = re.sub(r"^היו[\"״]ר\s+", "", header).strip()

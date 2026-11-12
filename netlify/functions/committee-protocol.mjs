@@ -65,28 +65,48 @@ function docxText(xml) {
 
 // Same turn markers and roles as build_protocols.py (plus דובר_המשך,
 // which the static parser's marker set would otherwise swallow).
-const ROLE = { "יור": "chair", "דובר": "speaker", "דובר_המשך": "speaker", "אורח": "guest", "קריאה": "interjection", "נושא": "topic", "סיום": "end" };
-const MARK = /<<\s*(יור|דובר|אורח|קריאה|נושא|סיום|דובר_המשך)\s*>>\s*([\s\S]*?)<<\s*(?:יור|דובר|אורח|קריאה|נושא|סיום|דובר_המשך)\s*>>/g;
+const ROLE = { "יור": "chair", "יו\"ר": "chair", "דובר": "speaker", "דובר_המשך": "cont", "אורח": "guest", "קריאה": "interjection", "נושא": "topic", "סיום": "end", "הפסקה": "topic", "מנהל": "chair" };
+// Turn text keeps its paragraphs: docx paragraphs arrive as lines
+// (docxText maps </w:p> to \n) and are stored joined by a blank line,
+// rendered as separate <p>s. Collapsing all whitespace — the pre-fix
+// behaviour — fused whole speeches into one wall of text.
+const parasOf = (body) => body.split("\n").map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean).join("\n\n");
+const MARK = /<<\s*(יו"ר|יור|דובר|אורח|קריאה|נושא|סיום|דובר_המשך|הפסקה|מנהל)\s*>>\s*([\s\S]*?)<<\s*(?:יו"ר|יור|דובר|אורח|קריאה|נושא|סיום|דובר_המשך|הפסקה|מנהל)\s*>>/g;
 
-function parseTranscript(text) {
+export function parseTranscript(text) {
   const turns = [], speakers = {};
   const matches = [...text.matchAll(MARK)];
   for (let i = 0; i < matches.length; i++) {
     const m = matches[i];
-    const role = ROLE[m[1]];
+    let role = ROLE[m[1]];
     let header = m[2].replace(/\s+/g, " ").trim().replace(/:$/, "").trim();
-    const body = text.slice(m.index + m[0].length, i + 1 < matches.length ? matches[i + 1].index : undefined).replace(/\s+/g, " ").trim();
+    const body = parasOf(text.slice(m.index + m[0].length, i + 1 < matches.length ? matches[i + 1].index : undefined).replace(/\s*<<\s*סיום\s*>>\s*$/, "")); // a lone trailing end-marker has no pair to match
     if (role === "topic") { turns.push({ role: "topic", speaker: "", text: header || body }); continue; }
     if (role === "end") continue;
+    if (role === "cont") {
+      // << דובר_המשך >>: the same speaker continues — another paragraph
+      // of the previous turn, not a new turn of their own.
+      const prev = turns[turns.length - 1];
+      if (prev && ["speaker", "chair", "guest"].includes(prev.role) && body) {
+        prev.text += "\n\n" + body;
+        if (speakers[prev.speaker]) speakers[prev.speaker].words += body.split(/\s+/).length;
+        continue;
+      }
+      role = "speaker"; // a continuation with nothing before it
+    }
     let faction = "";
-    const fm = header.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
-    if (fm) { header = fm[1].trim(); faction = fm[2].trim(); }
+    if (header.startsWith("(") && header.endsWith(")")) {
+      header = header.slice(1, -1).replace(/,\s*\d{1,2}:\d{2}\s*$/, "").trim(); // << מנהל >> wraps the whole name: (היו"ר שם, 14:08)
+    } else {
+      const fm = header.match(/^(.*?)\s*\(([^)]*)\)\s*$/);
+      if (fm) { header = fm[1].trim(); faction = fm[2].trim(); }
+    }
     const speaker = header.replace(/^היו["״]ר\s+/, "").trim();
     if (!speaker || !body) continue;
     turns.push({ role, speaker, faction_hint: faction, text: body });
     const s = speakers[speaker] ??= { turns: 0, words: 0, role, faction_hint: faction };
     s.turns += 1;
-    s.words += body.split(" ").length;
+    s.words += body.split(/\s+/).length;
   }
   return { turns, speakers };
 }
