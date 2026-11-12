@@ -1,5 +1,6 @@
 // Local dev server: static files + the Netlify functions that the app
-// calls (currently /.netlify/functions/plenum). Production runs the same
+// calls (/.netlify/functions/plenum, /.netlify/functions/committee-protocol).
+// Production runs the same
 // handlers on Netlify; locally `python3 -m http.server` cannot, so the
 // plenum reader used to show its "live site only" fallback. Run:
 //
@@ -12,6 +13,7 @@ import { createServer } from "node:http";
 import { readFile } from "node:fs/promises";
 import { extname, join, normalize, resolve, sep } from "node:path";
 import plenumHandler from "./netlify/functions/plenum.mjs";
+import committeeProtocolHandler from "./netlify/functions/committee-protocol.mjs";
 
 const ROOT = resolve(process.cwd());
 const PORT = Number(process.env.PORT || 8094);
@@ -21,7 +23,7 @@ const MIME = {
   ".png": "image/png", ".jpg": "image/jpeg", ".ico": "image/x-icon",
   ".pdf": "application/pdf", ".md": "text/plain; charset=utf-8",
 };
-const FUNCTIONS = { "/.netlify/functions/plenum": plenumHandler };
+const FUNCTIONS = { "/.netlify/functions/plenum": plenumHandler, "/.netlify/functions/committee-protocol": committeeProtocolHandler };
 
 const server = createServer(async (req, res) => {
   const url = new URL(req.url, `http://127.0.0.1:${PORT}`);
@@ -51,4 +53,4 @@ const server = createServer(async (req, res) => {
     res.end("not found");
   }
 });
-server.listen(PORT, "127.0.0.1", () => console.log(`mandat121 dev: http://127.0.0.1:${PORT} (static + plenum function)`));
+server.listen(PORT, "127.0.0.1", () => console.log(`mandat121 dev: http://127.0.0.1:${PORT} (static + plenum/committee-protocol functions)`));
