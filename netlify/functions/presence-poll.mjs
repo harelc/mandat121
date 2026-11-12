@@ -73,6 +73,18 @@ export function emptyState() {
   return { _meta: {}, days: {}, by_mk: {} };
 }
 
+const lobbyName = (m) => `${m?.Lastname || ""} ${m?.Firstname || ""}`.split(/\s+/).filter(Boolean).join(" ");
+
+export function currentFromMks(mks, at) {
+  // Who is in the building *right now* (present AND absent — arrivals
+  // alone can't say who left). Stored on the state as `current` so the
+  // page's live overlay reads this poll's snapshot instead of every
+  // open tab polling the Knesset API itself every 3 minutes.
+  const map = {};
+  for (const m of mks || []) { const name = lobbyName(m); if (name) map[name] = !!m.IsPresent; }
+  return { at: jerusalemParts(at).iso, map };
+}
+
 export function mergePoll(state, mks, at, force = false) {
   // Merge one lobby reading. `mks` is the raw payload list, `at` a Date.
   // Returns { state, added } — added = names first seen in this poll.
@@ -88,7 +100,7 @@ export function mergePoll(state, mks, at, force = false) {
   const added = [];
   for (const m of mks || []) {
     if (!m || !m.IsPresent) continue;
-    const name = `${m.Lastname || ""} ${m.Firstname || ""}`.split(/\s+/).filter(Boolean).join(" ");
+    const name = lobbyName(m);
     if (!name || known.has(name)) continue;
     known.add(name);
     day.arrivals.push({ name, mk_id: m.MkId ?? null, first_seen: local.iso, at_first_poll: firstPollOfDay });
@@ -145,16 +157,28 @@ export default async function handler() {
   }
 
   let state = (await store.get("state", { type: "json" })) || (await seedState());
+  const now = new Date();
   const before = JSON.stringify(state.days || {});
-  const { added } = mergePoll(state, mks, new Date());
-  if (JSON.stringify(state.days || {}) === before) {
-    console.log("presence-poll: unchanged — no new arrivals");
+  const { added } = mergePoll(state, mks, now);
+  // Refresh the live snapshot every poll. Write when arrivals changed,
+  // when the present/absent set changed, or when the snapshot is over
+  // 15 min old (so its timestamp — shown in the UI as "נכון ל־" — never
+  // drifts far from the last actual poll even on a quiet day).
+  const prev = state.current;
+  const current = currentFromMks(mks, now);
+  state.current = current;
+  const daysChanged = JSON.stringify(state.days || {}) !== before;
+  const setChanged = !prev || JSON.stringify(prev.map) !== JSON.stringify(current.map);
+  const stale = !prev?.at || Date.parse(current.at) - Date.parse(prev.at) > 15 * 60000;
+  if (!daysChanged && !setChanged && !stale) {
+    console.log("presence-poll: unchanged — no new arrivals, same building");
     return Response.json({ ok: true, changed: false, added: 0 });
   }
   await store.setJSON("state", state);
-  const today = jerusalemParts(new Date()).date;
-  console.log(`presence-poll: ${today}: ${added.length} new arrival(s), ${state.days[today]?.arrivals.length ?? 0} so far today, ${state._meta.workdays_tracked} workday(s) tracked`);
-  return Response.json({ ok: true, changed: true, added: added.length });
+  const today = jerusalemParts(now).date;
+  const present = Object.values(current.map).filter(Boolean).length;
+  console.log(`presence-poll: ${today}: ${added.length} new arrival(s), ${present} in the building now, ${state._meta.workdays_tracked ?? 0} workday(s) tracked`);
+  return Response.json({ ok: true, changed: true, added: added.length, present });
 }
 
 export const config = { schedule: "*/5 4-18 * * 0-4" }; // UTC; the Sun–Thu Jerusalem gate is in mergePoll, like build_presence.py

@@ -2,7 +2,7 @@
 // JS port of build_presence.py (retired with the GH polling workflow).
 // Run: node tests/test_presence_merge.mjs  (no deps; wired into check.yml)
 import assert from "node:assert";
-import { emptyState, mergePoll } from "../netlify/functions/presence-poll.mjs";
+import { currentFromMks, emptyState, mergePoll } from "../netlify/functions/presence-poll.mjs";
 
 const mk = (last, first, id, present = true) => ({ Lastname: last, Firstname: first, MkId: id, IsPresent: present });
 let passed = 0;
@@ -64,6 +64,12 @@ test("a workday with nobody present still opens (honest empty day)", () => {
   const { added } = mergePoll(s, [mk("כהן", "דנה", 1, false)], new Date("2026-11-12T05:30:00Z"));
   assert.deepEqual(added, []);
   assert.deepEqual(s.days["2026-11-12"].arrivals, []);
+});
+
+test("currentFromMks maps present AND absent, by surname-first name", () => {
+  const cur = currentFromMks([mk("כהן", "דנה", 1), mk("לוי", "אבי", 2, false), { IsPresent: true }], new Date("2026-11-12T05:30:00Z"));
+  assert.deepEqual(cur.map, { "כהן דנה": true, "לוי אבי": false });
+  assert.equal(cur.at, "2026-11-12T07:30:00+02:00");
 });
 
 console.log(`presence merge: ${passed} tests passed`);

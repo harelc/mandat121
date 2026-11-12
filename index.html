@@ -805,17 +805,21 @@ function toggleIn(arr,v){const i=arr.indexOf(v); i>=0?arr.splice(i,1):arr.push(v
 
 let MKP={}, K26=null, mkIndex={}, factionStats={};
 let K26_TENURE={}, K26_FACTIONS={}; // official K26 serving roster (build_k25_tenure.py --knesset 26 -> data/k26_tenure.json); empty until OData publishes KnessetNum=26 positions
-/* Live "in the building", read in the browser straight from the Knesset
-   MK-lobby API (the IsPresent signal): one GET returns all 120 MKs
-   (~62 KB, Access-Control-Allow-Origin: *). Cached 3 minutes so renders
-   and page switches don't refetch; a failed fetch just leaves whatever
-   static fallback a surface has. Only the boolean is used, matched by
-   name against our own data — no API string ever reaches the DOM.
+/* Live "in the building": the IsPresent snapshot that the server-side
+   presence poll (presence-poll.mjs, every 5 min) stores in Blobs as
+   state.current, read here via the presence function. The browser used
+   to poll the Knesset lobby API itself every 3 min per open tab; with
+   the server poll running anyway, that duplicated traffic bought only
+   ~2 minutes of freshness. Trade-off, chosen deliberately: the
+   overlay can now lag reality by up to one poll cycle (~5 min), and
+   LIVE_PRESENCE.at is the SERVER poll time, so the "נכון ל־" labels
+   stay honest. Only booleans are consumed, matched by name against
+   our own data — no API string ever reaches the DOM.
    Consumers: the K26 Now hemicycle (which paints it ONLY on the official
    serving roster — before that the live feed still describes the
    outgoing Knesset's members), the MK page's presence chip, and the
    MK-card grids (cards of MKs currently in the building are framed in
-   green). Presence is live-only: it is not stored in any data file. */
+   green). */
 let LIVE_PRESENCE={at:0,tryAt:0,map:null};
 const livePresenceOf=name=>LIVE_PRESENCE.map&&name in LIVE_PRESENCE.map?LIVE_PRESENCE.map[name]:undefined;
 function ensureLivePresence(){
@@ -823,14 +827,14 @@ function ensureLivePresence(){
   if(LIVE_PRESENCE.map&&now-LIVE_PRESENCE.at<180000) return;
   if(now-LIVE_PRESENCE.tryAt<60000) return; // in flight, or a recent failure — don't hammer
   LIVE_PRESENCE.tryAt=now;
-  fetch('https://www.knesset.gov.il/WebSiteApi/knessetapi/MkLobby/GetMkLobbyData120?lang=he',{cache:'no-store'})
+  fetch('/.netlify/functions/presence',{cache:'no-store'})
     .then(r=>r.ok?r.json():null)
     .then(j=>{
-      if(!j||!Array.isArray(j.mks)) return;
+      const cur=j&&j.current; if(!cur||!cur.map) return;
       const map={};
-      for(const m of j.mks){ const key=normName(`${m.Lastname||''} ${m.Firstname||''}`); if(key) map[key]=!!m.IsPresent }
+      for(const [k,v] of Object.entries(cur.map)){ const key=normName(k); if(key) map[key]=!!v }
       if(!Object.keys(map).length) return;
-      LIVE_PRESENCE={at:Date.now(),tryAt:LIVE_PRESENCE.tryAt,map};
+      LIVE_PRESENCE={at:Date.parse(cur.at)||Date.now(),tryAt:LIVE_PRESENCE.tryAt,map};
       if(view==='now'&&KN===26) renderNow26();
       else if(view==='mk') renderMkDetail();
       // MK cards: highlight who is in the building. Skip the re-render
@@ -2307,7 +2311,7 @@ function renderNow26(){
   <div class="sec-title">${serving?'מליאת הכנסת ה־26':'המליאה הנכנסת'} <small>${serving?'מי מכהן/ת בפועל — כולל כניסות ויציאות לפי החוק הנורווגי':'רחפו או לחצו על מושב — חלקם כיהנו גם בכנסת 25'}</small></div>
   <div class="card pad plenum-wrap home rise"><div id="k26plenum">${K26?plenumSVG(seats,'k26',null):''}</div>
   <div class="legend">${legend.map(([f,v])=>`<span><i style="background:${v.color}"></i>${esc(f)} ${v.n}</span>`).join('')}</div>
-  ${presenceKnown?`<div class="small" style="margin-top:.35rem"><span class="pdot" style="background:var(--for)"></span> <b>${presentN} מתוך ${seats.length}</b> כעת במשכן הכנסת — מושב בטבעת ירוקה = במשכן, מושב כהה = לא במשכן · קריאה חיה מאפליקציית לובי הח״כים של הכנסת, נכון ל־${esc(presenceWhen)} · מתרענן כל כמה דקות</div>`:''}
+  ${presenceKnown?`<div class="small" style="margin-top:.35rem"><span class="pdot" style="background:var(--for)"></span> <b>${presentN} מתוך ${seats.length}</b> כעת במשכן הכנסת — מושב בטבעת ירוקה = במשכן, מושב כהה = לא במשכן · קריאת לובי הח״כים של הכנסת, נכון ל־${esc(presenceWhen)} · מתרענן כל כמה דקות</div>`:''}
   </div>
   ${presenceArrivalsHTML(seats)}
   ${presenceGridHTML(seats)}
@@ -3329,7 +3333,7 @@ function mkContactHTML(name){
   if(!c){ // former MKs have no Knesset contact card; show live presence if the feed has them, and a Wikidata-only X if one was discovered
     const wx=WIKI[name]?.x_handles?.[0];
     if(live===undefined&&!wx) return '';
-    return `${live!==undefined?`<div class="card pad" style="margin-top:.85rem"><h3>נוכחות <small class="dim">קריאה חיה מאפליקציית לובי הח״כים של הכנסת · נכון ל־${esc(liveWhen)}</small></h3><div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.55rem;align-items:center">${chipFor(live)}</div></div>`:''}${wx?`<div class="card pad" style="margin-top:.85rem"><h3>𝕏 ברשת <small class="dim">מויקינתונים בלבד</small></h3>
+    return `${live!==undefined?`<div class="card pad" style="margin-top:.85rem"><h3>נוכחות <small class="dim">קריאת לובי הח״כים של הכנסת · נכון ל־${esc(liveWhen)}</small></h3><div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.55rem;align-items:center">${chipFor(live)}</div></div>`:''}${wx?`<div class="card pad" style="margin-top:.85rem"><h3>𝕏 ברשת <small class="dim">מויקינתונים בלבד</small></h3>
     <div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.55rem"><a class="chip" href="https://x.com/${esc(wx)}" target="_blank" rel="noopener" title="מקור: ויקינתונים (Wikidata), לא אתר הכנסת">𝕏 @${esc(wx)} · מויקינתונים ↗</a></div>
     <p class="small dim" style="margin-top:.5rem">${KN===26?'טרם פורסם כרטיס קשר לח״כ הזה/זו באתר הכנסת;':'לח״כ לשעבר אין כרטיס קשר באתר הכנסת;'} הקישור הזה מויקינתונים (CC0) ועלול להיות לא מעודכן — בדקו בעמוד עצמו.</p></div>`:''}`;
   }
@@ -3969,7 +3973,7 @@ function renderAbout(){
         <li>הנתונים מתרעננים אוטומטית מבוני־נתונים פתוחים (<span dir="ltr">build_*.py</span> בקוד המקור); האתר עצמו הוא דף סטטי שמציג תמונת־מצב (snapshot) של אותם נתונים.</li>
         <li>כל טענה מחושבת מסומנת בכיסוי שלה — למשל כמה מההצבעות כוללות תוצאות לפי ח״כ — כדי שאפשר יהיה להבחין בין מאגר מלא לחלקי.</li>
         <li><b>דמיון הצבעה</b> בניתוח הוא שיעור הסכמה בהצבעות משותפות בלבד. הוא אינו מודד אידאולוגיה, אינו מעיד על תיאום, ואין לקרוא בו סיבה ותוצאה.</li>
-        <li>״נוכח/ת בבניין״ נקרא <b>חי</b> מאפליקציית לובי הח״כים של הכנסת כשפותחים את כרטיס הח״כ או את מפת כנסת 26 (ומתרענן כל כמה דקות); אם הקריאה נכשלת לא מוצגת נוכחות כלל (אין צילום יומי — הוא היה מיושן כבר כשהתפרסם). בנוסף, מאז 12 בנובמבר 2026 שרת המעקב שלנו קורא את אותה אפליקציה כל 5 דקות בימי ראשון–חמישי ובונה ממנה היסטוריית נוכחות לכנסת 26 בלבד: סדר הגעה לכל יום עבודה ומספר ימי הנוכחות של כל ח״כ. ״נראה/תה לראשונה״ היא הקריאה הראשונה שראתה את הח״כ — לא שעת כניסה בשער; לפני תחילת המעקב אין היסטוריה, והיא לא מומצאת בדיעבד. לכנסת 25 אין ולא תהיה היסטוריית נוכחות, כי הלובי משרת רק את הסגל המכהן. תקצירי ויקיפדיה בדפי ח״כים מובאים עם ייחוס למקור, וקישורי X שמקורם בוויקינתונים מסומנים ככאלה — בנפרד מהערוצים הרשמיים של הכנסת.</li>
+        <li>״נוכח/ת בבניין״ מגיע מקריאת לובי הח״כים האחרונה של שרת המעקב שלנו (קורא כל 5 דקות, ראשון–חמישי) — כך שייתכן פיגור של עד כ־5 דקות, והשעה המוצגת היא שעת אותה קריאה; אם אין קריאה לא מוצגת נוכחות כלל (אין צילום יומי — הוא היה מיושן כבר כשהתפרסם). בנוסף, מאז 12 בנובמבר 2026 שרת המעקב שלנו קורא את אותה אפליקציה כל 5 דקות בימי ראשון–חמישי ובונה ממנה היסטוריית נוכחות לכנסת 26 בלבד: סדר הגעה לכל יום עבודה ומספר ימי הנוכחות של כל ח״כ. ״נראה/תה לראשונה״ היא הקריאה הראשונה שראתה את הח״כ — לא שעת כניסה בשער; לפני תחילת המעקב אין היסטוריה, והיא לא מומצאת בדיעבד. לכנסת 25 אין ולא תהיה היסטוריית נוכחות, כי הלובי משרת רק את הסגל המכהן. תקצירי ויקיפדיה בדפי ח״כים מובאים עם ייחוס למקור, וקישורי X שמקורם בוויקינתונים מסומנים ככאלה — בנפרד מהערוצים הרשמיים של הכנסת.</li>
       </ul>
     </div>
 
