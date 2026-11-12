@@ -31,6 +31,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
+from build_plenum_hl import HL_DIR, idf_map, merge_parts, session_df, session_hl
 from build_protocols import docx_text
 from build_protocols_search import (SEARCH_P_DIR, add_counts_to_shards,
                                     flush_shards, words_of)
@@ -66,7 +67,10 @@ def paged(entity, params):
 
 
 def session_words(url):
-    text = docx_text(url)
+    return session_words_text(docx_text(url))
+
+
+def session_words_text(text):
     kept = []
     for para in text.split("\n"):
         p = para.strip()
@@ -116,14 +120,28 @@ def main():
         jobs = [(s, docs[s["Id"]]) for s in todo if docs.get(s["Id"])]
         print(f"{len(jobs)} sessions with דברי הכנסת documents", flush=True)
 
+        # Plenum highlight candidates (build_plenum_hl.py) are scored in
+        # the same pass — the transcript is already in memory here, and
+        # re-downloading it later just to score turns would double the
+        # traffic. IDF = the shard corpus as indexed before this run.
+        hl_idf = idf_map(session_df(), len(sessions))
+
         def work(job):
             s, urls = job
+            texts = [docx_text(u) for u in urls]  # several parts — merge
             counts = Counter()
-            for u in urls:  # a session may have several parts — merge
-                counts.update(session_words(u))
-            return s, counts, {"number": s["Number"],
-                               "date": (s.get("StartDate") or "")[:10],
-                               "doc": urls[0]}
+            for text in texts:
+                counts.update(session_words_text(text))
+            entry = {"number": s["Number"],
+                     "date": (s.get("StartDate") or "")[:10],
+                     "doc": urls[0]}
+            hl = None
+            try:
+                hl = session_hl(merge_parts(str(s["Id"]), entry["date"], texts),
+                                entry, hl_idf, len(sessions))
+            except Exception:
+                pass  # highlights must never sink the search index
+            return s, counts, entry, hl
 
         done, failed = 0, []
         cache, dirty = {}, set()
@@ -132,11 +150,15 @@ def main():
             for fut in as_completed(futs):
                 sid = futs[fut]
                 try:
-                    s, counts, entry = fut.result()
+                    s, counts, entry, hl = fut.result()
                     add_counts_to_shards(SEARCH_P_DIR, str(s["Id"]), counts,
                                          cache, dirty)
                     index[str(s["Id"])] = entry
                     done_sids.add(str(s["Id"]))
+                    if hl is not None:
+                        HL_DIR.mkdir(parents=True, exist_ok=True)
+                        (HL_DIR / f"{s['Id']}.json").write_text(
+                            json.dumps(hl, ensure_ascii=False), encoding="utf-8")
                 except Exception as e:
                     failed.append((sid, str(e)[:80]))
                 done += 1

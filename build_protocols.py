@@ -46,7 +46,9 @@ def docx_text(url):
                .replace("&lt;", "<").replace("&gt;", ">").replace("&amp;", "&"))
 
 def parse(session, url):
-    text = docx_text(url)
+    return parse_text(session, docx_text(url))
+
+def parse_text(session, text):
     turns, speakers = [], {}
     matches = list(MARK.finditer(text))
     for i, m in enumerate(matches):

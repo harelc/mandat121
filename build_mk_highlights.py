@@ -50,8 +50,10 @@ from pathlib import Path
 from build_protocols_search import words_of
 
 PROTO_DIR = Path("data/protocols")
+PLENUM_HL_DIR = Path("data/plenum_hl")
 OUT = Path("data/mk_highlights.json")
 MIN_WORDS, MIN_TERMS, TOP_N, PER_SESSION_CAP = 30, 25, 5, 2
+PICKS_PER_SOURCE = 3  # top committee + top plenum picks per MK (scores are per-corpus; never compared across sources)
 
 # index.html FORWARD: surname-first key -> given-first display, for
 # multi-token surnames the naive token move gets wrong. Keep in sync.
@@ -151,8 +153,9 @@ def main():
                     # turn texts — strip them (and the name they carry)
                     # from the excerpt; the verbatim text is one click
                     # away in the protocol itself.
-                    "excerpt": re.sub(r"<<\s*[^>]*>>\s*[^:]{0,40}:", " — ",
-                                      " ".join((t.get("text") or "").split()))[:300],
+                    "excerpt": re.sub(r"<<[^>]*>>", "",
+                                      re.sub(r"<<\s*[^>]*>>\s*[^:]{0,40}:", " — ",
+                                             " ".join((t.get("text") or "").split())))[:300],
                 }))
         docs.append(sid)
 
@@ -173,9 +176,72 @@ def main():
             highlights.append({**rec, "score": round(score, 2)})
         appearances = sorted(agg["sessions"].values(),
                              key=lambda s: (-s["words"], s["date"]))
+        for a in appearances:
+            a["kind"] = "committee"
+        for h in highlights:
+            h["kind"] = "committee"
         by_mk[key] = {"turns": agg["turns"], "words": agg["words"],
                       "sessions": len(agg["sessions"]),
-                      "appearances": appearances, "highlights": highlights}
+                      "committee_sessions": len(agg["sessions"]),
+                      "plenum_sessions": 0,
+                      "appearances": appearances,
+                      "highlights": highlights[:PICKS_PER_SOURCE]}
+
+    # ---- plenum (דברי הכנסת): merge the parse-time residue
+    # (data/plenum_hl/*.json, build_plenum_hl.py). Appearances and
+    # highlights arrive pre-scored on a session-level IDF, so they are
+    # picked separately and interleaved — scores never compete across
+    # corpora. Sessions are counted per source (committee and plenum
+    # session ids share one numeric space).
+    plenum_files = sorted(PLENUM_HL_DIR.glob("*.json")) if PLENUM_HL_DIR.exists() else []
+    plenum_seen = set()
+    for f in plenum_files:
+        p = json.loads(f.read_text("utf-8"))
+        sid = str(p["id"])
+        label = f"מליאת הכנסת · ישיבה {p.get('number') or ''}".strip()
+        apps_here = {}  # one appearance per MK per sitting, even under name variants
+        for speaker, s in (p.get("speakers") or {}).items():
+            key = resolve(speaker, by_display, by_pair)
+            if not key:
+                continue
+            e = by_mk.setdefault(key, {"turns": 0, "words": 0, "sessions": 0,
+                                       "committee_sessions": 0, "plenum_sessions": 0,
+                                       "appearances": [], "highlights": []})
+            e["turns"] += s.get("turns", 0)
+            e["words"] += s.get("words", 0)
+            if key in apps_here:
+                apps_here[key]["turns"] += s.get("turns", 0)
+                apps_here[key]["words"] += s.get("words", 0)
+            else:
+                app = {"sid": sid, "kind": "plenum", "committee": label,
+                       "date": p.get("date", ""), "turns": s.get("turns", 0),
+                       "words": s.get("words", 0)}
+                apps_here[key] = app
+                e["plenum_sessions"] += 1
+                e["appearances"].append(app)
+            plenum_seen.add(sid)
+        for speaker, tops in (p.get("top") or {}).items():
+            key = resolve(speaker, by_display, by_pair)
+            if not key:
+                continue
+            e = by_mk.setdefault(key, {"turns": 0, "words": 0, "sessions": 0,
+                                       "committee_sessions": 0, "plenum_sessions": 0,
+                                       "appearances": [], "highlights": []})
+            e.setdefault("_plenum_hl", []).extend(
+                {**rec, "sid": sid, "kind": "plenum", "committee": label,
+                 "date": p.get("date", "")} for rec in tops)
+    for e in by_mk.values():
+        picks = sorted(e.pop("_plenum_hl", []), key=lambda r: -r["score"])[:PICKS_PER_SOURCE]
+        merged, c_hl = [], e["highlights"]
+        for i in range(max(len(c_hl), len(picks))):
+            if i < len(c_hl):
+                merged.append(c_hl[i])
+            if i < len(picks):
+                merged.append(picks[i])
+        e["highlights"] = merged
+        e["appearances"].sort(key=lambda a: (-a["words"], a["date"]))
+        e["appearances"] = e["appearances"][:12]  # UI shows top 6; counts live in the *_sessions fields
+        e["sessions"] = e["committee_sessions"] + e["plenum_sessions"]
 
     payload = {
         "_meta": {
@@ -184,7 +250,11 @@ def main():
                       f"candidates >= {MIN_WORDS} words; max {PER_SESSION_CAP} "
                       "per sitting. No LLM.",
             "sessions": len(docs), "turns_scored": n_turns, "mks": len(by_mk),
-            "source": "data/protocols/*.json (official committee transcripts)",
+            "plenum_sessions": len(plenum_seen),
+            "source": "data/protocols/*.json (official committee transcripts) "
+                      "+ data/plenum_hl/*.json (plenum residue, build_plenum_hl.py; "
+                      "session-level IDF, picked separately — scores are not "
+                      "comparable across the two corpora)",
         },
         "by_mk": by_mk,
     }

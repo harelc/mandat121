@@ -1194,17 +1194,30 @@ function openMkProtocol(sid,name){
   openSession(sid);
   let tries=0; const iv=setInterval(()=>{ if(apply()||++tries>20) clearInterval(iv) },150);
 }
-/* The MK page's protocol card: where this MK actually spoke in committee
-   (appearances, by volume) and their highest-scoring turns (highlights).
-   Scores are TF-IDF over the transcripts — classic IR, no LLM — and the
-   excerpt is the turn's own opening words, verbatim. */
+/* Same idea for a plenum sitting: open its דברי הכנסת page, open the
+   on-demand reader, then filter it to the MK (plenumProtoFilter.speaker
+   is matched against given-first speaker names). */
+function openMkPlenum(sid,name){
+  const apply=()=>{ if(PLENUM_CUR&&PLENUM_CUR.id===String(sid)){ plenumProtoFilter={speaker:disp(name),q:'',hl:[],hlOnly:true}; renderPlenumProtocol(); const b=$('#plenumProtoBox'); if(b) b.scrollIntoView({block:'start',behavior:'smooth'}); return true } return false };
+  openPlenum(sid);
+  setTimeout(()=>{ if(!apply()) togglePlenumProtocol(String(sid)).then(()=>apply()) },60);
+}
+const openMkTurn=(x,name)=>x.kind==='plenum'?`openMkPlenum('${x.sid}','${jsq(name)}')`:`openMkProtocol('${x.sid}','${jsq(name)}')`;
+/* The MK page's protocol card: where this MK actually spoke — committee
+   protocols (full text in the repo) and plenum sittings (דברי הכנסת,
+   scored at parse time into data/plenum_hl/) — and their
+   highest-scoring turns (highlights) from each corpus. Scores are
+   TF-IDF over the transcripts — classic IR, no LLM — picked per corpus
+   and never compared across corpora; the excerpt is the turn's own
+   opening words, verbatim. */
 function mkHighlightsHTML(name){
   const h=MK_HIGHLIGHTS?.by_mk?.[normName(name)]; if(!h) return '';
-  const hl=h.highlights||[], apps=(h.appearances||[]).slice(0,6);
-  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> בפרוטוקולי הוועדות <small class="dim">דבריו/ה המתועדים — והקטעים הבולטים</small></h3>
-  <div class="small muted" style="margin-top:.35rem;line-height:1.9">דיבר/ה ב־<b>${h.sessions}</b> ישיבות ועדה מתועדות · <b>${h.turns.toLocaleString('he-IL')}</b> תורות · <b>${h.words.toLocaleString('he-IL')}</b> מילים</div>
-  ${hl.length?`<h4 style="margin-top:.7rem">הקטעים הבולטים</h4><div class="rows" style="margin:.35rem -.9rem 0">${hl.map(x=>`<div class="row" onclick="openMkProtocol('${x.sid}','${jsq(name)}')"><span class="flex" style="white-space:normal">״${esc(x.excerpt)}…״<br><span class="dim small">${esc(x.committee)} · ${fmtDate(x.date)} · ${x.words} מילים בתור</span></span><span class="chip acc">לפרוטוקול ←</span></div>`).join('')}</div>`:''}
-  ${apps.length?`<h4 style="margin-top:.7rem">ישיבות שדיבר/ה בהן הכי הרבה</h4><div class="rows" style="margin:.35rem -.9rem 0">${apps.map(a=>`<div class="row" onclick="openMkProtocol('${a.sid}','${jsq(name)}')"><span class="flex">${esc(a.committee)}<br><span class="dim small">${fmtDate(a.date)} · ${a.turns} תורות · ${a.words.toLocaleString('he-IL')} מילים</span></span><span class="chip acc">לפרוטוקול ←</span></div>`).join('')}</div>${h.sessions>apps.length?`<div class="small dim" style="margin-top:.4rem">ועוד ${h.sessions-apps.length} ישיבות — פתחו אחת מהרשימה או חפשו את שמו/ה בכל ישיבה דרך לשונית הוועדות.</div>`:''}`:''}
+  const hl=h.highlights||[], apps=(h.appearances||[]).slice(0,8);
+  const sessLine=[h.committee_sessions?`<b>${h.committee_sessions}</b> ישיבות ועדה`:null,h.plenum_sessions?`<b>${h.plenum_sessions}</b> ישיבות מליאה`:null].filter(Boolean).join(' ו־');
+  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> בפרוטוקולים <small class="dim">ועדות ומליאה · דבריו/ה המתועדים — והקטעים הבולטים</small></h3>
+  <div class="small muted" style="margin-top:.35rem;line-height:1.9">דיבר/ה ב־${sessLine} מתועדות · <b>${h.turns.toLocaleString('he-IL')}</b> תורות · <b>${h.words.toLocaleString('he-IL')}</b> מילים</div>
+  ${hl.length?`<h4 style="margin-top:.7rem">הקטעים הבולטים</h4><div class="rows" style="margin:.35rem -.9rem 0">${hl.map(x=>`<div class="row" onclick="${openMkTurn(x,name)}"><span class="flex" style="white-space:normal">״${esc(x.excerpt)}…״<br><span class="dim small">${esc(x.committee)} · ${fmtDate(x.date)} · ${x.words} מילים בתור</span></span><span class="chip ${x.kind==='plenum'?'':'acc'}">${x.kind==='plenum'?'מליאה':'ועדה'}</span><span class="chip acc">לפרוטוקול ←</span></div>`).join('')}</div>`:''}
+  ${apps.length?`<h4 style="margin-top:.7rem">ישיבות שדיבר/ה בהן הכי הרבה</h4><div class="rows" style="margin:.35rem -.9rem 0">${apps.map(a=>`<div class="row" onclick="${openMkTurn(a,name)}"><span class="flex">${esc(a.committee)}<br><span class="dim small">${fmtDate(a.date)} · ${a.turns} תורות · ${a.words.toLocaleString('he-IL')} מילים</span></span><span class="chip ${a.kind==='plenum'?'':'acc'}">${a.kind==='plenum'?'מליאה':'ועדה'}</span><span class="chip acc">לפרוטוקול ←</span></div>`).join('')}</div>${h.sessions>apps.length?`<div class="small dim" style="margin-top:.4rem">ועוד ${h.sessions-apps.length} ישיבות מתועדות.</div>`:''}`:''}
   <p class="small dim" style="margin-top:.55rem">״בולטים״ נבחרו אוטומטית לפי ניקוד TF-IDF על טקסט הפרוטוקולים (מילים ייחודיות וספציפיות שוקלות יותר; מינימום 30 מילים לתור) — בלי מודל שפה. לחיצה פותחת את הפרוטוקול מסונן לדברי הח״כ.</p></div>`;
 }
 const presenceTrackedDays=()=>PRESENCE26?Object.keys(PRESENCE26.days||{}).length:0;
