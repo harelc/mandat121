@@ -2459,10 +2459,10 @@ const agOn=d=>({plenum:(AGENDA.plenum||[]).filter(s=>s.start.slice(0,10)===d),cm
 const agCount=(from,to)=>agAll().filter(s=>{const d=s.start.slice(0,10);return d>=from&&d<=to}).length;
 function agendaLatestDate(){ const ds=agAll().map(s=>s.start.slice(0,10)).sort(); return ds[ds.length-1]||AGENDA.today }
 function agendaDefaultAnchor(){ // today, unless its week is unpublished — then the latest published sitting day
-  // On a Thursday the Knesset normally has no sittings left this week, so
-  // looking at Thu/this week is a dead end: open on next week (its Sunday
-  // is also where day view lands when switched to).
-  if(agDate(AGENDA.today).getDay()===4) return agAdd(AGENDA.today,3); // next Sunday
+  // From Thursday on (Thu–Sat) the Knesset normally has no sittings left
+  // this week, so looking at today/this week is a dead end: open on next
+  // week (anchored on its Sunday).
+  if(agDate(AGENDA.today).getDay()>=4) return agAdd(AGENDA.today,7-agDate(AGENDA.today).getDay()); // next Sunday
   const tw=AGENDA.this_week[0];
   if(agCount(tw,agAdd(tw,4))) return AGENDA.today;
   const future=agAll().map(s=>s.start.slice(0,10)).filter(d=>d>AGENDA.today).sort()[0];
@@ -2475,8 +2475,8 @@ function agendaSetMode(m,explicitDay=false){ agendaMode=m;
   // view next week — not Thursday's normally-empty schedule. Anchors the
   // user navigated to (past/other weeks) are left alone, as is a day
   // explicitly clicked in month view (agendaGoDay).
-  if(!explicitDay&&(m==='day'||m==='week')&&agDate(AGENDA.today).getDay()===4&&agendaAnchor>=AGENDA.this_week[0]&&agendaAnchor<=AGENDA.today) agendaAnchor=agAdd(AGENDA.today,m==='day'?4:3); // day -> next Monday, week -> next Sunday
-  else if(!explicitDay&&m==='day'&&agDate(AGENDA.today).getDay()===4&&agendaAnchor===agAdd(AGENDA.today,3)) agendaAnchor=agAdd(AGENDA.today,4); // week view's next-Sunday anchor -> Monday in day view
+  if(!explicitDay&&(m==='day'||m==='week')&&agDate(AGENDA.today).getDay()>=4&&agendaAnchor>=AGENDA.this_week[0]&&agendaAnchor<=AGENDA.today) agendaAnchor=agAdd(AGENDA.today,(7-agDate(AGENDA.today).getDay())+(m==='day'?1:0)); // day -> next Monday, week -> next Sunday
+  else if(!explicitDay&&m==='day'&&agDate(AGENDA.today).getDay()>=4&&agendaAnchor===agAdd(AGENDA.today,7-agDate(AGENDA.today).getDay())) agendaAnchor=agAdd(agendaAnchor,1); // week view's next-Sunday anchor -> Monday in day view
   else if(m==='day') agendaAnchor=agWorkdayOnOrBefore(agendaAnchor);
   document.querySelectorAll('.agenda-modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===m)); renderAgenda() }
 function agendaNav(dir){ agendaAnchor=agendaMode==='day'?agStepWorkday(agendaAnchor,dir):agendaMode==='week'?agAdd(agendaAnchor,7*dir):agMonthAdd(agendaAnchor,dir); renderAgenda() }
@@ -2561,9 +2561,9 @@ function agendaBodyHTML(){
 function agendaBodyHTMLInner(){
   const today=AGENDA.today, tw=AGENDA.this_week[0];
   const thisWeekEmpty=!agCount(tw,agAdd(tw,4));
-  const thuShift=agDate(today).getDay()===4&&agendaAnchor>today; // landed past Thu per the Thursday rule
+  const thuShift=agDate(today).getDay()>=4&&agendaAnchor>today; // landed past this week per the Thu–Sat rule
   const note=thuShift
-    ?`<div class="agenda-note small muted">היום יום חמישי — בדרך כלל אין ישיבות בכנסת, אז מוצג <b style="color:var(--text)">יום העבודה הבא בכנסת</b>${agendaMode==='day'?` (${AG_DAYS[agDate(agendaAnchor).getDay()]} · ${fmtDate(agendaAnchor)})`:` (השבוע המתחיל ${fmtDate(agSunday(agendaAnchor))})`}.</div>`
+    ?`<div class="agenda-note small muted">היום יום ${AG_DAYS[agDate(today).getDay()]} — בדרך כלל אין ישיבות בכנסת, אז מוצג <b style="color:var(--text)">יום העבודה הבא בכנסת</b>${agendaMode==='day'?` (${AG_DAYS[agDate(agendaAnchor).getDay()]} · ${fmtDate(agendaAnchor)})`:` (השבוע המתחיל ${fmtDate(agSunday(agendaAnchor))})`}.</div>`
     :(thisWeekEmpty&&agendaAnchor!==today)
     ?`<div class="agenda-note small muted">לשבוע הנוכחי (${fmtDate(tw)} – ${fmtDate(agAdd(tw,4))}) טרם פורסם סדר יום ב־OData הרשמי — הכנסת לא מתכנסת כל שבוע (פגרה / חגים), וישיבות מופיעות במאגר רק כשהכנסת מפרסמת אותן · נכון ל־${fmtDate(today)}.</div>`:'';
   if(agendaMode==='day'){
