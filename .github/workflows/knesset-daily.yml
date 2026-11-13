@@ -167,6 +167,13 @@ jobs:
           python3 -u build_protocols.py --knesset 26  # -> data/k26_protocols_index.json + shared data/protocols/
           if [ "${{ inputs.full }}" = "true" ] || [ $((10#$(date -u +%V) % 2)) -eq 0 ]; then python3 -u build_mk_highlights.py; else echo "mk_highlights skipped (biweekly layer)"; fi # shared protocol store; biweekly per Derived layers note
 
+      # Event stream: diff the fresh snapshot against yesterday's and
+      # append dated status-change / new-bill / new-vote / new-session
+      # events (data/events.json) — the client cannot prove transitions
+      # from snapshots alone. Must run after all data builders above.
+      - name: Build event stream (diff snapshot)
+        run: python3 -u build_events.py
+
       - name: Commit refreshed data
         id: commit
         run: |

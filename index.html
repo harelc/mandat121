@@ -1381,6 +1381,8 @@ function ensureBillDocs(){ if(BILL_DOCS) return Promise.resolve(BILL_DOCS); retu
 function ensureRoles(){ if(ROLES) return Promise.resolve(ROLES); return _lazyOnce('roles',async()=>{ const j=await _fetchJson(`data/k${KN}_roles.json`); if(j){ ROLES=j; if(view==='mk') renderMkDetail() } return ROLES }) }
 function ensurePresence26(){ if(PRESENCE26) return Promise.resolve(PRESENCE26); return _lazyOnce('presence26',async()=>{ let j=await _fetchJson('/.netlify/functions/presence'); if(!j||!Object.keys(j.days||{}).length) j=await _fetchJson('data/k26_presence.json'); if(j){ adoptPresence26(j); if(KN===26&&(view==='now'||view==='mks'||view==='mk')) render() } return PRESENCE26 }) } // live state: Netlify Blobs via presence-poll.mjs; the committed file is the frozen GH-era seed/fallback only
 function ensureMkHighlights(){ if(MK_HIGHLIGHTS) return Promise.resolve(MK_HIGHLIGHTS); return _lazyOnce('mkHighlights',async()=>{ const j=await _fetchJson('data/mk_highlights.json'); if(j){ j.by_mk=_normKeys(j.by_mk); MK_HIGHLIGHTS=j; if(view==='mk') renderMkDetail() } return MK_HIGHLIGHTS }) }
+let EVENTS=null; // data/events.json — server-diffed, dated transitions (build_events.py)
+function ensureEvents(){ if(EVENTS) return Promise.resolve(EVENTS); return _lazyOnce('events',async()=>{ const j=await _fetchJson('data/events.json'); if(Array.isArray(j)){ EVENTS=j; if(view==='mine') renderMine() } return EVENTS }) }
 /* Scroll to + flash one exact turn (data-turn anchor in protoTurnsHTML).
    Highlight rows promise THIS turn, not just the sitting — anything less
    is a misleading button. Returns false when the turn isn't rendered
@@ -3634,7 +3636,7 @@ function rankBars(rows,key,label){
   return rows.map((r,i)=>{const f=(mkIndex[r.name]||{}).faction||''; return `<div class="row" onclick="openMk('${jsq(r.name)}')"><b style="width:1.6rem;color:var(--dim)">${i+1}</b>${avatar(r.name,f,30)}<span class="flex">${esc(disp(r.name))}<br><span style="display:block;height:.4rem;background:var(--surface2);border-radius:99px;margin-top:.25rem"><i style="display:block;height:100%;width:${Math.round(r[key]/max*100)}%;background:${fcol(f)};border-radius:99px"></i></span></span><b>${r[key].toLocaleString('he-IL')}</b><span class="dim small">${label}</span></div>`}).join('');
 }
 function renderAnalysis(){
-  if(KN===26){ $('#app').innerHTML=`<div class="sec-title">ניתוח</div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v18h16"/><path d="M8.5 17v-6M12.5 17V7M16.5 17v-9"/></svg></div>ניתוח הצבעות יתחיל עם הצבעות כנסת 26 הראשונות.<br>${k25CtaHTML('📊 לניתוח המלא של כנסת 25 ←')}</div>`; return }
+  if(KN===26){ $('#app').innerHTML=`<div class="sec-title">ניתוח</div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v18h16"/><path d="M8.5 17v-6M12.5 17V7M16.5 17v-9"/></svg></div>${K26V.length?`כבר התקיימו ${K26V.length} הצבעות בכנסת 26 — הניתוח (מי מצביע עם מי, חריגות מהסיעה) ייפתח כשתוצאות ההצבעה לפי ח״כ ייקצרו ויצטברו.`:'ניתוח הצבעות יתחיל עם הצבעות כנסת 26 הראשונות.'}<br>${k25CtaHTML('📊 לניתוח המלא של כנסת 25 ←')}</div>`; return }
   if(!ANALYTICS){ ensureAnalytics(); $('#app').innerHTML=`<div class="sec-title">ניתוח</div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M4 3v18h16"/><path d="M8.5 17v-6M12.5 17V7M16.5 17v-9"/></svg></div>טוען נתוני ניתוח…</div>`; return }
   const cov=ANALYTICS.coverage, mx=ANALYTICS.matrix;
   const ini=n=>disp(n).split(/\s+/).map(w=>w[0]).join('');
@@ -4395,6 +4397,14 @@ function renderMine(){
      badged. "Changed state" is honest: bills only expose their current
      status + updated date, so we say "עודכן" with the current stage. */
   if(fm.length&&!MK_HIGHLIGHTS) ensureMkHighlights().then(()=>{ if(view==='mine') renderMine() }).catch(()=>{});
+  if(!EVENTS) ensureEvents().catch(()=>{});
+  // Server-proven transitions first: exact from→to status changes on
+  // followed bills (the snapshot feed below cannot claim these).
+  if(EVENTS) for(const e of EVENTS){
+    if(e.type==='status_change'&&fbIds.has(String(e.bill_id))) pushFeed(e.date,'🔀',`חוק במעקב שינה שלב: ${e.name||''}`,`${e.from||'—'} ← ${e.to||''} · כנסת ${e.kn}`,`openBillPage('${e.bill_id}')`);
+    else if(e.type==='new_vote'&&e.item_id&&fbIds.has(String(e.item_id))) pushFeed(e.date,'🗳️',`הצבעה חדשה על חוק במעקב: ${(ALLB_BY_ID[e.item_id]&&displayText(ALLB_BY_ID[e.item_id]))||e.name||''}`,`${e.for??''}–${e.against??''}`,`openVote('${e.vote_id}')`);
+    else if(e.type==='new_session'&&(S.followCommittees||[]).map(String).includes(String(e.committee_id))) pushFeed(e.date,'🏛️',`ישיבה חדשה בוועדה במעקב: ${e.committee||cmtName(e.committee_id)}`,`ישיבת ועדה · כנסת ${e.kn}`,`openCommittee('${e.committee_id}')`);
+  }
   const feed=[]; const feedSeen=new Set();
   const pushFeed=(date,icon,title,sub,go)=>{ if(!date) return; const k=icon+'|'+title+'|'+date; if(feedSeen.has(k)) return; feedSeen.add(k); feed.push({date,icon,title,sub,go}) };
   const fbIds=new Set(fb.map(b=>String(b.id)));
