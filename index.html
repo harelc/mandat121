@@ -887,7 +887,7 @@ function migrateLocalStars(){
 }
 function syncStar(kind,key,on){ const uid=starUid(); if(!uid) return;
   fetch('/.netlify/functions/stars',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind,key,uid,on}),cache:'no-store'})
-    .then(r=>r.ok?r.json():null).then(j=>{ if(j){ STAR_COUNTS[kind+':'+key]=j.count; paintStarCounts() } }).catch(()=>{}) }
+    .then(r=>r.ok?r.json():null).then(j=>{ if(j&&typeof j.count==='number'){ STAR_COUNTS[kind+':'+key]=j.count; paintStarCounts() } }).catch(()=>{}) }
 function toggleIn(arr,v){const i=arr.indexOf(v); i>=0?arr.splice(i,1):arr.push(v); save()}
 
 let MKP={}, K26=null, mkIndex={}, factionStats={};
