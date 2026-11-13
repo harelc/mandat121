@@ -4303,6 +4303,54 @@ function renderMine(){
   const fc=(S.followCommittees||[]).map(id=>committeeById(id)).filter(Boolean); // followed committees may belong to either Knesset
   const ff=(S.followFactions||[]);
   const topMk=rank[0], topFac=fr[0];
+  /* ---- Activity feed: everything the entities you follow have done ----
+     Mapped from data already on the client (no extra fetches except the
+     lazy protocol-highlights file for "spoke in a session"):
+       📜 followed bill updated / changed stage   (ALLB.updated + status)
+       🗳️ a vote was held on a followed bill      (VOTES_ALL by item_id)
+       👤 a followed MK voted (and how)            (mkIndex votes)
+       ✍️ a followed MK initiated a new bill       (ALLB initiators)
+       🏛️ a followed committee held a session      (recent_sessions)
+       🗣️ a followed MK spoke in committee/plenum  (MK_HIGHLIGHTS appearances)
+       🏷️ a vote on a followed topic               (bill topics)
+       👥 a followed faction's members initiated a bill
+     Sorted newest-first, deduped, items after the previous visit are
+     badged. "Changed state" is honest: bills only expose their current
+     status + updated date, so we say "עודכן" with the current stage. */
+  if(fm.length&&!MK_HIGHLIGHTS) ensureMkHighlights().then(()=>{ if(view==='mine') renderMine() }).catch(()=>{});
+  const feed=[]; const feedSeen=new Set();
+  const pushFeed=(date,icon,title,sub,go)=>{ if(!date) return; const k=icon+'|'+title+'|'+date; if(feedSeen.has(k)) return; feedSeen.add(k); feed.push({date,icon,title,sub,go}) };
+  const fbIds=new Set(fb.map(b=>String(b.id)));
+  for(const b of fb){
+    pushFeed(b.updated,'📜',`חוק במעקב עודכן: ${displayText(b)}`,`השלב כעת: ${statusBucket(b)}${b.status?` · ${b.status}`:''}`,`openBillPage('${b.id}')`);
+  }
+  for(const v of VOTES_ALL){
+    if(v.item_id&&fbIds.has(String(v.item_id))){ const b=ALLB_BY_ID[v.item_id]; pushFeed(v.date,'🗳️',`הצבעה על חוק במעקב: ${b?displayText(b):''}`,`${v.for??''}–${v.against??''} · ${RL[v.reading]||v.kind_label||'הצבעת מליאה'}`,`openVote('${v.id}')`) }
+    if((S.followTopics||[]).length&&v.item_id&&ALLB_BY_ID[v.item_id]){ const ts=(ALLB_BY_ID[v.item_id].topics||[]).filter(t=>(S.followTopics||[]).includes(t)); if(ts.length) pushFeed(v.date,'🏷️',`הצבעה בנושא במעקב (${ts.join(', ')}): ${displayText(ALLB_BY_ID[v.item_id])}`,`${v.for??''}–${v.against??''}`,`openVote('${v.id}')`) }
+  }
+  const RV={1:'בעד',2:'נגד',3:'נמנע'};
+  for(const m of fm){
+    const rec=mkIndex[m.name];
+    if(rec) for(const v of rec.votes.slice(-4)) pushFeed(v.bill.vote_date,'👤',`${disp(m.name)} הצביע/ה ${RV[v.result]||''}: ${displayText(v.bill)}`,`סיעה: ${shortF(v.bill.mk_votes?.find(x=>x.mk_name===m.name)?.faction||rec.faction||'')} · התוצאה ${v.bill.total_for}–${v.bill.total_against}`,`openVote('${v.bill.id}')`);
+    const hl=MK_HIGHLIGHTS?.by_mk?.[normName(m.name)];
+    if(hl) for(const a of (hl.appearances||[]).slice(0,3)) pushFeed(a.date,'🗣️',`${disp(m.name)} דיבר/ה ב${a.kind==='plenum'?'מליאה':'וועדה'}: ${a.committee}`,`${a.turns} קטעים · ${a.words.toLocaleString('he-IL')} מילים`,openMkTurn(a,m.name));
+  }
+  for(const b of ALLB){
+    const inits=(b.initiators||[]).filter(i=>i.initiator);
+    const mineMk=inits.find(i=>S.followMks.includes(i.name));
+    if(mineMk&&!fbIds.has(String(b.id))) pushFeed(b.updated,'✍️',`הצעת חוק חדשה של ${disp(mineMk.name)}`,`${b.name} · ${statusBucket(b)}`,`openBillPage('${b.id}')`);
+  }
+  const sessSrc=[...(CMT?.recent_sessions||[]),...(K26CMT?.recent_sessions||[])];
+  for(const s of sessSrc){ if((S.followCommittees||[]).map(String).includes(String(s.committee_id))) pushFeed((s.start||s.date||'').slice(0,10),'🏛️',`ישיבת ועדה במעקב: ${cmtName(s.committee_id)}`,`${s.title||'ישיבת ועדה'}`,`openCommittee('${s.committee_id}')`) }
+  if(ff.length){
+    const memberNames=new Set();
+    for(const f of ff){ const cf=currentFactions().find(x=>x.name===f||shortF(x.name)===f); if(cf) cf.members.forEach(n=>memberNames.add(n));
+      const p=(K26?.parties||[]).find(x=>x.name===f); if(p) (p.elected||[]).forEach(n=>memberNames.add(n)) }
+    for(const b of ALLB){ const hit=(b.initiators||[]).find(i=>i.initiator&&memberNames.has(i.name)); if(hit&&!fbIds.has(String(b.id))) pushFeed(b.updated,'👥',`חבר/ת ${ff[0]} יזם/ה הצעת חוק`,`${b.name} · יוזם/ת: ${disp(hit.name)} · ${statusBucket(b)}`,`openBillPage('${b.id}')`) }
+  }
+  feed.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
+  const feedTop=feed.slice(0,18);
+  const feedNew=prevSeen?feed.filter(e=>(e.date||'')>prevSeen).length:0;
   $('#app').innerHTML=`
   <section class="cc-hero rise"><div style="display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap"><h2>🎛️ מרכז הבקרה שלי</h2><span class="small muted">המנדט ה־121 שלך — הצבעות, מעקב ומי מייצג אותך · נשמר מקומית בדפדפן זה בלבד</span><span style="margin-inline-start:auto"><button class="btn small" onclick="go('bills')">לחוקים ←</button> <button class="btn small" onclick="go('mks')">לח״כים ←</button> <button class="btn small" onclick="go('votes')">להצבעות ←</button> <button class="btn small" onclick="go('now')">לעכשיו ←</button></span></div>
   <div class="cc-tiles">
@@ -4315,6 +4363,9 @@ function renderMine(){
   </div>
   ${(S.followTopics||[]).length?`<div class="chips" style="margin-top:.7rem"><span class="pill-lbl">הנושאים שלי:</span>${S.followTopics.map(t=>`<button class="chip on" onclick="filterTopic('${jsq(t)}');go('votes')">${esc(t)}</button>`).join('')}</div>`:''}
   </section>
+  ${feedTop.length?`<div class="card pad rise" style="margin-bottom:.85rem"><h3>🔔 פעילות במעקב שלי ${feedNew?`<span class="chip" style="background:var(--against-dim);color:var(--against);font-weight:800">${feedNew} חדשות מאז הביקור הקודם</span>`:''} <small class="dim">כל מה שהחוקים, הח״כים, הוועדות, הסיעות והנושאים שאתם עוקבים אחריהם עשו — מהחדש לישן</small></h3>
+  <div class="rows" style="margin:.5rem -.9rem 0">${feedTop.map(e=>`<div class="row" onclick="${e.go}"><span style="font-size:1.05rem">${e.icon}</span><span class="flex">${esc(e.title)}<br><span class="dim small">${esc(e.sub||'')}</span></span>${prevSeen&&(e.date||'')>prevSeen?'<span class="chip" style="background:var(--against-dim);color:var(--against);font-weight:800">חדש</span>':''}<span class="dim small">${fmtDate(e.date)}</span></div>`).join('')}</div>
+  ${feed.length>feedTop.length?`<div class="small dim" style="margin-top:.45rem">מוצגות ${feedTop.length} הפעולות האחרונות מתוך ${feed.length} שנמצאו במעקב שלך.</div>`:''}</div>`:followCount()?`<div class="card pad rise" style="margin-bottom:.85rem"><h3>🔔 פעילות במעקב שלי</h3><p class="muted small" style="margin-top:.35rem">עוד לא נרשמה פעילות לישויות שבמעקב שלך במאגר הנטען — פעילות תופיע כאן כשהחוקים יתעדכנו, יתקיימו הצבעות וישיבות.</p></div>`:''}
   <div class="sec-title">שלי <small>הצבעות, מעקב ומי מייצג אותי — נשמר מקומית</small></div>
   ${prevSeen&&newSince.length?`<div class="card pad rise" style="margin-bottom:.85rem"><b>מאז הביקור הקודם (${fmtDate(prevSeen)}):</b> <span class="muted">${newSince.length} הצבעות חדשות במליאה.</span> <button class="btn" style="margin-inline-start:.5rem" onclick="go('now')">לראות ←</button></div>`:''}
   <div class="grid c2">
