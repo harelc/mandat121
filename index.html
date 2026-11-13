@@ -109,6 +109,7 @@ svg.icn{width:1.05em;height:1.05em;flex:none;fill:none;stroke:currentColor;strok
 .chips .chip{flex:none}
 /* long committee names must never widen a card/column: truncate, full name in tooltip */
 .chip.cmt{max-width:15rem;overflow:hidden;text-overflow:ellipsis;min-width:0}
+.chip.cmt.fol{background:linear-gradient(180deg,#f9efc9,#f3e3a1);border-color:#c9a227;color:#8a660a;box-shadow:0 1px 6px rgba(201,162,39,.35)}
 .card-top .chip{min-width:0}
 .chip.for{background:var(--for-dim);color:var(--for);border-color:#a9bf8f}.chip.against{background:var(--against-dim);color:var(--against);border-color:#e0aa94}
 .chip.abstain{background:var(--abstain-dim);color:var(--abstain);border-color:#dcc175}.chip.acc{background:var(--accent-dim);color:var(--accent);border-color:#9db1cf}
@@ -2600,8 +2601,9 @@ function agendaCmtHTML(s,max=4){
   // Link to the committee page only when this Knesset actually has that
   // committee in its data (K26 committees arrive after the sittings do).
   const canOpenCmt=KN===26?!!((K26CMT?.committees)||[]).find(c=>String(c.id)===String(s.committee_id)):!!CMT_BY_ID[s.committee_id];
-  const cmtBtn=canOpenCmt?`<button class="chip cmt" title="${esc(s.committee||'')}" onclick="openCommittee('${s.committee_id}')">`:`<span class="chip cmt" title="${esc(s.committee||'')}">`;
-  return `<div class="agenda-sess ${cancelled?'cancelled':''}"><div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap"><b>${esc((s.start||'').slice(11,16))}</b>${cmtBtn}<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(s.committee||'ועדה')} ←${canOpenCmt?'</button>':'</span>'}${followedCommittee(s.committee_id)?'<span class="chip abstain">★ במעקב שלי</span>':''}${s.type?`<span class="chip">${esc(s.type)}</span>`:''}${s.status?`<span class="chip ${cancelled?'against':''}">${esc(s.status)}</span>`:''}<button class="btn ghost small" style="padding:.25rem .65rem;margin-inline-start:auto" onclick="openSession('${s.id}')">לישיבה ←</button></div>
+  const folCmt=followedCommittee(s.committee_id);
+  const cmtBtn=canOpenCmt?`<button class="chip cmt${folCmt?' fol':''}" title="${esc(s.committee||'')}${folCmt?' · במעקב שלי':''}" onclick="openCommittee('${s.committee_id}')">`:`<span class="chip cmt${folCmt?' fol':''}" title="${esc(s.committee||'')}">`;
+  return `<div class="agenda-sess ${cancelled?'cancelled':''}"><div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap"><b>${esc((s.start||'').slice(11,16))}</b>${cmtBtn}${folCmt?'★ ':''}<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(s.committee||'ועדה')} ←${canOpenCmt?'</button>':'</span>'}${s.type?`<span class="chip">${esc(s.type)}</span>`:''}${s.status?`<span class="chip ${cancelled?'against':''}">${esc(s.status)}</span>`:''}<button class="btn ghost small" style="padding:.25rem .65rem;margin-inline-start:auto" onclick="openSession('${s.id}')">לישיבה ←</button></div>
   <div class="agenda-name small" style="margin-top:.25rem">${s.location?`<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 21s-6.5-5.4-6.5-10.3A6.5 6.5 0 0 1 12 4a6.5 6.5 0 0 1 6.5 6.7C18.5 15.6 12 21 12 21z"/><circle cx="12" cy="10.5" r="2.3"/></svg> ${esc(s.location)} · `:''}${s.items.length?`${s.items.length} נושאים על סדר היום`:'סדר היום טרם פורסם'}</div>
   ${s.items.length?`<ul class="agenda-items">${s.items.slice(0,max).map(agendaItemHTML).join('')}${s.items.length>max?`<li class="dim">…ועוד ${s.items.length-max} נושאים</li>`:''}</ul>`:''}</div>`;
 }
