@@ -49,9 +49,22 @@ export default async function handler(request) {
   const storeKey = `s:${kind}:${key}`;
   const data = (await store.get(storeKey, { type: "json" }).catch(() => null)) || { u: [] };
   const i = data.u.indexOf(uidHash);
+  const changed = (on && i < 0) || (!on && i >= 0);
   if (on && i < 0) data.u.push(uidHash);
   if (!on && i >= 0) data.u.splice(i, 1);
   if (data.u.length) await store.setJSON(storeKey, data);
   else await store.delete(storeKey).catch(() => {});
+  // Admin audit log (read only via netlify/functions/admin.mjs, token-gated):
+  // one entry per actual state change, per Jerusalem day, capped.
+  if (changed) {
+    try {
+      const logStore = getStore({ name: "admin-log", consistency: "strong" });
+      const day = new Intl.DateTimeFormat("en-CA", { timeZone: "Asia/Jerusalem", year: "numeric", month: "2-digit", day: "2-digit" }).format(new Date());
+      const lk = `star:${day}`;
+      const log = (await logStore.get(lk, { type: "json" }).catch(() => null)) || [];
+      log.push({ t: new Date().toISOString(), kind, key, action: on ? "follow" : "unfollow", count: data.u.length, uid: uidHash.slice(0, 8) });
+      await logStore.setJSON(lk, log.slice(-500));
+    } catch { /* logging must never break the toggle */ }
+  }
   return Response.json({ count: data.u.length }, { headers: { "Cache-Control": "no-store" } });
 }
