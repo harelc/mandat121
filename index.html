@@ -2309,7 +2309,7 @@ function renderProtocol(){
   box.innerHTML=`
   <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,14).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${protoFilter.speaker&&protoFilter.speaker!==n?'off':''}" onclick="protoFilter.speaker=protoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderProtocol()" title="${s.turns} קטעים · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
   ${protoFilter.speaker?`<button class="chip" onclick="protoFilter.speaker='';renderProtocol()">✕ כל הדוברים</button>`:''}</div>
-  <input type="search" placeholder="חיפוש בפרוטוקול…" value="${esc(protoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="protoFilter.q=this.value;protoFilter.hlOnly=true;protoFilter.hl=this.value.trim()?[this.value.trim()]:[];_markState.proto={i:-1};$('#protoTurns').innerHTML=protoTurnsHTML();protoSyncHitBar('proto')">
+  <input type="search" placeholder="חיפוש בפרוטוקול… (Enter — לתוצאה הראשונה)" onkeydown="if(event.key==='Enter'){event.preventDefault();protoMarkNav('proto',1)}" value="${esc(protoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="protoFilter.q=this.value;protoFilter.hlOnly=true;protoFilter.hl=this.value.trim()?[this.value.trim()]:[];_markState.proto={i:-1};$('#protoTurns').innerHTML=protoTurnsHTML();protoSyncHitBar('proto')">
   <div class="small dim" style="margin-bottom:.5rem">${PROTO_CUR.turns.filter(t=>t.role!=='topic').length} קטעים · ${spk.length} דוברים${protoFilter.q?` · ${protoOccurrences(PROTO_CUR,protoFilter.q)} אזכורים מודגשים בכל הפרוטוקול`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו</div>
   <div class="proto-layout">${protoTocHTML(PROTO_CUR,'proto')}<div id="protoTurns" style="flex:1;min-width:0">${protoTurnsHTML()}</div></div>
   ${protoHitBarHTML('proto')}`;
@@ -2357,7 +2357,7 @@ function protoHitBarHTML(scope){
 function protoSyncHitBar(scope){
   const has=!!document.querySelector(`#${scope}Turns mark`);
   const bar=document.querySelector(`#${scope}HitBar`); if(bar) bar.style.display=has?'flex':'none';
-  const pos=document.querySelector(`#${scope}HitPos`); if(pos&&has){ const i=_markState[scope]?.i??-1, n=document.querySelectorAll(`#${scope}Turns mark`).length; pos.textContent=i>=0?`${i+1} / ${n}`:`0 / ${n}` }
+  const pos=document.querySelector(`#${scope}HitPos`); if(pos&&has){ const i=_markState[scope]?.i??-1, n=document.querySelectorAll(`#${scope}Turns mark`).length; pos.textContent=i>=0?`${i+1} / ${n}`:`${n} תוצאות` }
 }
 async function togglePlenumProtocol(sid){
   const box=$('#plenumProtoBox'); if(!box) return;
@@ -2384,7 +2384,7 @@ function renderPlenumProtocol(){
   box.innerHTML=`
   <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,16).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${plenumProtoFilter.speaker&&plenumProtoFilter.speaker!==n?'off':''}" onclick="plenumProtoFilter.speaker=plenumProtoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderPlenumProtocol()" title="${s.turns} קטעים · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
   ${plenumProtoFilter.speaker?`<button class="chip" onclick="plenumProtoFilter.speaker='';renderPlenumProtocol()">✕ כל הדוברים</button>`:''}</div>
-  <input type="search" placeholder="חיפוש בפרוטוקול…" value="${esc(plenumProtoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="plenumProtoFilter.q=this.value;plenumProtoFilter.hl=this.value.trim()?[this.value.trim()]:[];_markI=-1;$('#plenumTurns').innerHTML=protoTurnsHTML(PLENUM_CUR,plenumProtoFilter);const o=$('#plenumOcc');if(o)o.textContent=plenumProtoFilter.hl.length?protoOccurrences(PLENUM_CUR,plenumProtoFilter.hl):'';_markState.plenum={i:-1};protoSyncHitBar('plenum')">
+  <input type="search" placeholder="חיפוש בפרוטוקול… (Enter — לתוצאה הראשונה)" onkeydown="if(event.key==='Enter'){event.preventDefault();protoMarkNav('plenum',1)}" value="${esc(plenumProtoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="plenumProtoFilter.q=this.value;plenumProtoFilter.hl=this.value.trim()?[this.value.trim()]:[];_markI=-1;$('#plenumTurns').innerHTML=protoTurnsHTML(PLENUM_CUR,plenumProtoFilter);const o=$('#plenumOcc');if(o)o.textContent=plenumProtoFilter.hl.length?protoOccurrences(PLENUM_CUR,plenumProtoFilter.hl):'';_markState.plenum={i:-1};protoSyncHitBar('plenum')">
   <div class="small dim" style="margin-bottom:.5rem">${PLENUM_CUR.turns.filter(t=>t.role!=='topic').length} קטעים · ${spk.length} דוברים${HL?` · <span id="plenumOcc">${occ}</span> אזכורים מודגשים בכל הפרוטוקול`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו
   <span id="plenumMarkNav" style="display:${occ?'':'none'};white-space:nowrap"> · ניווט בין התוצאות: בסרגל הצף למטה</span></div>
   <div class="proto-layout">${protoTocHTML(PLENUM_CUR,'plenum')}<div id="plenumTurns" style="flex:1;min-width:0">${protoTurnsHTML(PLENUM_CUR,plenumProtoFilter)}</div></div>
