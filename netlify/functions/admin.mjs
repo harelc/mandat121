@@ -35,14 +35,23 @@ fetch(location.pathname + '?data=1', { headers: { 'x-hit-token': tok }, cache: '
  .then(function(j){
    var N = function(x){ return (x||0).toLocaleString('he-IL') };
    var esc = function(s){ return String(s==null?'':s).replace(/[&<>"]/g, function(c){ return {'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c] }) };
+   var BASE = 'https://mandat121.netlify.app/';
+   var linkFor = function(kind, key){
+     if(kind==='mk') return BASE + '#mk=' + encodeURIComponent(key);
+     if(kind==='bill') return BASE + '#bill=' + encodeURIComponent(key);
+     if(kind==='committee') return BASE + '#committee=' + encodeURIComponent(key);
+     if(kind==='faction') return BASE + '#faction=' + encodeURIComponent(key);
+     return '';
+   };
+   var entLink = function(kind, key){ var u = linkFor(kind, key); var label = esc(key); return u ? '<a href="' + u + '" target="_blank" rel="noopener">' + label + ' ↗</a>' : label };
    var h = '';
    h += '<div class="card"><h3>תנועה</h3>'
      + '<div>היום: <b class="n">' + N(j.traffic.today.pageviews) + '</b> צפיות · ' + N(j.traffic.today.unique_ips) + ' מבקרים ייחודיים · בשעה האחרונה ' + N(j.traffic.hour.pageviews) + ' צפיות · <b>עכשיו באתר: ' + N(j.traffic.online) + '</b></div>'
      + '<div class="muted">דפים מובילים היום: ' + j.traffic.top_pages.map(function(p){ return esc(p.path) + ' (' + N(p.pageviews) + ')' }).join(' · ') + '</div></div>';
    h += '<div class="card"><h3>★ הכי נעקבים (' + j.stars.total_entities + ' ישויות)</h3><table><tr><th>ישות</th><th>סוג</th><th>עוקבים</th></tr>'
-     + j.stars.top.map(function(s){ return '<tr><td>' + esc(s.key) + '</td><td>' + esc(s.kind) + '</td><td>' + N(s.count) + '</td></tr>' }).join('') + '</table></div>';
+     + j.stars.top.map(function(s){ return '<tr><td>' + entLink(s.kind, s.key) + '</td><td>' + esc(s.kind) + '</td><td>' + N(s.count) + '</td></tr>' }).join('') + '</table></div>';
    h += '<div class="card"><h3>יומן פעולות ★ (אחרונות ' + j.star_log.length + ')</h3><table><tr><th>זמן</th><th>פעולה</th><th>ישות</th><th>סוג</th><th>סה״כ אחרי</th><th>מבקר</th></tr>'
-     + j.star_log.slice().reverse().map(function(e){ return '<tr><td>' + esc(e.t.replace('T',' ').slice(0,19)) + '</td><td>' + (e.action==='follow'?'★ follow':'☆ unfollow') + '</td><td>' + esc(e.key) + '</td><td>' + esc(e.kind) + '</td><td>' + N(e.count) + '</td><td><code>' + esc(e.uid) + '</code></td></tr>' }).join('') + '</table></div>';
+     + j.star_log.slice().reverse().map(function(e){ return '<tr><td>' + esc(e.t.replace('T',' ').slice(0,19)) + '</td><td>' + (e.action==='follow'?'★ follow':'☆ unfollow') + '</td><td>' + entLink(e.kind, e.key) + '</td><td>' + esc(e.kind) + '</td><td>' + N(e.count) + '</td><td><code>' + esc(e.uid) + '</code></td></tr>' }).join('') + '</table></div>';
    h += '<div class="card"><h3>תנועה לפי שעה (אחרונות 24)</h3><table><tr><th>שעה</th><th>צפיות</th><th>ייחודיים</th></tr>'
      + j.traffic.hours.slice(0,24).map(function(x){ return '<tr><td>' + esc(x.hour) + '</td><td>' + N(x.pageviews) + '</td><td>' + N(x.unique_ips) + '</td></tr>' }).join('') + '</table></div>';
    h += '<p class="muted">נוצר ' + esc(j.generated) + ' · הנתונים הם אגרגטים + מזהי מבקר חתוכים ומגובבים בלבד — אין IP גולמי ואין מזהים מלאים.</p>';
