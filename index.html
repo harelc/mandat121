@@ -1138,7 +1138,7 @@ function voteModel26(id){
     vote_date:v.date,kind:v.kind||null,kind_label:v.kind_label||'',method_id:v.method_id||null,secret:v.secret||null,
     has_tally:v.for!=null&&v.against!=null,bill_type:'',topics:[],doc_url:null,summary:null,synopsis:null,
     total_for:v.for||0,total_against:v.against||0,total_abstain:v.abstain||0,
-    mk_votes:rows.map(([i,c])=>{const nm=VOTE_RES26.names[i]; const e=k26Entry(nm); return {mk_name:nm,result:c,faction:(e&&e.party)||''}})};
+    mk_votes:rows.map(([i,c])=>{const nm=VOTE_RES26.names[i]; const e=k26Entry(nm); return {mk_name:nm,result:c,faction:(e&&e.party&&e.party.name)||''}})};
   m.is_accepted=m.has_tally?m.total_for>m.total_against:(v.accepted!=null?!!v.accepted:null);
   VOTE_MODELS26[key]=m; return m;
 } // K26 layers as the daily builders publish them (k26_bills/votes/committees/committee_members.json); empty until then, K26 views fall back to their "not yet" states
