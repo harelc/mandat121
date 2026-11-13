@@ -3213,8 +3213,10 @@ function mkCommitteesHTML(name){
   if(!list.length) return '';
   const roleLbl={chair:'יו״ר',member:'חבר/ה',substitute:'מ״מ'};
   const rank=r=>r.role==='chair'?0:r.role==='member'?1:2;
-  const cur=list.filter(x=>!x.to).sort((a,b)=>rank(a)-rank(b));
-  const past=list.filter(x=>x.to);
+  // K25 archive: every stint is closed in OData now — "current" means the
+  // stints in force at that committee's last session, via cmtRoster names.
+  const cur=KN===25?list.filter(x=>cmtRoster({id:x.committee_id,last_session:(CMT_BY_ID[x.committee_id]||{}).last_session}).some(m=>m.name===name&&m.committee_id===x.committee_id)).sort((a,b)=>rank(a)-rank(b)):list.filter(x=>!x.to).sort((a,b)=>rank(a)-rank(b));
+  const past=list.filter(x=>!cur.includes(x));
   // The official roster gives a chair two concurrent stints in the same
   // committee (chair + member). Dedup by committee only — `cur` is sorted
   // chair-first, so the chair stint wins and the person appears once.
@@ -3231,7 +3233,7 @@ function mkCommitteesHTML(name){
   const pastShown=mkPastCmtShowAll?pastD:pastD.slice(0,6);
   const cmtChip=x=>`<button class="chip ${x.role==='chair'?'acc':''}" onclick="openCommittee('${x.committee_id}')"${x.from?` title="${esc(fmtDate(x.from))}${x.to?` – ${esc(fmtDate(x.to))}`:''}"`:''}>${x.role==='chair'?'★ ':''}${esc(x.committee||cmtName(x.committee_id))} · ${roleLbl[x.role]} ←</button>`;
   return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ועדות בכנסת ${KN}</h3>
-  ${curD.length?`<div class="chips" style="margin-top:.45rem">${curD.map(cmtChip).join('')}</div>`:'<p class="muted small" style="margin-top:.35rem">לא חבר/ה כיום באף ועדה.</p>'}
+  ${curD.length?`<div class="chips" style="margin-top:.45rem">${curD.map(cmtChip).join('')}</div>`:`<p class="muted small" style="margin-top:.35rem">${KN===25?'לא חבר/ה באף ועדה בסיום פעילותה.':'לא חבר/ה כיום באף ועדה.'}</p>`}
   ${pastD.length?`<div style="margin-top:.55rem"><div class="small dim">בעבר (${pastD.length}) — לחיצה פותחת את דף הוועדה:</div><div class="chips" style="margin-top:.35rem;flex-wrap:wrap;overflow-x:visible">${pastShown.map(cmtChip).join('')}</div>${pastD.length>pastShown.length?`<div style="text-align:center;margin-top:.7rem"><button class="btn" onclick="mkPastCmtShowAll=true;renderMkDetail()">הצגת כל ${pastD.length} הוועדות הקודמות</button></div>`:mkPastCmtShowAll&&pastD.length>6?`<div style="text-align:center;margin-top:.7rem"><button class="btn ghost" onclick="mkPastCmtShowAll=false;renderMkDetail()">קיפול הרשימה</button></div>`:''}</div>`:''}</div>`;
 }
 function committeeMembersHTML(c){
@@ -3239,14 +3241,13 @@ function committeeMembersHTML(c){
   if(!all.length) return '';
   const roleLbl={chair:'יו״ר',member:'חבר/ה',substitute:'מ״מ'};
   const rank=r=>r.role==='chair'?0:r.role==='member'?1:2;
-  const cur=all.filter(x=>!x.to).sort((a,b)=>rank(a)-rank(b)||disp(a.name).localeCompare(disp(b.name),'he'));
-  // Same dual-stint issue as on MK pages: a current chair also carries an
-  // open member stint. Dedup by person only — `cur` is sorted chair-first,
-  // so they appear once, as chair.
-  const seen=new Set(), curD=cur.filter(x=>{const k=x.name; if(seen.has(k))return false; seen.add(k); return true});
-  const pastN=new Set(all.filter(x=>x.to).map(x=>x.name)).size;
-  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> חברי הוועדה כיום (${curD.length})</h3>
-  ${curD.length?`<div class="rows" style="margin:.5rem -.9rem 0">${curD.map(x=>{const fac=KN===26?(K26_FACTIONS[x.name]||''):((MKP[x.name]||mkIndex[x.name]||{}).faction||''); return `<div class="row" onclick="openMk('${jsq(x.name)}')">${avatar(x.name,fac,32)}<span class="flex">${esc(disp(x.name))}<br><span class="dim small">${esc(shortF(fac))}</span></span>${x.role==='chair'?'<span class="chip acc">★ יו״ר</span>':x.role==='substitute'?'<span class="chip">מ״מ</span>':'<span class="chip acc">לכרטיס ←</span>'}</div>`}).join('')}</div>`:'<p class="muted small" style="margin-top:.35rem">אין חברים נוכחיים במאגר.</p>'}
+  const curD=cmtRoster(c); // K26: open stints; K25: roster in force at last session (see cmtAsOf)
+  const inRoster=new Set(curD.map(x=>x.name));
+  const pastN=new Set(all.filter(x=>!inRoster.has(x.name)).map(x=>x.name)).size;
+  const asOf=KN===25?cmtAsOf(c):null;
+  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> ${KN===25?`חברי הוועדה כפי שהייתה בפעילותה (${curD.length})`:`חברי הוועדה כיום (${curD.length})`}</h3>
+  ${KN===25&&asOf?`<p class="small dim" style="margin-top:.3rem">ההרכב שהיה בתוקף בישיבתה האחרונה (${fmtDate(asOf)}) — כנסת 25 הסתיימה, והמאגר הרשמי סגר בדיעבד את כל המינויים; ההרכב ההיסטורי נשמר כאן כפי שהיה.</p>`:''}
+  ${curD.length?`<div class="rows" style="margin:.5rem -.9rem 0">${curD.map(x=>{const fac=KN===26?(K26_FACTIONS[x.name]||''):((MKP[x.name]||mkIndex[x.name]||{}).faction||''); return `<div class="row" onclick="openMk('${jsq(x.name)}')">${avatar(x.name,fac,32)}<span class="flex">${esc(disp(x.name))}<br><span class="dim small">${esc(shortF(fac))}</span></span>${x.role==='chair'?'<span class="chip acc">★ יו״ר</span>':x.role==='substitute'?'<span class="chip">מ״מ</span>':'<span class="chip acc">לכרטיס ←</span>'}</div>`}).join('')}</div>`:'<p class="muted small" style="margin-top:.35rem">אין חברים במאגר.</p>'}
   ${pastN?`<div class="small dim" style="margin-top:.4rem">${pastN} ח״כים נוספים כיהנו בוועדה במהלך הקדנציה.</div>`:''}</div>`;
 }
 /* One person, two Knessets: a shared strip atop the MK page in both
@@ -3975,8 +3976,23 @@ function renderPlenumSession(){
    statutory duty). committeeFilter.type holds a tier key
    ('perm'|'sub'|'special'|'joint'), not a raw type string. */
 const CMT_TIER=c=>(c.type==='ועדה ראשית'||c.type==='ועדת הכנסת')?'perm':c.type==='ועדת משנה'?'sub':c.type==='ועדה מיוחדת'?'special':'joint';
-const cmtChair=c=>{ const x=(CMEM.by_committee[String(c.id)]||[]).find(m=>!m.to&&m.role==='chair'); return x?x.name:null };
-const cmtMemberCount=c=>new Set((CMEM.by_committee[String(c.id)]||[]).filter(m=>!m.to).map(m=>m.name)).size;
+/* K25 is an archive: OData now reports every K25 committee IsCurrent=false
+   and closes every KNS_PersonToPosition stint at term end, so "!to" / c.current
+   no longer mean "was a member / was operating". Show each K25 committee as it
+   was when active: the roster in force on its last session date (fallback:
+   latest stint end). K26 keeps the live !to semantics. */
+const cmtAsOf=c=>{ if(KN!==25) return null; const all=(CMEM.by_committee[String(c.id)]||[]); return c.last_session||all.reduce((m,x)=>((x.to||x.from||'')>m?(x.to||x.from||''):m),'')||null };
+const _rosterCache={};
+const cmtRoster=c=>{ if(_rosterCache[c.id]) return _rosterCache[c.id]; const all=((KN===26?K26CMEM:CMEM).by_committee[String(c.id)]||[]); if(KN===26) return all.filter(x=>!x.to);
+  const asOf=cmtAsOf(c); if(!asOf) return [];
+  const covers=all.filter(x=>(x.from||'')<=asOf&&(!x.to||x.to>=asOf));
+  // committees whose stints were all mass-closed before their last session fall back to the latest-starting stints
+  const pool=covers.length?covers:all.filter(x=>x.from===all.reduce((m,y)=>((y.from||'')>m?(y.from||''):m),''));
+  const rank=r=>r.role==='chair'?0:r.role==='member'?1:2, seen=new Set();
+  return _rosterCache[c.id]=pool.sort((a,b)=>rank(a)-rank(b)||disp(a.name).localeCompare(disp(b.name),'he')).filter(x=>{if(seen.has(x.name))return false;seen.add(x.name);return true}) };
+const cmtChair=c=>{ const x=cmtRoster(c).find(m=>m.role==='chair'); return x?x.name:null };
+const cmtMemberCount=c=>cmtRoster(c).length;
+const cmtMembersLabel=KN25=>KN===25?'חברים בסיום פעילותה':'חברים כיום';
 const miniStar=c=>`<button class="mini-star ${followedCommittee(c.id)?'on':''}" title="מעקב אחרי ${esc(c.name)}" aria-label="מעקב ${esc(c.name)}" onclick="event.stopPropagation();toggleFollow('committee','${c.id}',this)"><span class="star-ic">${followedCommittee(c.id)?'★':'☆'}</span><span class="star-n" data-starc="committee:${c.id}" ${starCountOf('committee',c.id)?'':'style="display:none"'}>${starCountOf('committee',c.id)||''}</span></button>`;
 function renderCommittees(){
   if(KN===26){ if(K26CMT?.committees?.length){ const cs=[...K26CMT.committees].sort((a,b)=>(b.sessions_total||0)-(a.sessions_total||0));
@@ -4006,10 +4022,10 @@ function renderCommittees(){
   <div class="tier-head"><span class="tier-no">א׳</span><h2>ועדות קבועות — עמודי התווך</h2><span class="tier-count">${byTier.perm.length} ועדות · מדורגות לפי ישיבות</span></div>
   <p class="tier-sub">מעוגנות בתקנון הכנסת וחיות כל הקדנציה. <b>כאן מתבשלת כמעט כל החקיקה</b> — אורך הפס הוא חלקה של כל ועדה מישיבות הוועדה העמוסה ביותר, ${esc((CMT.committees.find(c=>(c.sessions_total||0)===maxSess)||{}).name||'')}.</p>
   <div class="perm-list">${byTier.perm.map((c,i)=>{ const chair=cmtChair(c), members=cmtMemberCount(c); return `
-    <article class="perm-row ${c.current?'':'dead'} ${followedCommittee(c.id)?'followed':''}" onclick="openCommittee('${c.id}')">
+    <article class="perm-row ${KN===25||c.current?'':'dead'} ${followedCommittee(c.id)?'followed':''}" onclick="openCommittee('${c.id}')">
       <div class="perm-rank">${String(i+1).padStart(2,'0')}</div>
       <div class="perm-main"><h3>${esc(c.name)}</h3>
-        <div class="perm-meta">${chair?`${avatar(chair,(MKP[chair]||mkIndex[chair]||{}).faction||'',26)}<span>יו״ר <b style="color:var(--text)">${esc(disp(chair))}</b></span>·`:''}${members?`<span>${members} חברים כיום</span>·`:''}<span>${(c.dataset_bills||0).toLocaleString('he-IL')} חוקים מהמאגר נידונו בה</span>·<span>ישיבה אחרונה: ${c.last_session?fmtDate(c.last_session):'—'}</span>${recentCount[c.id]?`·<span>${recentCount[c.id]} מפורטות לאחרונה</span>`:''}${c.current?'':'·<span>אינה פעילה</span>'}</div>
+        <div class="perm-meta">${chair?`${avatar(chair,(MKP[chair]||mkIndex[chair]||{}).faction||'',26)}<span>יו״ר <b style="color:var(--text)">${esc(disp(chair))}</b></span>·`:''}${members?`<span>${members} ${KN===25?'חברים בסיום פעילותה':'חברים כיום'}</span>·`:''}<span>${(c.dataset_bills||0).toLocaleString('he-IL')} חוקים מהמאגר נידונו בה</span>·<span>ישיבה אחרונה: ${c.last_session?fmtDate(c.last_session):'—'}</span>${recentCount[c.id]?`·<span>${recentCount[c.id]} מפורטות לאחרונה</span>`:''}${KN===25||c.current?'':'·<span>אינה פעילה</span>'}</div>
       </div>
       <div class="perm-stat"><b>${(c.sessions_total||0).toLocaleString('he-IL')}</b> <span>ישיבות בקדנציה</span><div class="perm-bar"><i style="width:${Math.max(2,Math.round((c.sessions_total||0)/maxSess*100))}%"></i></div></div>
       ${starBtn('committee',c.id,c.name)}
@@ -4149,7 +4165,7 @@ function renderCommitteeDetail(){
   app.innerHTML=`
   ${backBtnHTML('committees','› ועדות')}
   <article class="card pad rise" style="margin-top:.6rem">
-    <div style="display:flex;gap:.6rem;align-items:flex-start"><div style="flex:1"><div class="card-top"><span class="chip ${CMT_TIER(c)==='perm'?'acc':''}">${{perm:'שכבה א׳ · ועדה קבועה',sub:'שכבה ב׳ · ועדת משנה',special:'שכבה ג׳ · ועדה מיוחדת',joint:'שכבה ד׳ · ועדה משותפת'}[CMT_TIER(c)]}</span>${c.type?`<span class="chip">${esc(c.type)}</span>`:''}${c.category&&c.category!==c.type?`<span class="chip">${esc(c.category)}</span>`:''}${c.current?'<span class="chip acc">פעילה</span>':'<span class="chip against">סיימה את פעילותה</span>'}</div>
+    <div style="display:flex;gap:.6rem;align-items:flex-start"><div style="flex:1"><div class="card-top"><span class="chip ${CMT_TIER(c)==='perm'?'acc':''}">${{perm:'שכבה א׳ · ועדה קבועה',sub:'שכבה ב׳ · ועדת משנה',special:'שכבה ג׳ · ועדה מיוחדת',joint:'שכבה ד׳ · ועדה משותפת'}[CMT_TIER(c)]}</span>${c.type?`<span class="chip">${esc(c.type)}</span>`:''}${c.category&&c.category!==c.type?`<span class="chip">${esc(c.category)}</span>`:''}<span class="chip acc">כנסת 25 · כפי שהייתה בפעילותה</span></div>
     <h1 style="font-size:1.45rem;line-height:1.35">${esc(c.name)}</h1></div>${starBtn('committee',c.id,c.name)}</div>
     <div class="kpis"><div class="kpi"><b>${(c.sessions_total||0).toLocaleString('he-IL')}</b><span>ישיבות בקדנציה</span></div><div class="kpi"><b>${bills.length.toLocaleString('he-IL')}</b><span>חוקים מהמאגר נידונו כאן</span></div><div class="kpi"><b>${c.last_session?fmtDate(c.last_session):'—'}</b><span>ישיבה אחרונה</span></div></div>
   </article>
