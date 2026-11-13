@@ -447,9 +447,10 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 /* MK */
 .mk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:.7rem}
 .mk-card{padding:.9rem .6rem;text-align:center;cursor:pointer;transition:transform .15s;position:relative}
-.mk-card .star-corner{position:absolute;top:.4rem;left:.4rem;z-index:1}
+.mk-card .star-corner{position:absolute;top:.5rem;left:.5rem;z-index:1}
+.mk-card .star-corner .chip{font-size:.6rem;padding:.02rem .32rem;line-height:1.45}
 .mk-card:hover{transform:translateY(-3px)}
-.mk-card .avatar{margin:0 auto .5rem}
+.mk-card .avatar{margin:.45rem auto .5rem}
 /* currently in the Knesset building (live MkLobby read): green frame +
    avatar ring + pill, same green language as the hemicycle presence ring */
 .mk-card.present{border-color:#7fb35e;background:linear-gradient(180deg,#eff7e2,var(--bg2));box-shadow:0 0 0 2px rgba(58,138,24,.45),var(--shadow)}
@@ -1554,7 +1555,7 @@ function ensureK25Archive(){
     for(const v of VOTES_ALL){
       const rows=VOTE_RES.votes[String(v.id)]; if(!rows?.length) continue;
       const lite=v.item_id?ALLB_BY_ID[v.item_id]:null;
-      const billObj={id:String(v.id),bill_id:v.item_id||null,name:v.title,vote_date:v.date,vote_reading:KIND_READING[v.kind]??null,kind_label:v.kind_label,summary:null,topics:lite?.topics||[],mk_votes:rows.map(([i,c])=>({mk_name:VOTE_RES.names[i],result:c,faction:factionOn(VOTE_RES.names[i],v.date)}))};
+      const billObj={id:String(v.id),bill_id:v.item_id||null,name:v.title,vote_date:v.date,vote_reading:KIND_READING[v.kind]??null,kind_label:v.kind_label,summary:null,topics:lite?.topics||[],total_for:v.for||0,total_against:v.against||0,total_abstain:v.abstain||0,mk_votes:rows.map(([i,c])=>({mk_name:VOTE_RES.names[i],result:c,faction:factionOn(VOTE_RES.names[i],v.date)}))};
       for(const [i,c] of rows){
         const nm=VOTE_RES.names[i];
         const m=mkIndex[nm]??={name:nm,faction:'',votes:[]};
@@ -4532,7 +4533,7 @@ function renderMine(){
   const RV={1:'בעד',2:'נגד',3:'נמנע'};
   for(const m of fm){
     const rec=mkIndex[m.name];
-    if(rec) for(const v of rec.votes.slice(-4)) pushFeed(v.bill.vote_date,'👤',`${disp(m.name)} הצביע/ה ${RV[v.result]||''}: ${displayText(v.bill)}`,`סיעה: ${shortF(v.bill.mk_votes?.find(x=>x.mk_name===m.name)?.faction||rec.faction||'')} · התוצאה ${v.bill.total_for}–${v.bill.total_against}`,`openVote('${v.bill.id}')`);
+    if(rec) for(const v of rec.votes.slice(-4)) pushFeed(v.bill.vote_date,'👤',`${disp(m.name)} הצביע/ה ${RV[v.result]||''}: ${displayText(v.bill)}`,`סיעה: ${shortF(v.bill.mk_votes?.find(x=>normName(x.mk_name)===normName(m.name))?.faction||rec.faction||'')} · התוצאה ${v.bill.total_for}–${v.bill.total_against}`,`openVote('${v.bill.id}')`);
     const hl=MK_HIGHLIGHTS?.by_mk?.[normName(m.name)];
     if(hl) for(const a of (hl.appearances||[]).slice(0,3)) pushFeed(a.date,'🗣️',`${disp(m.name)} דיבר/ה ב${a.kind==='plenum'?'מליאה':'וועדה'}: ${a.committee}`,`${a.turns} קטעים · ${a.words.toLocaleString('he-IL')} מילים`,openMkTurn(a,m.name));
   }
