@@ -2278,22 +2278,30 @@ let _billLinkMaps=null, _billLinkSrc=0;
 function billLinkMaps(){
   const src=ALLB.length*100000+K26B.length;
   if(_billLinkMaps&&_billLinkSrc===src) return _billLinkMaps;
-  const byPriv={}, byName={};
+  const byPriv={}, byNum={}, byName={};
   const norm=s=>String(s||'').normalize('NFC').replace(/[^\p{L}\p{N} ]/gu,' ').replace(/\s+/g,' ').trim();
   for(const b of [...ALLB,...K26B]){
     if(b.private_number!=null) byPriv[String(b.private_number)]=b;
-    if(b.name) byName[norm(b.name)]=b;
+    if(b.number!=null) byNum[String(b.number)]=b;
+    if(b.name){ // protocols tag enacted laws as הצעת חוק X while the index calls them חוק X (and vice versa) — index every prefix variant
+      const n=norm(b.name);
+      byName[n]=b;
+      byName[n.replace(/^הצעת /,'')]=b;
+      if(n.startsWith('הצעת חוק ')) byName['חוק '+n.slice(9)]=b;
+      if(n.startsWith('חוק ')) byName['הצעת '+n]=b;
+    }
   }
-  _billLinkMaps={byPriv,byName,norm}; _billLinkSrc=src; return _billLinkMaps;
+  _billLinkMaps={byPriv,byNum,byName,norm}; _billLinkSrc=src; return _billLinkMaps;
 }
 function billLinksPrepare(text){
-  const {byPriv,byName,norm}=billLinkMaps();
+  const {byPriv,byNum,byName,norm}=billLinkMaps();
   const links=[]; const tok=i=>`\uE000${i}\uE001`;
   let s=String(text??'');
   const chip=(b,label)=>b?`<a class="bill-ref" href="#" onclick="event.preventDefault();event.stopPropagation();${K26B.includes(b)?`openBill26('${b.id}')`:`openBillPage('${b.id}')`}" title="לדף הצעת החוק">${esc(label)}</a>`:`<span class="bill-ref dim">${esc(label)}</span>`;
-  const bracketBill=(()=>{ const m=s.match(/\[הצעת חוק\s+פ\/(\d+)\/\d+/); return m?byPriv[String(+m[1])]:null })();
+  const bracketBill=(()=>{ const m=s.match(/\[הצעת חוק\s+פ\/(\d+)\/\d+/)||s.match(/מס'\s*כ\/(\d+)/)||s.match(/חוב'\s*מ\/(\d+)/); if(!m) return null; return byPriv[String(+m[1])]||byNum[String(+m[1])]||null })();
   s=s.replace(/<<\s*הצח\s*>>([\s\S]*?)<<\s*הצח\s*>>/g,(m,name)=>{ const b=byName[norm(name)]||bracketBill; links.push(chip(b,name.trim())); return tok(links.length-1) });
   s=s.replace(/\[הצעת חוק\s+פ\/(\d+)\/\d+[^\]]*\]/g,(m,num)=>{ const b=byPriv[String(+num)]; links.push(b?chip(b,`הצעת חוק פ/${num} — לדף ההצעה ←`):`<span class="bill-ref dim">הצעת חוק פ/${num}</span>`); return tok(links.length-1) });
+  s=s.replace(/\[מס'\s*כ\/(\d+)[^\]]*\]/g,(m,num)=>{ const b=byNum[String(+num)]; links.push(b?chip(b,`הצעת חוק כ/${num} — לדף ההצעה ←`):`<span class="bill-ref dim">הצעת חוק כ/${num}</span>`); return tok(links.length-1) });
   return {text:s,links};
 }
 function billLinksApply(html,links){
