@@ -54,8 +54,35 @@ function clientIp(request) {
   return fwd ? fwd.split(",")[0].trim() : "";
 }
 
+const ONLINE_TTL_MS = 120_000; // 4 missed 30s heartbeats = gone
+const MAX_SESSIONS_PER_IP = 5; // blunt cheap presence inflation from one address
+const SESSION_ID = /^[A-Za-z0-9_-]{16,64}$/;
+
+async function countOnline(store, now = Date.now()) {
+  const { blobs } = await store.list({ prefix: "online:" });
+  const byIp = new Map();
+  let total = 0;
+  const stale = [];
+  for (const { key } of blobs) {
+    const data = await store.get(key, { type: "json" }).catch(() => null);
+    if (!data || !data.t || now - data.t > ONLINE_TTL_MS) { stale.push(key); continue; }
+    const ip = data.ip || "unknown";
+    const n = (byIp.get(ip) || 0) + 1;
+    byIp.set(ip, n);
+    if (n <= MAX_SESSIONS_PER_IP) total += 1;
+  }
+  // Opportunistic cleanup; never let it fail the request.
+  await Promise.all(stale.slice(0, 50).map((k) => store.delete(k).catch(() => {})));
+  return total;
+}
+
+async function registerPresence(store, sessionId, ipHash, now = Date.now()) {
+  if (!sessionId || !SESSION_ID.test(sessionId)) return;
+  await store.setJSON(`online:${sessionId}`, { t: now, ip: ipHash });
+}
+
 export default async function handler(request) {
-  const store = getStore("site-traffic");
+  const store = getStore({ name: "site-traffic", consistency: "strong" });
 
   if (request.method === "GET" && new URL(request.url).searchParams.get("summary") === "1") {
     // Public aggregate only (counts, no identifiers) for the on-site
@@ -74,6 +101,7 @@ export default async function handler(request) {
       if (isHour) { hourPv = data.pv || 0; (data.ips || []).forEach((h) => hourIps.add(h)); }
     }
     return Response.json({
+      online: await countOnline(store).catch(() => null),
       today: { pageviews: pv, unique_ips: ips.size },
       hour: { pageviews: hourPv, unique_ips: hourIps.size },
       top_pages: Object.entries(pagePv).map(([path, p]) => ({ path, pageviews: p }))
@@ -108,9 +136,9 @@ export default async function handler(request) {
   const ua = request.headers.get("user-agent") || "";
   if (!ua || BOT_UA.test(ua)) return new Response(null, { status: 204 });
 
-  let page = "/";
+  let page = "/", body = {};
   try {
-    const body = await request.json();
+    body = await request.json();
     if (typeof body.p === "string" && body.p.startsWith("/")) page = body.p.slice(0, 80);
   } catch { /* beacon without a body still counts as a hit on / */ }
   page = page.split(/[?#]/)[0] || "/";
@@ -119,6 +147,18 @@ export default async function handler(request) {
   const { day, hour } = jerusalemParts();
   const salt = process.env.HIT_SALT || "mandat121";
   const ipHash = ip ? createHash("sha256").update(`${ip}|${day}|${salt}`).digest("hex").slice(0, 16) : null;
+
+  // Heartbeat: refresh presence only — not a pageview. Returns the live
+  // count so the client needs no separate poll. Presence is keyed by a
+  // random per-tab session id (sessionStorage, no cookie, no raw IP).
+  // TODO(security): unauthenticated by design (public counter); abuse is
+  // bounded by the bot-UA filter, session-id shape, and per-IP cap above
+  // (CWE-770 — no hard rate limit is possible in a stateless function).
+  if (body.hb === 1) {
+    await registerPresence(store, body.s, ipHash).catch(() => {});
+    const online = await countOnline(store).catch(() => null);
+    return Response.json({ online }, { headers: { "Cache-Control": "no-store" } });
+  }
 
   const key = `h:${day}T${hour}`;
   const existing = await store.get(key, { type: "json" }).catch(() => null);
@@ -132,5 +172,6 @@ export default async function handler(request) {
     if (!pg.ips.includes(ipHash)) pg.ips.push(ipHash);
   }
   await store.setJSON(key, data);
+  await registerPresence(store, body.s, ipHash).catch(() => {});
   return new Response(null, { status: 204 });
 }
