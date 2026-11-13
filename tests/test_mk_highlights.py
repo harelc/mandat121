@@ -54,6 +54,27 @@ class ResolveTest(unittest.TestCase):
         self.assertIsNone(mh.resolve("אלי רון כהן", bd, bp))
         self.assertEqual(mh.resolve("אלי כהן", bd, bp), "כהן אלי")
 
+    def test_double_space_spelling_collapses(self):
+        # Tenure ships 'גואטה  ששון ששי' (double space), contacts the
+        # single-space form — one person, one key, however spelled, and
+        # the speaker map winner must not depend on set iteration order.
+        self.assertEqual(mh.norm_key("גואטה  ששון ששי"), "גואטה ששון ששי")
+        bd, bp = mh.speaker_map({"גואטה ששון ששי", "גואטה  ששון ששי"})
+        self.assertEqual(bd, {"ששון ששי גואטה": "גואטה ששון ששי"})
+        self.assertEqual(mh.resolve("ששון ששי גואטה", bd, bp), "גואטה ששון ששי")
+
+    def test_name_canon_alias_collapses(self):
+        # Contacts spell him גנץ בני, tenure/votes גנץ בנימין (NAME_CANON).
+        self.assertEqual(mh.norm_key("גנץ בני"), "גנץ בנימין")
+        bd, _ = mh.speaker_map({"גנץ בני", "גנץ בנימין"})
+        self.assertEqual(list(bd.values()), ["גנץ בנימין"])
+
+    def test_mk_universe_has_no_spelling_duplicates(self):
+        universe = mh.mk_universe()
+        self.assertIn("גואטה ששון ששי", universe)
+        self.assertNotIn("גואטה  ששון ששי", universe)
+        self.assertEqual(len(universe), len({mh.norm_key(n) for n in universe}))
+
     def test_guest_resolves_to_none(self):
         self.assertIsNone(mh.resolve("יוסי שריד-לוי", BY_DISPLAY, BY_PAIR))
         self.assertIsNone(mh.resolve("", BY_DISPLAY, BY_PAIR))

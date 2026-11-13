@@ -128,7 +128,12 @@ jobs:
           if [ "${{ inputs.full }}" = "true" ] || [ "$(date -u +%u)" = "7" ]; then python3 -u build_mk_wiki.py || echo "::warning::build_mk_wiki failed — keeping previous Wikipedia abstracts"; fi
           python3 -u build_protocols_search.py   # committee protocol search index
           python3 -u build_plenum_search.py      # plenum (דברי הכנסת) search index — incremental, new sessions only; also writes data/plenum_hl/ highlight residue for new sittings
-          python3 -u build_mk_highlights.py      # per-MK protocol highlights (TF-IDF, no LLM) -> data/mk_highlights.json; from data/protocols/ + data/plenum_hl/, ~1s (after plenum_search so new sittings land the same run)
+          # mk_highlights uses a global TF-IDF: one new protocol rescores
+          # every MK, so rebuilding hourly churns the file (and triggers a
+          # deploy) for no visible gain. Rebuild only every other week
+          # (even ISO weeks) or on full=true; determinism is guaranteed by
+          # sort_keys + full tie-breakers in build_mk_highlights.py.
+          if [ "${{ inputs.full }}" = "true" ] || [ $((10#$(date -u +%V) % 2)) -eq 0 ]; then python3 -u build_mk_highlights.py; else echo "mk_highlights skipped (biweekly layer; even ISO weeks or full=true)"; fi
           python3 -u build_odata_extras.py       # P1 OData extras — probe-gated per section: unchanged sections are reused, so this is seconds on a no-news day
           python3 -u build_agenda.py             # this-week agenda: plenum order of the day + committee sittings (windowed, recess-honest)
 
@@ -160,7 +165,7 @@ jobs:
         run: |
           python3 -u build_committees.py --knesset 26 # -> data/k26_committees.json (never touches K25 committees.json)
           python3 -u build_protocols.py --knesset 26  # -> data/k26_protocols_index.json + shared data/protocols/
-          python3 -u build_mk_highlights.py           # new K26 protocols change the highlights too (shared protocol store)
+          if [ "${{ inputs.full }}" = "true" ] || [ $((10#$(date -u +%V) % 2)) -eq 0 ]; then python3 -u build_mk_highlights.py; else echo "mk_highlights skipped (biweekly layer)"; fi # shared protocol store; biweekly per Derived layers note
 
       - name: Commit refreshed data
         id: commit

@@ -69,7 +69,50 @@ FORWARD = {"פרקש הכהן אורית": "אורית פרקש הכהן", "בן
            "שיר סגמן מיכל": "מיכל שיר סגמן", "תומא סלימאן עאידה": "עאידה תומא סלימאן"}
 
 
+# index.html NAME_CANON (the alias half of normName) — keep in sync.
+NAME_CANON = {"גנץ בני": "גנץ בנימין", "סגלוביץ יואב": "סגלוביץ' יואב",
+              "מלקו צגה צגנש": "מלקו צגה", "סטרוק אורית": "סטרוק אורית מלכה",
+              "פינדרוס יצחק זאב": "פינדרוס יצחק",
+              "סון הר-מלך לימור": "סון הר מלך לימור", "אל הואשלה ואליד": "אלהואשלה ואליד",
+              "ביסמוט בעז": "ביסמוט בועז", "איזנקוט גד": "איזנקוט גדי",
+              "כהן אליהו": "כהן אלי", "לוין יריב גדעון": "לוין יריב",
+              "רגב מרים": "רגב מירי מרים", "סער גדעון משה": "סער גדעון",
+              "זוהר מכלוף": "זוהר מכלוף מיקי", "עטייה חוה": "עטייה חוה אתי",
+              "גמליאל דמרי גילה": "גמליאל גילה", "טרופר יחיאל משה": "טרופר חילי",
+              "גולדקנופ יצחק יששכר": "גולדקנופ יצחק", "מלינובסקי קונין יוליה": "מלינובסקי יוליה",
+              "גוטליב רויטל טלי": "גוטליב טלי", "מלכיאלי מיכאל משה": "מלכיאלי מיכאל",
+              "סמוטריץ בצלאל יואל": "סמוטריץ' בצלאל", "רוטמן שמחה דן": "רוטמן שמחה",
+              "מושיאשוילי סימיון": "מושיאשוילי סימון",
+              "טרנר אייל קרן": "טרנר קרן", "הירש נגרי מיכל טליה": "נגרי מיכל",
+              "פינק יאיר": "פינק יאיא (יאיר)", "לסקי שוץ גבריאלה": "לסקי גבי",
+              "גואילי טלי": "גואילי טליק", "שטארק אלי": "שטארק אליקים",
+              "הרוש גיטי עינבר": "הרוש גיטי ענבר", "יחזקאלי בליליוס ענבר": "יחזקאלי ענבר",
+              "מסרי עבד אל כרים": "מסרי עבד אלכרים",
+              "איפרגן תאיר סולי": "איפרגן תאיר", "פולקמן רועי שמואל": "פולקמן רועי",
+              "תיבון נעם משה": "תיבון נעם", "רוזנטל משה עזריאל": "רוזנטל משה",
+              "וויספיש יהודה לייב": "וויספיש יהודה", "דורפמן חנמאל שיראי": "דורפמן חנמאל",
+              "בוסו אוריאל מנחם": "בוסו אוריאל", "פייגלין משה זלמן": "פייגלין משה",
+              "איתם איתמר מרדכי": "איתם איתמר"}
+
+_MARKS = re.compile(r"[\u05B0-\u05BD\u05BF\u05C1\u05C2\u05C4\u05C5\u05C7]")
+
+
+def norm_key(name):
+    """index.html normName: one canonical spelling per person — whitespace
+    collapsed, geresh == apostrophe, Hebrew combining marks stripped, plus
+    the NAME_CANON aliases above. Without this, one person enters the
+    universe under two spellings (tenure ships 'גואטה  ששון ששי' with a
+    double space, contacts the single-space form) and each build splits
+    their record between the two keys — nondeterministically, since the
+    speaker map is built over a set."""
+    s = " ".join(str(name or "").split())
+    s = s.replace("׳", "'").replace("״", '"')
+    s = _MARKS.sub("", s)
+    return NAME_CANON.get(s, s)
+
+
 def disp(key):
+    key = norm_key(key)
     if key in FORWARD:
         return FORWARD[key]
     p = key.split()
@@ -90,7 +133,7 @@ def mk_universe():
         ("data/k26_contacts.json", lambda d: d.get("by_name", {})),
     ]:
         try:
-            names |= set(getter(json.loads(Path(path).read_text("utf-8"))))
+            names |= {norm_key(n) for n in getter(json.loads(Path(path).read_text("utf-8")))}
         except Exception:
             pass
     return names
@@ -99,7 +142,10 @@ def mk_universe():
 def speaker_map(names):
     """given-first protocol speaker -> surname-first MK key."""
     by_display = {}
-    for n in names:
+    # Canonicalise again (callers may pass raw roster keys) and iterate in
+    # sorted order: if two surviving keys ever share a display form, the
+    # winner is deterministic instead of set-iteration (hash) order.
+    for n in sorted({norm_key(n) for n in names}):
         by_display.setdefault(" ".join(disp(n).split()), n)
     # (surname token, first given token) fallback, unambiguous only.
     by_pair = {}
@@ -179,7 +225,7 @@ def main():
         for content, rec in candidates.get(key, []):
             score = sum(idf[t] for t in set(content)) / math.sqrt(len(content))
             scored.append((score, rec))
-        scored.sort(key=lambda x: (-x[0], x[1]["date"], x[1]["sid"]))
+        scored.sort(key=lambda x: (-x[0], x[1]["date"], x[1]["sid"], x[1]["turn"]))
         highlights, per_session = [], Counter()
         for score, rec in scored:
             if len(highlights) >= TOP_N or per_session[rec["sid"]] >= PER_SESSION_CAP:
@@ -187,7 +233,7 @@ def main():
             per_session[rec["sid"]] += 1
             highlights.append({**rec, "score": round(score, 2)})
         appearances = sorted(agg["sessions"].values(),
-                             key=lambda s: (-s["words"], s["date"]))
+                             key=lambda s: (-s["words"], s["date"], s["sid"]))
         for a in appearances:
             a["kind"] = "committee"
         for h in highlights:
@@ -252,6 +298,7 @@ def main():
         sess_tab = arch.get("sessions", {})
         arch_sessions = len(sess_tab)
         for key, agg in (arch.get("by_mk") or {}).items():
+            key = norm_key(key)  # cmt_hl files built before norm_key existed carry raw spellings
             e = by_mk.setdefault(key, {"turns": 0, "words": 0, "sessions": 0,
                                        "committee_sessions": 0, "plenum_sessions": 0, "archive_sessions": 0,
                                        "appearances": [], "highlights": []})
@@ -273,8 +320,8 @@ def main():
                              for rec in agg.get("top", []) if rec["sid"] not in have]
 
     for e in by_mk.values():
-        p_picks = sorted(e.pop("_plenum_hl", []), key=lambda r: -r["score"])[:PICKS_PER_SOURCE]
-        a_picks = sorted(e.pop("_arch_hl", []), key=lambda r: -r["score"])[:PICKS_PER_SOURCE]
+        p_picks = sorted(e.pop("_plenum_hl", []), key=lambda r: (-r["score"], r.get("date", ""), r["sid"], r.get("turn", 0)))[:PICKS_PER_SOURCE]
+        a_picks = sorted(e.pop("_arch_hl", []), key=lambda r: (-r["score"], r.get("date", ""), r["sid"], r.get("turn", 0)))[:PICKS_PER_SOURCE]
         merged, c_hl = [], e["highlights"]
         for i in range(max(len(c_hl), len(p_picks), len(a_picks))):
             if i < len(c_hl):
@@ -284,7 +331,7 @@ def main():
             if i < len(a_picks):
                 merged.append(a_picks[i])
         e["highlights"] = merged
-        e["appearances"].sort(key=lambda a: (-a["words"], a["date"]))
+        e["appearances"].sort(key=lambda a: (-a["words"], a["date"], a["sid"], a.get("kind", "")))
         e["appearances"] = e["appearances"][:12]  # UI shows the top few; counts live in the *_sessions fields
         e["sessions"] = e["committee_sessions"] + e["plenum_sessions"] + e["archive_sessions"]
 
@@ -303,7 +350,7 @@ def main():
         },
         "by_mk": by_mk,
     }
-    OUT.write_text(json.dumps(payload, ensure_ascii=False), encoding="utf-8")
+    OUT.write_text(json.dumps(payload, ensure_ascii=False, sort_keys=True), encoding="utf-8")
     total_hl = sum(len(v["highlights"]) for v in by_mk.values())
     print(f"DONE {OUT} — {len(by_mk)} MKs, {total_hl} highlights from "
           f"{len(docs)} protocols ({n_turns} turns scored)")
