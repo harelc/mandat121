@@ -1238,7 +1238,7 @@ const NAME_CANON={'גנץ בני':'גנץ בנימין','סגלוביץ יואב
  // NOTE: absence from K25 data never means "new to the Knesset" — e.g.
  // פייגלין משה served in K19. UI copy must only ever claim לא כיהן/ה בכנסת 25.
  'סון הר-מלך לימור':'סון הר מלך לימור','אל הואשלה ואליד':'אלהואשלה ואליד','ביסמוט בעז':'ביסמוט בועז','איזנקוט גד':'איזנקוט גדי','כהן אליהו':'כהן אלי','לוין יריב גדעון':'לוין יריב','רגב מרים':'רגב מירי מרים','סער גדעון משה':'סער גדעון','זוהר מכלוף':'זוהר מכלוף מיקי','עטייה חוה':'עטייה חוה אתי','גמליאל דמרי גילה':'גמליאל גילה','טרופר יחיאל משה':'טרופר חילי','גולדקנופ יצחק יששכר':'גולדקנופ יצחק','מלינובסקי קונין יוליה':'מלינובסקי יוליה','גוטליב רויטל טלי':'גוטליב טלי','מלכיאלי מיכאל משה':'מלכיאלי מיכאל','סמוטריץ בצלאל יואל':"סמוטריץ' בצלאל",'רוטמן שמחה דן':'רוטמן שמחה','מושיאשוילי סימיון':'מושיאשוילי סימון',
- // K26 OData (KNS_Person) spellings confirmed 2026-11-10 when the official
+ // K26 official-roster spellings confirmed 2026-11-10 when the official
  // serving roster published — CEC list spelling on the left, OData on the right.
  'טרנר אייל קרן':'טרנר קרן','הירש נגרי מיכל טליה':'נגרי מיכל','פינק יאיר':'פינק יאיא (יאיר)','לסקי שוץ גבריאלה':'לסקי גבי','גואילי טלי':'גואילי טליק','שטארק אלי':'שטארק אליקים','הרוש גיטי עינבר':'הרוש גיטי ענבר','יחזקאלי בליליוס ענבר':'יחזקאלי ענבר','מסרי עבד אל כרים':'מסרי עבד אלכרים',
  'איפרגן תאיר סולי':'איפרגן תאיר','פולקמן רועי שמואל':'פולקמן רועי','תיבון נעם משה':'תיבון נעם','רוזנטל משה עזריאל':'רוזנטל משה','וויספיש יהודה לייב':'וויספיש יהודה','דורפמן חנמאל שיראי':'דורפמן חנמאל','בוסו אוריאל מנחם':'בוסו אוריאל','פייגלין משה זלמן':'פייגלין משה','איתם איתמר מרדכי':'איתם איתמר'}; // sources disagree on spelling; canonical = the vote-harvest spelling
@@ -2513,7 +2513,7 @@ function renderNow26(){
 
 /* ============ AGENDA — what's on this week's agenda ============
    The knesset.gov.il agenda page, joined our way: plenum order of the day
-   (KNS_PlmSessionItem) + committee sittings (KNS_CmtSessionItem) for one
+   plenum agenda items + committee sittings for one
    Sunday–Saturday week, bill items deep-linked to their bill pages and
    committee sittings to their in-app session pages. Source is build_agenda.py
    (OData only). OData publishes session rows only once the Knesset releases
