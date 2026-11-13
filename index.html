@@ -2195,7 +2195,7 @@ async function toggleProtocol(id){
     const r=await fetch(`data/protocols/${id}.json`); if(r.ok) doc=await r.json();
     if(!doc){
       const r2=await fetch(`/.netlify/functions/committee-protocol?id=${encodeURIComponent(id)}`);
-      if(r2.status===404){ box.innerHTML='<p class="muted small">לישיבה זו לא פורסם פרוטוקול במאגר הכנסת (הקורא לפי־דרישה פעיל באתר החי).</p>'; return }
+      if(r2.status===404){ box.innerHTML='<p class="muted small">לישיבה זו לא פורסם פרוטוקול במאגר הכנסת.</p>'; return }
       if(!r2.ok) throw 0;
       doc=await r2.json();
     }
