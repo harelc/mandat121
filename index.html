@@ -2356,7 +2356,7 @@ function protoHitBarHTML(scope){
 function protoSyncHitBar(scope){
   const has=!!document.querySelector(`#${scope}Turns mark`);
   const bar=document.querySelector(`#${scope}HitBar`); if(bar) bar.style.display=has?'flex':'none';
-  const pos=document.querySelector(`#${scope}HitPos`); if(pos&&has) pos.textContent=`${(_markState[scope]?.i??-1)+1||''} / ${document.querySelectorAll(`#${scope}Turns mark`).length}`.replace(/^0 /,'');
+  const pos=document.querySelector(`#${scope}HitPos`); if(pos&&has){ const i=_markState[scope]?.i??-1, n=document.querySelectorAll(`#${scope}Turns mark`).length; pos.textContent=i>=0?`${i+1} / ${n}`:`0 / ${n}` }
 }
 async function togglePlenumProtocol(sid){
   const box=$('#plenumProtoBox'); if(!box) return;
