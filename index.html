@@ -313,7 +313,9 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 .mv.sel[data-v="3"]{background:var(--abstain);color:#3d2c00;border-color:var(--abstain)}
 
 /* bill card */
-.bill-card{padding:1rem 1.1rem;cursor:pointer;transition:transform .15s,border-color .15s}
+.bill-card{padding:1rem 1.1rem 2.1rem;cursor:pointer;transition:transform .15s,border-color .15s;position:relative}
+.bill-card .star-corner-b{position:absolute;bottom:.55rem;left:.6rem;z-index:1}
+.bill-card .star-corner-b .chip{font-size:.62rem;padding:.05rem .38rem;line-height:1.5}
 .bill-card:hover{transform:translateY(-2px);border-color:#b3a37c}
 .bill-name{font-size:.78rem;color:var(--dim);line-height:1.45;margin-top:.45rem}
 .syn{font-size:1.02rem;font-weight:600;line-height:1.6}
@@ -2885,7 +2887,7 @@ function renderBillsAll(){
     <div class="card-top"><span class="chip acc">${esc(statusBucket(b))}</span><span class="chip">${esc(b.type||'')}</span>${b.committee?`<span class="chip cmt" title="${esc(b.committee)}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(b.committee)}</span>`:''}<span class="date">${esc(billActivityLabel(b))}</span></div>
     <div class="syn" style="font-size:.98rem">${esc(b.name)}</div>
     ${b.initiators&&b.initiators.length?`<div class="small muted" style="margin-top:.35rem">יוזמים: ${b.initiators.filter(i=>i.initiator).slice(0,3).map(i=>esc(disp(i.name))).join(', ')}${b.initiators.length>3?` · ועוד ${b.initiators.length-3}`:''}</div>`:''}
-    <div class="small" style="margin-top:.4rem">${b.votes&&b.votes.length?`<span class="chip for"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> ${b.votes.length} הצבעות מתועדות — בדף ההצעה ←</span>`:`<span class="dim">${esc(b.status||'')}</span>`} ${starChip('bill',b.id)}</div>
+    <div class="small" style="margin-top:.4rem">${b.votes&&b.votes.length?`<span class="chip for"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> ${b.votes.length} הצבעות מתועדות — בדף ההצעה ←</span>`:`<span class="dim">${esc(b.status||'')}</span>`}</div><span class="star-corner-b">${starChip('bill',b.id)}</span>
   </article>`).join('')}</div>
   ${list.length>shown.length?`<div style="text-align:center;margin-top:1rem"><button class="btn" onclick="allFilter.limit+=30;renderBills()">עוד הצעות</button></div>`:''}`
   :'<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg></div>לא נמצאו הצעות בסינון הזה.</div>'}`;
@@ -2994,7 +2996,7 @@ function renderBills(){
     <div class="card-top"><span class="chip acc">${esc(statusBucket(b))}</span><span class="chip">${esc(b.type||'')}</span>${b.committee?`<span class="chip cmt" title="${esc(b.committee)}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(b.committee)}</span>`:''}<span class="date">${esc(billActivityLabel(b))}</span></div>
     <div class="syn" style="font-size:.98rem">${esc(b.name)}</div>
     ${b.initiators&&b.initiators.length?`<div class="small muted" style="margin-top:.35rem">יוזמים: ${b.initiators.filter(i=>i.initiator).slice(0,3).map(i=>esc(disp(i.name))).join(', ')}${b.initiators.length>3?` · ועוד ${b.initiators.length-3}`:''}</div>`:''}
-    <div class="small" style="margin-top:.4rem">${b.votes&&b.votes.length?`<span class="chip for"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> ${b.votes.length} הצבעות מתועדות — בדף ההצעה ←</span>`:`<span class="dim">${esc(b.status||'')}</span>`} ${starChip('bill',b.id)}</div>
+    <div class="small" style="margin-top:.4rem">${b.votes&&b.votes.length?`<span class="chip for"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> ${b.votes.length} הצבעות מתועדות — בדף ההצעה ←</span>`:`<span class="dim">${esc(b.status||'')}</span>`}</div><span class="star-corner-b">${starChip('bill',b.id)}</span>
   </article>`).join('')}</div>
   ${list.length>shown.length?`<div style="text-align:center;margin-top:1rem"><button class="btn" onclick="allFilter.limit+=30;renderBills()">עוד הצעות</button></div>`:''}`
   :'<div class="card empty"><div class="big">🔍</div>לא נמצאו הצעות בסינון הזה.</div>'}`; return }
@@ -3066,12 +3068,12 @@ function renderVotesAll(){
   <div style="margin-bottom:.9rem"><input type="search" data-keep="eraQ" placeholder="חיפוש בהצבעות…" value="${esc(eraFilter.q)}" style="width:100%" oninput="eraFilter.q=this.value;eraFilter.limit=30;renderVotesKeep(this)"></div>
   ${shown.length?`<div class="grid c2">${shown.map(v=>{const lite=v.item_id?ALLB_BY_ID[v.item_id]:null; const tot=(v.for||0)+(v.against||0)+(v.abstain||0); const hasRes=!!(RES.votes[String(v.id)]||[]).length;
     return `<article class="card bill-card rise" onclick="openVote('${v.id}')">
-    <div class="card-top"><span class="chip acc">${esc(v.kind_label)}</span>${hasRes?'<span class="chip for">מפת הצבעה ←</span>':lite?'<span class="chip">לחוק ←</span>':''}${v.item_id?starChip('bill',v.item_id):''}<span class="date">${fmtDate(v.date)}</span></div>
+    <div class="card-top"><span class="chip acc">${esc(v.kind_label)}</span>${hasRes?'<span class="chip for">מפת הצבעה ←</span>':lite?'<span class="chip">לחוק ←</span>':''}<span class="date">${fmtDate(v.date)}</span></div>
     <div class="syn" style="font-size:.95rem">${esc(v.title||'')}</div>
     ${v.desc&&v.desc!==v.kind_label?`<div class="small muted" style="margin-top:.3rem">${esc(v.desc)}</div>`:''}
     ${v.for!=null&&tot?`<div class="scorebar" style="margin-top:.55rem"><i style="width:${v.for/tot*100}%;background:var(--for)"></i><i style="width:${(v.abstain||0)/tot*100}%;background:var(--abstain)"></i><i style="width:${v.against/tot*100}%;background:var(--against)"></i></div>
     <div class="small" style="margin-top:.3rem"><b style="color:var(--for)">${v.for} בעד</b> · <b style="color:var(--against)">${v.against} נגד</b>${v.abstain?` · <b style="color:var(--abstain)">${v.abstain} נמנע</b>`:''} · <b style="color:${v.for>v.against?'var(--for)':v.against>v.for?'var(--against)':'var(--abstain)'}">${v.for>v.against?'✓ עברה':v.against>v.for?'✕ נדחתה':'= תיקו'}</b></div>`:`<div class="small dim" style="margin-top:.4rem">${v.method_id>=3?`${esc(VOTE_METHOD[v.method_id])} — אין רישום לפי ח״כ${v.accepted!=null?` · ${v.accepted?'✓ עברה':'✕ נדחתה'}`:''}`:'התוצאה המספרית בתהליך איסוף'}</div>`}
-    <div style="margin-top:.65rem">${myVoteHTML(v)}</div>
+    <div style="margin-top:.65rem">${myVoteHTML(v)}</div>${v.item_id?`<span class="star-corner-b">${starChip('bill',v.item_id)}</span>`:''}
     <div data-matchhost>${matchStrip(KN===26?voteModel26(v.id):voteModel(v.id))}</div>
   </article>`}).join('')}</div>
   ${list.length>shown.length?`<div style="text-align:center;margin-top:1rem"><button class="btn" onclick="eraFilter.limit+=30;renderVotes()">עוד ${Math.min(30,list.length-shown.length)} הצבעות</button></div>`:''}`
