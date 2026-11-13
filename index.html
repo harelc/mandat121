@@ -4397,7 +4397,7 @@ function renderMine(){
   const feedTop=feed.slice(0,18);
   const feedNew=prevSeen?feed.filter(e=>(e.date||'')>prevSeen).length:0;
   $('#app').innerHTML=`
-  <section class="cc-hero rise"><div style="display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap"><h2>⭐ מרכז המעקב שלי</h2><span class="small muted">המנדט ה־121 שלך — הצבעות, מעקב ומי מייצג אותך · נשמר מקומית בדפדפן זה בלבד</span><span style="margin-inline-start:auto"><button class="btn small" onclick="go('bills')">לחוקים ←</button> <button class="btn small" onclick="go('mks')">לח״כים ←</button> <button class="btn small" onclick="go('votes')">להצבעות ←</button> <button class="btn small" onclick="go('now')">לעכשיו ←</button></span></div>
+  <section class="cc-hero rise"><div style="display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap"><h2>⭐ מרכז המעקב שלי</h2><span class="small muted">המנדט ה־121 שלך — הצבעות, מעקב ומי מייצג אותך · נשמר מקומית בדפדפן זה בלבד</span></div>
   <div class="cc-tiles">
     <div class="cc-tile"><b>${mineBills.length.toLocaleString('he-IL')}</b><span>הצבעות שסימנתי “אני הייתי מצביע/ה”</span></div>
     <div class="cc-tile gold"><b>${followCount().toLocaleString('he-IL')}</b><span>במעקב שלי ★ — ${fb.length} חוקים (${fb25.length} מכנסת 25 · ${fb26.length} מכנסת 26) · ${fm.length} ח״כים · ${fc.length} ועדות · ${ff.length} סיעות${(S.followTopics||[]).length?` · ${S.followTopics.length} נושאים`:''}</span></div>
