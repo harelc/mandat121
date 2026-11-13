@@ -2234,6 +2234,7 @@ function renderSessionDetail(){
 /* Inline protocol: speaker turns colour-coded — MKs by faction colour (the
    meaningful encoding), officials/guests by a muted per-person palette. */
 async function toggleProtocol(id){
+  ensureK25Archive().then(()=>{ if(PROTO_CUR) renderProtocol() }); // bill tags in the text link only once the bill index exists
   const box=$('#protoBox'); if(!box) return;
   if(PROTO_CUR&&PROTO_CUR.id===String(id)){ PROTO_CUR=null; box.innerHTML=''; return }
   box.innerHTML='<p class="muted small">טוען פרוטוקול…</p>';
@@ -2399,6 +2400,7 @@ function protoSyncHitBar(scope){
   const pos=document.querySelector(`#${scope}HitPos`); if(pos&&has){ const i=_markState[scope]?.i??-1, n=document.querySelectorAll(`#${scope}Turns mark`).length; pos.textContent=i>=0?`${i+1} / ${n}`:`${n} תוצאות` }
 }
 async function togglePlenumProtocol(sid){
+  ensureK25Archive().then(()=>{ if(PLENUM_CUR) renderPlenumProtocol() }); // bill tags in the text link only once the bill index exists
   const box=$('#plenumProtoBox'); if(!box) return;
   const btn=$('#plenumReadBtn');
   if(PLENUM_CUR&&PLENUM_CUR.id===String(sid)){ PLENUM_CUR=null; box.innerHTML=''; if(btn) btn.innerHTML=`${icon('plenum')} הצג את פרוטוקול הישיבה`; return }
