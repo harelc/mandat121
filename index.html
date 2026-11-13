@@ -2459,15 +2459,28 @@ const agOn=d=>({plenum:(AGENDA.plenum||[]).filter(s=>s.start.slice(0,10)===d),cm
 const agCount=(from,to)=>agAll().filter(s=>{const d=s.start.slice(0,10);return d>=from&&d<=to}).length;
 function agendaLatestDate(){ const ds=agAll().map(s=>s.start.slice(0,10)).sort(); return ds[ds.length-1]||AGENDA.today }
 function agendaDefaultAnchor(){ // today, unless its week is unpublished — then the latest published sitting day
+  // On a Thursday the Knesset normally has no sittings left this week, so
+  // looking at Thu/this week is a dead end: open on next week (its Sunday
+  // is also where day view lands when switched to).
+  if(agDate(AGENDA.today).getDay()===4) return agAdd(AGENDA.today,3); // next Sunday
   const tw=AGENDA.this_week[0];
   if(agCount(tw,agAdd(tw,4))) return AGENDA.today;
   const future=agAll().map(s=>s.start.slice(0,10)).filter(d=>d>AGENDA.today).sort()[0];
   return future||agendaLatestDate();
 }
 function renderAgenda(){ const b=$('#agendaBox'); if(b) b.innerHTML=agendaBodyHTML(); const l=$('#agendaPeriod'); if(l) l.textContent=agendaPeriodLabel(); const[ pv,nx]=AG_NAVLBL[agendaMode]; const p=$('#agendaPrev'),n=$('#agendaNext'); if(p)p.textContent=pv; if(n)n.textContent=nx }
-function agendaSetMode(m){ agendaMode=m; if(m==='day') agendaAnchor=agWorkdayOnOrBefore(agendaAnchor); document.querySelectorAll('.agenda-modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===m)); renderAgenda() }
+function agendaSetMode(m,explicitDay=false){ agendaMode=m;
+  // Thursday rule (see agendaDefaultAnchor): if the anchor is still
+  // today/this week on a Thursday, day view opens next Monday and week
+  // view next week — not Thursday's normally-empty schedule. Anchors the
+  // user navigated to (past/other weeks) are left alone, as is a day
+  // explicitly clicked in month view (agendaGoDay).
+  if(!explicitDay&&(m==='day'||m==='week')&&agDate(AGENDA.today).getDay()===4&&agendaAnchor>=AGENDA.this_week[0]&&agendaAnchor<=AGENDA.today) agendaAnchor=agAdd(AGENDA.today,m==='day'?4:3); // day -> next Monday, week -> next Sunday
+  else if(!explicitDay&&m==='day'&&agDate(AGENDA.today).getDay()===4&&agendaAnchor===agAdd(AGENDA.today,3)) agendaAnchor=agAdd(AGENDA.today,4); // week view's next-Sunday anchor -> Monday in day view
+  else if(m==='day') agendaAnchor=agWorkdayOnOrBefore(agendaAnchor);
+  document.querySelectorAll('.agenda-modes button').forEach(b=>b.classList.toggle('on',b.dataset.m===m)); renderAgenda() }
 function agendaNav(dir){ agendaAnchor=agendaMode==='day'?agStepWorkday(agendaAnchor,dir):agendaMode==='week'?agAdd(agendaAnchor,7*dir):agMonthAdd(agendaAnchor,dir); renderAgenda() }
-function agendaGoDay(d){ agendaAnchor=d; agendaSetMode('day'); const el=$('#agendaBox'); if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'}) }
+function agendaGoDay(d){ agendaAnchor=d; agendaSetMode('day',true); const el=$('#agendaBox'); if(el) el.scrollIntoView({block:'nearest',behavior:'smooth'}) }
 function agendaJumpLatest(){ agendaAnchor=agendaMode==='day'?agWorkdayOnOrBefore(agendaLatestDate()):agendaLatestDate(); renderAgenda() }
 /* Older months are sharded (data/agenda/YYYY-MM.json, one per month back to
    the Knesset's first session) and merged in on first navigation to them. */
@@ -2548,7 +2561,10 @@ function agendaBodyHTML(){
 function agendaBodyHTMLInner(){
   const today=AGENDA.today, tw=AGENDA.this_week[0];
   const thisWeekEmpty=!agCount(tw,agAdd(tw,4));
-  const note=(thisWeekEmpty&&agendaAnchor!==today)
+  const thuShift=agDate(today).getDay()===4&&agendaAnchor>today; // landed past Thu per the Thursday rule
+  const note=thuShift
+    ?`<div class="agenda-note small muted">היום יום חמישי — בדרך כלל אין ישיבות בכנסת, אז מוצג <b style="color:var(--text)">יום העבודה הבא בכנסת</b>${agendaMode==='day'?` (${AG_DAYS[agDate(agendaAnchor).getDay()]} · ${fmtDate(agendaAnchor)})`:` (השבוע המתחיל ${fmtDate(agSunday(agendaAnchor))})`}.</div>`
+    :(thisWeekEmpty&&agendaAnchor!==today)
     ?`<div class="agenda-note small muted">לשבוע הנוכחי (${fmtDate(tw)} – ${fmtDate(agAdd(tw,4))}) טרם פורסם סדר יום ב־OData הרשמי — הכנסת לא מתכנסת כל שבוע (פגרה / חגים), וישיבות מופיעות במאגר רק כשהכנסת מפרסמת אותן · נכון ל־${fmtDate(today)}.</div>`:'';
   if(agendaMode==='day'){
     agendaAnchor=agWorkdayOnOrBefore(agendaAnchor); // Fri/Sat have no day view — land on Thursday
