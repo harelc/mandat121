@@ -1319,7 +1319,7 @@ function noMkVotesHTML(b){
   if(b.method_id===4) return wrap(searchIcon,`הצבעה זו נערכה <b>בהרמת ידיים עם מונים</b> — מזכירות הכנסת ספרה את הידיים המורמות, והתוצאה המספרית למעלה היא הספירה הרשמית. בהצבעה כזאת לא נרשם איך הצביע כל ח״כ, ולכן אין מפת מליאה ואין רשימת ״מי הצביע איך״.`);
   if(b.method_id===5) return wrap(searchIcon,`הצבעה זו נערכה <b>בהרמת ידיים ללא מונים</b> — יושב־ראש הישיבה אמד את הרוב בעין, בלי ספירה. לא קיימת תוצאה מספרית ולא נרשם איך הצביע כל ח״כ, ולכן אין מפת מליאה ואין רשימת ״מי הצביע איך״.${b.is_accepted!=null?`<br><b>${b.is_accepted?'ההצעה התקבלה':'ההצעה לא התקבלה'}</b> — כך קבע יושב־ראש הישיבה.`:''}`);
   if(b.method_id===3) return wrap(searchIcon,`הצבעה זו נערכה <b>בהצבעה חשאית</b> מאחורי פרגוד — לא נרשם איך הצביע כל ח״כ, ולכן אין מפת מליאה ואין רשימת ״מי הצביע איך״.${b.secret&&b.secret.length?`<div class="rows" style="margin:.7rem -.9rem 0;text-align:start">${b.secret.map(s=>`<div class="row"><span class="flex">${esc(s.name)}</span><span class="vchip f">${s.votes} קולות</span></div>`).join('')}</div>`:''}`);
-  return wrap(searchIcon,`פירוט ההצבעה לפי ח״כ עדיין באיסוף מה־OData — התוצאה המספרית למעלה מעודכנת.`);
+  return wrap(searchIcon,`פירוט ההצבעה לפי ח״כ עדיין באיסוף מהמאגר הרשמי — התוצאה המספרית למעלה מעודכנת.`);
 }
 function voteMkVotes(m){ if(m&&!m.mk_votes) m.mk_votes=mkVotesFor(m.id,m.vote_date); return (m&&m.mk_votes)||[] }
 /* Saved "my vote" keys were once split two ways: a bill id for a bill's
@@ -1899,7 +1899,7 @@ const ICON_PATHS={
   plenum:'<path d="M4 4.5h16V16H9.5L4 19.8z"/><path d="M8 8.5h8M8 11.8h5.5"/>',
 };
 const icon=n=>`<svg class="icn" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[n]||''}</svg>`;
-const TABS=[['now','home','עכשיו'],['bills','bill','חוקים'],['votes','vote','הצבעות'],['mks','mks','ח״כים'],['factions','factions','סיעות'],['plenum','plenum','דברי הכנסת'],['committees','committees','ועדות'],['analysis','analysis','ניתוח'],['mine','mine','שלי']];
+const TABS=[['now','home','עכשיו'],['mine','mine','שלי'],['bills','bill','חוקים'],['votes','vote','הצבעות'],['mks','mks','ח״כים'],['factions','factions','סיעות'],['plenum','plenum','דברי הכנסת'],['committees','committees','ועדות'],['analysis','analysis','ניתוח']];
 function myCount(){return Object.keys(S.myVotes).length}
 function followCount(){return S.followBills.length+S.followMks.length+(S.followCommittees?.length||0)+(S.followFactions?.length||0)+(S.followTopics?.length||0)}
 function buildTabs(){const active=view==='vote'?'votes':view==='billAll'?'bills':view==='mk'?'mks':view==='faction'?'factions':(view==='committee'||view==='session')?'committees':view==='plenumSession'?'plenum':view; $('#tabs').innerHTML=TABS.map(([v,ic,l])=>`<button class="tab ${active===v?'active':''}" onclick="go('${v}')"><span class="ic">${icon(ic)}</span>${l}${v==='mine'&&(myCount()||followCount())?`<span class="dot">${myCount()+followCount()}</span>`:''}</button>`).join('')}
@@ -2121,7 +2121,7 @@ function setupGlobalSearch(){
 const cmtName=id=>(CMT_BY_ID[id]||{}).name||((K26CMT?.committees||[]).find(c=>String(c.id)===String(id))||{}).name||'ועדה';
 function billCmtHTML(b){
   const hist=(CMT&&CMT.bill_committees[String(b.bill_id)])||[];
-  if(!hist.length) return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> עבודת ועדה</h3><p class="muted small" style="margin-top:.3rem">לא נמצאו ישיבות ועדה מתועדות לחוק הזה ב־OData (ייתכן שהוועדה טרם דנה בו, או שהדיון תועד תחת פריט אחר).</p></div>`;
+  if(!hist.length) return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> עבודת ועדה</h3><p class="muted small" style="margin-top:.3rem">לא נמצאו ישיבות ועדה מתועדות לחוק הזה במאגר הרשמי (ייתכן שהוועדה טרם דנה בו, או שהדיון תועד תחת פריט אחר).</p></div>`;
   const cmts=[...new Set(hist.map(h=>h.committee_id))];
   const first=hist[0].date, last=hist[hist.length-1].date;
   return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> עבודת הוועדה — ${hist.length} ישיבות</h3>
@@ -2173,7 +2173,7 @@ function renderSessionDetail(){
     ${s&&(s.docs||[]).length?`<h3 style="margin-top:1rem">מסמכי הישיבה</h3><div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.45rem">${(s.docs||[]).map(d=>`<a class="chip" href="${esc(d.path)}" target="_blank" rel="noopener"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> ${esc(d.group)}</a>`).join('')}</div>`:''}
     ${EXTRAS?.broadcasts?.[String(id)]?`<div style="margin-top:1.1rem"><a class="btn" href="${esc(EXTRAS.broadcasts[String(id)])}" target="_blank" rel="noopener">📺 שידור הישיבה בארכיון הכנסת ↗</a></div>`:''}
     <div style="margin-top:1.1rem"><button class="btn primary" onclick="toggleProtocol('${id}')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> פרוטוקול הישיבה — מי אמר מה</button><div id="protoBox" style="margin-top:.7rem"></div></div>
-    <p class="small dim" style="margin-top:1rem">הדף הזה נבנה מנתוני ה־OData הרשמיים. הקישור הישיר לדף הישיבה באתר הכנסת אינו יציב (האתר מפנה לעמוד כללי), ולכן סדר היום והמסמכים — כולל פרוטוקול הוועדה — מוצגים כאן, עם קישור ישיר לקבצי המסמכים הרשמיים.</p>
+    <p class="small dim" style="margin-top:1rem">הדף הזה נבנה מהפרסומים הרשמיים של הכנסת. הקישור הישיר לדף הישיבה באתר הכנסת אינו יציב (האתר מפנה לעמוד כללי), ולכן סדר היום והמסמכים — כולל פרוטוקול הוועדה — מוצגים כאן, עם קישור ישיר לקבצי המסמכים הרשמיים.</p>
   </article>`;
 }
 /* Inline protocol: speaker turns colour-coded — MKs by faction colour (the
@@ -2499,6 +2499,7 @@ function renderNow26(){
   </div>
   ${presenceArrivalsHTML(seats)}
   ${presenceGridHTML(seats)}
+  ${siteTopStarsHTML()}
   <div class="sec-title">מה כבר יש, ומה יגיע</div>
   <div class="grid c2">
     <div class="card pad"><h3>✓ כבר כאן</h3><div class="small muted" style="line-height:2">תוצאות הבחירות הרשמיות ומנדטים<br>רשימות המועמדים בסדר הרשמי (466)<br>120 הנבחרים וצבעי הסיעות של כנסת 26<br>${serving?'מי מכהן/ת בפועל — מעל המפה<br>':''}${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?'סדר היום — ישיבות שפורסמו כבר כאן, מעל המפה<br>':''}${PRESENCE26&&presenceTrackedDays()?'סדר ההגעה למשכן וימי נוכחות — מתחת למפה, מתעדכן כל 5 דקות בימי עבודה<br>':''}קישור מהנבחרים להיסטוריית ההצבעות שלהם בכנסת 25</div></div>
@@ -2613,13 +2614,13 @@ function agendaDayCard(d,maxP=6,maxC=4){
   ${plenum.map(s=>agendaPlenumHTML(s,maxP)).join('')}${cmts.map(s=>agendaCmtHTML(s,maxC)).join('')}</div>`;
 }
 function agendaEmptyHTML(period){
-  return `<div class="empty agenda-empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></div>לא פורסמו ישיבות ${period} ב־OData הרשמי — הכנסת לא מתכנסת כל הזמן (פגרה / חגים), וישיבות מופיעות במאגר רק כשהכנסת מפרסמת אותן.<br><button class="btn" style="margin-top:.7rem" onclick="agendaJumpLatest()">לישיבה האחרונה שפורסמה (${fmtDate(agendaLatestDate())}) ←</button></div>`;
+  return `<div class="empty agenda-empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3.5" y="5" width="17" height="16" rx="2"/><path d="M3.5 10h17M8 3v4M16 3v4"/></svg></div>לא פורסמו ישיבות ${period} במאגר הרשמי של הכנסת — הכנסת לא מתכנסת כל הזמן (פגרה / חגים), וישיבות מופיעות במאגר רק כשהכנסת מפרסמת אותן.<br><button class="btn" style="margin-top:.7rem" onclick="agendaJumpLatest()">לישיבה האחרונה שפורסמה (${fmtDate(agendaLatestDate())}) ←</button></div>`;
 }
 function agendaSummaryHTML(from,to){
   const sess=agAll().filter(s=>{const d=s.start.slice(0,10);return d>=from&&d<=to});
   const pl=sess.filter(s=>s.number!==undefined).length;
   const nItems=sess.reduce((n,s)=>n+(s.items||[]).length,0);
-  return `<div class="small muted" style="margin-bottom:.6rem"><b style="color:var(--text)" id="agendaPeriod">${esc(agendaPeriodLabel())}</b> · ${pl} ישיבות מליאה · ${sess.length-pl} ישיבות ועדה · ${nItems} פריטים על סדר היום · מקור: OData רשמי, נבנה ${fmtBuilt(AGENDA.generated_at||'')}</div>`;
+  return `<div class="small muted" style="margin-bottom:.6rem"><b style="color:var(--text)" id="agendaPeriod">${esc(agendaPeriodLabel())}</b> · ${pl} ישיבות מליאה · ${sess.length-pl} ישיבות ועדה · ${nItems} פריטים על סדר היום · מקור: הפרסומים הרשמיים של הכנסת, נבנה ${fmtBuilt(AGENDA.generated_at||'')}</div>`;
 }
 /* Paint the body for the current anchor. While the needed month shard is
    in flight, keep the previous body on screen (see .agenda-stale) instead
@@ -2642,7 +2643,7 @@ function agendaBodyHTMLInner(){
   const note=thuShift
     ?`<div class="agenda-note small muted">היום יום ${AG_DAYS[agDate(today).getDay()]} — בדרך כלל אין ישיבות בכנסת, אז מוצג <b style="color:var(--text)">יום העבודה הבא בכנסת</b>${agendaMode==='day'?` (${AG_DAYS[agDate(agendaAnchor).getDay()]} · ${fmtDate(agendaAnchor)})`:` (השבוע המתחיל ${fmtDate(agSunday(agendaAnchor))})`}.</div>`
     :(thisWeekEmpty&&agendaAnchor!==today)
-    ?`<div class="agenda-note small muted">לשבוע הנוכחי (${fmtDate(tw)} – ${fmtDate(agAdd(tw,4))}) טרם פורסם סדר יום ב־OData הרשמי — הכנסת לא מתכנסת כל שבוע (פגרה / חגים), וישיבות מופיעות במאגר רק כשהכנסת מפרסמת אותן · נכון ל־${fmtDate(today)}.</div>`:'';
+    ?`<div class="agenda-note small muted">לשבוע הנוכחי (${fmtDate(tw)} – ${fmtDate(agAdd(tw,4))}) טרם פורסם סדר יום במאגר הרשמי של הכנסת — הכנסת לא מתכנסת כל שבוע (פגרה / חגים), וישיבות מופיעות במאגר רק כשהכנסת מפרסמת אותן · נכון ל־${fmtDate(today)}.</div>`:'';
   if(agendaMode==='day'){
     agendaAnchor=agWorkdayOnOrBefore(agendaAnchor); // Fri/Sat have no day view — land on Thursday
     const {plenum,cmts}=agOn(agendaAnchor);
@@ -2750,6 +2751,8 @@ function renderNow(){
   <div class="scrollrow">${close.map(v=>voteCard(v)).join('')}</div>
 
   ${committeeFeedHTML(6)}
+
+  ${siteTopStarsHTML()}
 
   <div class="sec-title">האחרונות במליאה</div>
   ${Object.entries(byDay).slice(0,4).map(([d,bs])=>`<div class="feed-day">${fmtDate(d)} · ${bs.length} הצבעות</div><div class="grid c2">${bs.slice(0,6).map(v=>voteCard(v)).join('')}</div>`).join('')}
@@ -4185,7 +4188,7 @@ function renderCommitteeDetail26(){
     <h1 style="font-size:1.45rem;line-height:1.35">${esc(c.name)}</h1></div>${starBtn('committee',c.id,c.name)}</div>
     <div class="kpis"><div class="kpi"><b>${(c.sessions_total||0).toLocaleString('he-IL')}</b><span>ישיבות בקדנציה</span></div><div class="kpi"><b>${memberN?memberN.toLocaleString('he-IL'):'—'}</b><span>חברים כיום</span></div><div class="kpi"><b>${chair?esc(disp(chair.name)):'טרם פורסם'}</b><span>יו״ר</span></div><div class="kpi"><b>${c.last_session?fmtDate(c.last_session):'—'}</b><span>ישיבה אחרונה</span></div></div>
   </article>
-  ${committeeMembersHTML(c)||`<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> חברי הוועדה</h3><p class="muted small" style="margin-top:.35rem;line-height:1.9">חברי הוועדה ויושב הראש טרם פורסמו במאגר הרשמי של הכנסת (KNS_PersonToPosition). הוועדה כבר קיימת במאגר הוועדות, אבל מינויי החברים עוד לא הופיעו בו — ברגע שיתפרסמו הם יוצגו כאן אוטומטית, בלי שננחש שמות.</p></div>`}
+  ${committeeMembersHTML(c)||`<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> חברי הוועדה</h3><p class="muted small" style="margin-top:.35rem;line-height:1.9">חברי הוועדה ויושב הראש טרם פורסמו במאגר הרשמי של הכנסת. הוועדה כבר קיימת במאגר הוועדות, אבל מינויי החברים עוד לא הופיעו בו — ברגע שיתפרסמו הם יוצגו כאן אוטומטית, בלי שננחש שמות.</p></div>`}
   <div style="margin-top:.85rem">${committeeSessionsHTML(c,recent)}</div>
   ${docs.length?`<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> מסמכים אחרונים</h3><div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.45rem">${docs.map(d=>`<a class="chip" href="${esc(d.path)}" target="_blank" rel="noopener">${esc(d.group)} · ${fmtDate(d.date)}</a>`).join('')}</div></div>`:''}`;
 }
@@ -4271,7 +4274,7 @@ function renderAbout(){
     <div class="card pad about-card rise">
       <h3>${icon('doc')} מקורות ומתודולוגיה</h3>
       <ul>
-        <li>כל נתוני הליבה מגיעים מ<b>פרסומים רשמיים של הכנסת</b>: שירות ה־OData הרשמי, מסמכי <span dir="ltr">fs.knesset.gov.il</span> וממשק אפליקציית הח״כים הרשמי — לא מגרידת אתרי צד שלישי.</li>
+        <li>כל נתוני הליבה מגיעים מ<b>פרסומים רשמיים של הכנסת</b>: הפרסומים הרשמיים של הכנסת באתר הכנסת וממשק אפליקציית הח״כים הרשמי — לא מגרידת אתרי צד שלישי.</li>
         <li>הנתונים מתרעננים אוטומטית מבוני־נתונים פתוחים (<span dir="ltr">build_*.py</span> בקוד המקור); האתר עצמו הוא דף סטטי שמציג תמונת־מצב (snapshot) של אותם נתונים.</li>
         <li>כל טענה מחושבת מסומנת בכיסוי שלה — למשל כמה מההצבעות כוללות תוצאות לפי ח״כ — כדי שאפשר יהיה להבחין בין מאגר מלא לחלקי.</li>
         <li><b>דמיון הצבעה</b> בניתוח הוא שיעור הסכמה בהצבעות משותפות בלבד. הוא אינו מודד אידאולוגיה, אינו מעיד על תיאום, ואין לקרוא בו סיבה ותוצאה.</li>
@@ -4297,6 +4300,22 @@ function renderAbout(){
   </div>`;
 }
 
+/* Site-wide most-followed (stars) — lives on Now, not Mine: it's public
+   discovery (what everyone follows), while Mine stays personal. Ranked
+   rows resolving stored keys (bill:4290 is an internal id) to names. */
+function siteTopStarsHTML(){
+  const top=Object.entries(STAR_COUNTS).sort((a,b)=>b[1]-a[1]).slice(0,8);
+  if(!top.length) return '';
+  const rows=top.map(([k,n],idx)=>{ const i=k.indexOf(':'); const kind=k.slice(0,i), key=k.slice(i+1);
+    let lbl=key, go='';
+    if(kind==='bill'){ lbl=(ALLB_BY_ID[key]&&displayText(ALLB_BY_ID[key]))||'הצעת חוק'; go=`openBillPage('${key}')` }
+    else if(kind==='mk'){ lbl=disp(key); go=`openMk('${jsq(key)}')` }
+    else if(kind==='committee'){ const c=committeeById(key); lbl=c?c.name:'ועדה'; go=`openCommittee('${key}')` }
+    else if(kind==='faction'){ go=`openFaction('${jsq(key)}')` }
+    const kindLbl={bill:'חוק',mk:'ח״כ',committee:'ועדה',faction:'סיעה',topic:'נושא'}[kind]||'';
+    return `<div class="row" ${go?`onclick="${go}"`:''}><b style="color:var(--accent);width:1.6rem">${idx+1}</b><span class="flex">${esc(lbl)}<br><span class="dim small">${esc(kindLbl)}</span></span>${starChip(kind,key)}</div>` }).join('');
+  return `<div class="sec-title">★ הכי נעקבים באתר כרגע <small>מה כל המבקרים מסמנים במעקב — לחצו לשם</small></div><div class="card rows rise">${rows}</div>`;
+}
 function renderMine(){
   // Newest vote first: the list below is capped, so insertion order would
   // hide the most recently cast votes once more than a pageful exist.
@@ -4376,7 +4395,7 @@ function renderMine(){
   const feedTop=feed.slice(0,18);
   const feedNew=prevSeen?feed.filter(e=>(e.date||'')>prevSeen).length:0;
   $('#app').innerHTML=`
-  <section class="cc-hero rise"><div style="display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap"><h2>🎛️ מרכז הבקרה שלי</h2><span class="small muted">המנדט ה־121 שלך — הצבעות, מעקב ומי מייצג אותך · נשמר מקומית בדפדפן זה בלבד</span><span style="margin-inline-start:auto"><button class="btn small" onclick="go('bills')">לחוקים ←</button> <button class="btn small" onclick="go('mks')">לח״כים ←</button> <button class="btn small" onclick="go('votes')">להצבעות ←</button> <button class="btn small" onclick="go('now')">לעכשיו ←</button></span></div>
+  <section class="cc-hero rise"><div style="display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap"><h2>⭐ מרכז המעקב שלי</h2><span class="small muted">המנדט ה־121 שלך — הצבעות, מעקב ומי מייצג אותך · נשמר מקומית בדפדפן זה בלבד</span><span style="margin-inline-start:auto"><button class="btn small" onclick="go('bills')">לחוקים ←</button> <button class="btn small" onclick="go('mks')">לח״כים ←</button> <button class="btn small" onclick="go('votes')">להצבעות ←</button> <button class="btn small" onclick="go('now')">לעכשיו ←</button></span></div>
   <div class="cc-tiles">
     <div class="cc-tile"><b>${mineBills.length.toLocaleString('he-IL')}</b><span>הצבעות שסימנתי “אני הייתי מצביע/ה”</span></div>
     <div class="cc-tile gold"><b>${followCount().toLocaleString('he-IL')}</b><span>במעקב שלי ★ — ${fb.length} חוקים (${fb25.length} מכנסת 25 · ${fb26.length} מכנסת 26) · ${fm.length} ח״כים · ${fc.length} ועדות · ${ff.length} סיעות${(S.followTopics||[]).length?` · ${S.followTopics.length} נושאים`:''}</span></div>
@@ -4405,20 +4424,9 @@ function renderMine(){
         ${ff.length?`<div class="small dim" style="margin-top:.5rem">סיעות במעקב</div>${ff.slice(0,6).map(f=>`<div class="row" style="margin:0 -.9rem" onclick="openFaction('${jsq(f)}')"><span class="flex" style="color:${fcol(f)};font-weight:700">${esc(f)}</span>${starChip('faction',f)}<span class="chip acc">לסיעה ←</span></div>`).join('')}`:''}
       `:'<p class="muted small" style="margin-top:.4rem">לחצו ☆ על חוק, ח״כ, ועדה או סיעה — והם יופיעו כאן עם עדכונים. ככה עוקבים אחרי הכנסת בלי לרדוף אחרי אתר הכנסת.</p>'}
     </div>
-    <div class="card pad"><h3>★ הכי נעקבים באתר <small class="dim">מתוך מה שאתם עוקבים אחריו — ומה שכולם עוקבים אחריו</small></h3>
+    <div class="card pad"><h3>★ מתוך המעקב שלי <small class="dim">כמה עוקבים באתר יש למה שאתם עוקבים אחריו (הדירוג הארצי — בעמוד ״עכשיו״)</small></h3>
       ${(()=>{ const mineStarred=[...fb.map(b=>({lbl:displayText(b),n:starCountOf('bill',b.id),go:`openBillPage('${b.id}')`})),...fm.map(m=>({lbl:disp(m.name),n:starCountOf('mk',m.name),go:`openMk('${jsq(m.name)}')`})),...fc.map(c=>({lbl:c.name,n:starCountOf('committee',c.id),go:`openCommittee('${c.id}')`})),...ff.map(f=>({lbl:f,n:starCountOf('faction',f),go:`openFaction('${jsq(f)}')`}))].filter(x=>x.n>0).sort((a,b)=>b.n-a.n).slice(0,6);
-        const siteTop=Object.entries(STAR_COUNTS).sort((a,b)=>b[1]-a[1]).slice(0,6);
-        return `${mineStarred.length?`<div class="small dim" style="margin-top:.4rem">מהמעקב שלי</div>${mineStarred.map(x=>`<div class="row" style="margin:0 -.9rem" onclick="${x.go}"><span class="flex">${esc(x.lbl)}</span><span class="chip" style="color:#8a660a;border-color:#c9a227;background:#f6ebc3;font-weight:800">★ ${x.n.toLocaleString('he-IL')}</span></div>`).join('')}`:'<p class="muted small" style="margin-top:.4rem">עוד אין מוני עוקבים למה שסימנתם — הם יופיעו כאן ככל שהמעקב באתר יצטבר.</p>'}
-        ${siteTop.length?`<div class="small dim" style="margin-top:.6rem">הכי נעקבים באתר כרגע</div><div class="rows" style="margin:.35rem -.9rem 0">${siteTop.map(([k,n],idx)=>{ const i=k.indexOf(':'); const kind=k.slice(0,i), key=k.slice(i+1);
-          // Resolve the stored entity key to a human name — bill/committee
-          // keys are numeric internal ids (e.g. bill:4290), never show those raw.
-          let lbl=key, go='';
-          if(kind==='bill'){ lbl=(ALLB_BY_ID[key]&&displayText(ALLB_BY_ID[key]))||'הצעת חוק'; go=`openBillPage('${key}')` }
-          else if(kind==='mk'){ lbl=disp(key); go=`openMk('${jsq(key)}')` }
-          else if(kind==='committee'){ const c=committeeById(key); lbl=c?c.name:'ועדה'; go=`openCommittee('${key}')` }
-          else if(kind==='faction'){ go=`openFaction('${jsq(key)}')` }
-          const kindLbl={bill:'חוק',mk:'ח״כ',committee:'ועדה',faction:'סיעה',topic:'נושא'}[kind]||'';
-          return `<div class="row" ${go?`onclick="${go}"`:''}><b style="color:var(--accent);width:1.6rem">${idx+1}</b><span class="flex">${esc(lbl)}<br><span class="dim small">${esc(kindLbl)}</span></span><span class="chip" style="color:#8a660a;border-color:#c9a227;background:#f6ebc3;font-weight:800">★ ${n.toLocaleString('he-IL')} עוקבים</span></div>` }).join('')}</div>`:''}` })()}
+        return mineStarred.length?`<div class="rows" style="margin:.4rem -.9rem 0">${mineStarred.map(x=>`<div class="row" onclick="${x.go}"><span class="flex">${esc(x.lbl)}</span><span class="chip" style="color:#8a660a;border-color:#c9a227;background:#f6ebc3;font-weight:800">★ ${x.n.toLocaleString('he-IL')}</span></div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">עוד אין מוני עוקבים למה שסימנתם — הם יופיעו כאן ככל שהמעקב באתר יצטבר.</p>' })()}
     </div>
   </div>
   ${rank.length?`<div class="sec-title">מי מצביע כמוני <span class="chip acc">כנסת 25</span> <small>על ${mineBills.length} ההצבעות שסימנת בכנסת 25</small></div>
