@@ -3409,7 +3409,19 @@ function billExtrasHTML(b){
   if(L?.merged_into) lineage.push(`<div class="small muted" style="line-height:1.9"><b style="color:var(--text)">מוזגה לתוך:</b></div><div class="chips" style="margin:.3rem 0 .6rem">${billChip(L.merged_into)}</div>`);
   if(L?.split_from) lineage.push(`<div class="small muted" style="line-height:1.9"><b style="color:var(--text)">פוצלה מתוך:</b></div><div class="chips" style="margin:.3rem 0 .6rem">${billChip(L.split_from)}</div>`);
   if(L?.split_to?.length) lineage.push(`<div class="small muted" style="line-height:1.9"><b style="color:var(--text)">פוצלה להצעות:</b></div><div class="chips" style="margin:.3rem 0 .6rem">${L.split_to.map(s=>billChip(s.id)).join('')}</div>`);
-  if(L?.names?.length>1) lineage.push(`<h4 style="margin-top:.6rem">שמות ההצעה לאורך המסע (${L.names.length})</h4><div class="rows" style="margin:.35rem -.9rem 0">${L.names.map(n=>`<div class="row" style="cursor:default"><span class="flex">${esc(n.name)}</span>${n.stage?`<span class="chip">${esc(n.stage)}</span>`:''}</div>`).join('')}</div>`);
+  // Each stage name in the path links to that stage's actual draft/law
+  // document — the same files listed in the "גרסאות ומסמכים נוספים" card
+  // above (matched by stage wording). A stage with no document in the
+  // data stays a plain row; it never links nowhere.
+  const stageDoc=stage=>{
+    const docs=(BILL_DOCS&&BILL_DOCS[String(b.id)])||[];
+    const kw=/שנייה|שניה/.test(stage)?'שנייה':/ראשונה/.test(stage)?'ראשונה':/לחוק|התקבל/.test(stage)?'חוק':/מוקדם/.test(stage)?'מוקדם':'';
+    if(!kw) return null;
+    return docs.find(d=>kw==='חוק'?/^(חוק|פרסום)/.test(d.group||''):(d.group||'').includes(kw))||((kw==='ראשונה'||kw==='מוקדם')&&b.doc_url?{url:b.doc_url}:null);
+  };
+  if(L?.names?.length>1) lineage.push(`<h4 style="margin-top:.6rem">שמות ההצעה לאורך המסע (${L.names.length})</h4><div class="rows" style="margin:.35rem -.9rem 0">${L.names.map(n=>{ const d=n.stage?stageDoc(n.stage):null;
+    return d?`<a class="row" href="${esc(d.url)}" target="_blank" rel="noopener" style="text-decoration:none;color:inherit"><span class="flex">${esc(n.name)}</span>${n.stage?`<span class="chip">${esc(n.stage)}</span>`:''}<span class="chip acc">לנוסח בשלב זה ↗</span></a>`
+             :`<div class="row" style="cursor:default"><span class="flex">${esc(n.name)}</span>${n.stage?`<span class="chip">${esc(n.stage)}</span>`:''}</div>` }).join('')}</div>`);
   const lawHTML=law?`<div style="margin-top:${lineage.length?'.9rem':'0'}"><div class="small muted" style="line-height:1.9">📖 <b style="color:var(--text)">פורסם ברשומות:</b> ספר החוקים, חלק ${esc(law.magazine||'—')}${law.page?`, עמ׳ ${esc(law.page)}`:''}${law.published?` · ${fmtDate(law.published)}`:''}${law.validity?` · תוקף: <b style="color:${law.validity==='תקף'?'var(--for)':'var(--against)'}">${esc(law.validity)}</b>`:''}${law.basic?' · חוק־יסוד':''}</div>${law.name&&law.name!==b.name?`<div class="small dim" style="margin-top:.25rem">שם החוק כפי שפורסם: ${esc(law.name)}</div>`:''}</div>`:'';
   if(!lineage.length&&!lawHTML) return '';
   return `<div class="card pad" style="margin-top:.85rem"><h3>🧬 שושלת ההצעה ופרסומה <small class="dim">מיזוגים, פיצולים וספר החוקים · מהמאגר הרשמי</small></h3><div style="margin-top:.5rem">${lineage.join('')}${lawHTML}</div></div>`;
