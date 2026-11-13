@@ -47,7 +47,7 @@ fetch(location.pathname + '?data=1', { headers: { 'x-hit-token': tok }, cache: '
    var h = '';
    h += '<div class="card"><h3>תנועה</h3>'
      + '<div>היום: <b class="n">' + N(j.traffic.today.pageviews) + '</b> צפיות · ' + N(j.traffic.today.unique_ips) + ' מבקרים ייחודיים · בשעה האחרונה ' + N(j.traffic.hour.pageviews) + ' צפיות · <b>עכשיו באתר: ' + N(j.traffic.online) + '</b></div>'
-     + '<div class="muted">דפים מובילים היום: ' + j.traffic.top_pages.map(function(p){ return esc(p.path) + ' (' + N(p.pageviews) + ')' }).join(' · ') + '</div></div>';
+     + '<div class="muted">דפים/תצוגות מובילים היום (לפי מסלול בתוך האתר): ' + (j.traffic.top_pages||[]).map(function(p){ return esc(p.path) + ' (' + N(p.pageviews) + ')' }).join(' · ') + '</div></div>';
    h += '<div class="card"><h3>★ הכי נעקבים (' + j.stars.total_entities + ' ישויות)</h3><table><tr><th>ישות</th><th>סוג</th><th>עוקבים</th></tr>'
      + j.stars.top.map(function(s){ return '<tr><td>' + entLink(s.kind, s.key) + '</td><td>' + esc(s.kind) + '</td><td>' + N(s.count) + '</td></tr>' }).join('') + '</table></div>';
    h += '<div class="card"><h3>יומן פעולות ★ (אחרונות ' + j.star_log.length + ')</h3><table><tr><th>זמן</th><th>פעולה</th><th>ישות</th><th>סוג</th><th>סה״כ אחרי</th><th>מבקר</th></tr>'
