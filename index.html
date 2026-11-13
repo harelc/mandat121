@@ -4058,7 +4058,9 @@ const CMT_TIER=c=>(c.type==='ועדה ראשית'||c.type==='ועדת הכנסת
    latest stint end). K26 keeps the live !to semantics. */
 const cmtAsOf=c=>{ if(KN!==25) return null; const all=(CMEM.by_committee[String(c.id)]||[]); return c.last_session||all.reduce((m,x)=>((x.to||x.from||'')>m?(x.to||x.from||''):m),'')||null };
 const _rosterCache={};
-const cmtRoster=c=>{ if(_rosterCache[c.id]) return _rosterCache[c.id]; const all=((KN===26?K26CMEM:CMEM).by_committee[String(c.id)]||[]); if(KN===26) return all.filter(x=>!x.to);
+const cmtRoster=c=>{ if(_rosterCache[c.id]) return _rosterCache[c.id]; const all=((KN===26?K26CMEM:CMEM).by_committee[String(c.id)]||[]); if(KN===26){ // one row per person: a chair often holds a member stint AND a chair stint, both open — dedupe by name, best role wins, chair first
+  const rank=r=>r.role==='chair'?0:r.role==='member'?1:2, seen=new Set();
+  return all.filter(x=>!x.to).sort((a,b)=>rank(a)-rank(b)||disp(a.name).localeCompare(disp(b.name),'he')).filter(x=>{if(seen.has(x.name))return false;seen.add(x.name);return true}) }
   const asOf=cmtAsOf(c); if(!asOf) return [];
   const covers=all.filter(x=>(x.from||'')<=asOf&&(!x.to||x.to>=asOf));
   // committees whose stints were all mass-closed before their last session fall back to the latest-starting stints
