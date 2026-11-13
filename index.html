@@ -345,12 +345,16 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 
 /* agenda (this week) — one packed pane: header + toolbar + body, days are
    divided sub-panels inside it, never cards-in-a-card */
-.agenda-pane{padding:1.05rem 1.15rem;margin-top:1.1rem}
+.agenda-pane{padding:1.05rem 1.15rem;margin-top:1.1rem;background:
+  radial-gradient(120% 90% at 85% -10%,rgba(71,107,158,.09),transparent 55%),
+  radial-gradient(90% 70% at 0% 110%,rgba(194,105,63,.07),transparent 55%),
+  linear-gradient(180deg,var(--surface),#f7f1e2);
+  border:1px solid #d8cbab;box-shadow:var(--shadow),inset 0 1px 0 rgba(255,255,255,.75)}
 .agenda-head{display:flex;gap:.7rem 1rem;align-items:flex-start;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:.75rem;margin-bottom:.8rem}
 .agenda-head h2{font-family:'Frank Ruhl Libre','Rubik',serif;font-size:1.3rem;font-weight:800;line-height:1.25}
 .agenda-head .sub{font-size:.8rem;color:var(--dim);margin-top:.15rem;max-width:52ch}
 .agenda-tools{display:flex;gap:.55rem;align-items:center;flex-wrap:wrap;margin-inline-start:auto}
-.agenda-note{background:var(--abstain-dim);border:1px solid #dcc175;border-radius:12px;padding:.6rem .8rem;margin-bottom:.7rem}
+.agenda-note{background:linear-gradient(180deg,#faf0cd,var(--abstain-dim));border:1px solid #dcc175;border-inline-start:4px solid var(--abstain);border-radius:12px;padding:.6rem .8rem;margin-bottom:.7rem;box-shadow:inset 0 1px 0 rgba(255,255,255,.6)}
 .agenda-empty{border:1px dashed var(--line);border-radius:14px}
 /* While a month shard loads, the previous body stays painted (dimmed,
    inert) at its full height — swapping in a short loading box collapsed
@@ -358,8 +362,8 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 .agenda-stale{position:relative;opacity:.5;pointer-events:none}
 .agenda-loading-pill{position:absolute;top:50%;left:50%;transform:translate(-50%,-50%);background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:.45rem 1rem;font-size:.85rem;font-weight:800;color:var(--text);box-shadow:var(--shadow);white-space:nowrap}
 .agenda-loading{min-height:24rem;display:flex;flex-direction:column;align-items:center;justify-content:center}
-.agenda-day{padding:.9rem 1.05rem;background:var(--surface2);border:1px solid var(--line);border-radius:16px}
-.agenda-day.today{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim),var(--shadow)}
+.agenda-day{padding:.9rem 1.05rem;background:linear-gradient(180deg,#f8f3e6,var(--surface2));border:1px solid var(--line);border-radius:16px;box-shadow:inset 0 1px 0 rgba(255,255,255,.7),0 3px 10px rgba(96,80,44,.06)}
+.agenda-day.today{border-color:var(--accent);background:linear-gradient(180deg,var(--accent-dim),#eef2f8 55%,var(--surface2));box-shadow:0 0 0 2px var(--accent-dim),var(--shadow)}
 .agenda-day.past{opacity:.82}
 .agenda-day h3{font-size:1rem;display:flex;gap:.5rem;align-items:center;flex-wrap:wrap}
 .agenda-sess{padding:.55rem 0;border-top:1px solid var(--line)}
@@ -371,18 +375,28 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 .agenda-modes{display:inline-flex;background:var(--surface);border:1px solid var(--line);border-radius:999px;padding:.2rem;gap:.2rem}
 .agenda-modes button{border:0;background:transparent;border-radius:999px;padding:.38rem .85rem;font-weight:800;font-size:.82rem;color:var(--dim)}
 .agenda-modes button.on{background:var(--accent);color:#fdfbf6}
-.cal-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.45rem}
-.cal-head{font-size:.72rem;font-weight:800;color:var(--dim);text-align:center;padding:.2rem 0;min-width:0;overflow:hidden}
-.cal-cell{background:linear-gradient(180deg,var(--surface),var(--bg2));border:1px solid var(--line);border-radius:14px;min-height:6.2rem;padding:.45rem .5rem;cursor:pointer;text-align:start;font-family:inherit;color:inherit;width:100%;min-width:0;overflow:hidden}
-.cal-cell:hover{border-color:#b3a37c}
+.cal-grid{display:grid;grid-template-columns:repeat(5,minmax(0,1fr));gap:.5rem;background:
+  repeating-linear-gradient(0deg,rgba(150,130,85,.045) 0 1px,transparent 1px 5px),
+  linear-gradient(180deg,#f3eddc,#eee5cf);
+  border:1px solid #d8cbab;border-radius:18px;padding:.6rem;box-shadow:inset 0 1px 0 rgba(255,255,255,.8),inset 0 0 0 1px rgba(255,255,255,.25),0 6px 18px rgba(96,80,44,.08)}
+.cal-head{font-size:.72rem;font-weight:900;letter-spacing:.04em;color:#7a6a44;text-align:center;padding:.15rem 0 .35rem;min-width:0;overflow:hidden;text-shadow:0 1px 0 rgba(255,255,255,.7)}
+.cal-cell{position:relative;background:linear-gradient(180deg,#fffdf7,var(--surface) 45%,var(--bg2));border:1px solid var(--line);border-radius:14px;min-height:6.2rem;padding:.45rem .5rem;cursor:pointer;text-align:start;font-family:inherit;color:inherit;width:100%;min-width:0;overflow:hidden;box-shadow:inset 0 1px 0 #fff,0 2px 6px rgba(96,80,44,.07);transition:transform .15s ease,border-color .15s ease,box-shadow .15s ease}
+.cal-cell::before{content:'';position:absolute;inset:0 0 auto;height:3px;background:transparent}
+.cal-cell.has-ev::before{background:linear-gradient(90deg,var(--accent),#8fa8c8)}
+.cal-cell.has-pl::before{background:linear-gradient(90deg,var(--pink),#dda07e)}
+.cal-cell.busy::before{background:linear-gradient(90deg,var(--pink),var(--abstain),var(--accent))}
+.cal-cell:hover{border-color:#b3a37c;transform:translateY(-2px);box-shadow:inset 0 1px 0 #fff,0 8px 18px rgba(96,80,44,.14)}
+.cal-cell:focus-visible{outline:2px solid var(--accent);outline-offset:2px}
 .cal-cell.out{opacity:.38;cursor:default}
-.cal-cell.other{opacity:.55}
-.cal-cell.today{border-color:var(--accent);box-shadow:0 0 0 2px var(--accent-dim)}
-.cal-cell.sel{border-color:var(--pink);box-shadow:0 0 0 2px rgba(194,105,63,.25)}
-.cal-cell .dnum{font-family:'Rubik';font-weight:900;font-size:1rem}
-.cal-cell .ev{font-size:.68rem;line-height:1.5;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;min-width:0}
-.cal-cell .ev.pl{color:var(--accent);font-weight:800}
-.cal-cell .ev.cx{color:var(--against);text-decoration:line-through}
+.cal-cell.other{opacity:.55;background:linear-gradient(180deg,#f3eddb,#ece2cb)}
+.cal-cell.today{border-color:var(--accent);background:linear-gradient(180deg,var(--accent-dim),#f4f7fb 60%,var(--bg2));box-shadow:0 0 0 2px var(--accent-dim),inset 0 1px 0 #fff,0 6px 16px rgba(71,107,158,.18)}
+.cal-cell.sel{border-color:var(--pink);background:linear-gradient(180deg,#fbeadd,#fdf6ec 55%,var(--bg2));box-shadow:0 0 0 2px rgba(194,105,63,.28),inset 0 1px 0 #fff,0 6px 16px rgba(194,105,63,.16)}
+.cal-cell .dnum{font-family:'Rubik';font-weight:900;font-size:1rem;display:inline-flex;align-items:center;justify-content:center;min-width:1.7rem;height:1.7rem;padding:0 .3rem;border-radius:999px}
+.cal-cell.today .dnum{background:var(--accent);color:#fdfbf6;box-shadow:0 2px 8px rgba(71,107,158,.4)}
+.cal-cell.sel .dnum{background:var(--pink);color:#fdfbf6}
+.cal-cell .ev{font-size:.68rem;line-height:1.45;color:var(--mid);white-space:nowrap;overflow:hidden;text-overflow:ellipsis;max-width:100%;min-width:0;background:rgba(71,107,158,.08);border:1px solid rgba(71,107,158,.14);border-radius:999px;padding:.08rem .45rem;margin-top:.28rem}
+.cal-cell .ev.pl{color:var(--accent);font-weight:800;background:var(--accent-dim);border-color:#9db1cf}
+.cal-cell .ev.cx{color:var(--against);text-decoration:line-through;background:var(--against-dim);border-color:#e8b3a2}
 .cal-cell .evn{display:none}
 @media(max-width:640px){.cal-cell{min-height:4.4rem;padding:.3rem}.cal-cell .ev{display:none}.cal-cell .evn{display:block;font-size:.68rem;color:var(--mid)}}
 
@@ -2581,7 +2595,7 @@ function agendaBodyHTMLInner(){
       const inMonth=agDate(d).getMonth()===dt.getMonth();
       const outside=AGENDA.window&&(d<AGENDA.window[0]||d>AGENDA.window[1]);
       const cx=cmts.filter(s=>(s.status||'').includes('מבוטלת')).length;
-      return `<button class="cal-cell ${inMonth?'':'other'} ${d===today?'today':''} ${d===agendaAnchor?'sel':''}" ${outside?'disabled':''} onclick="agendaGoDay('${d}')" title="${esc(fmtDate(d)+(plenum.length||cmts.length?': '+[...plenum.map(s=>'מליאה '+(s.start||'').slice(11,16)),...cmts.map(s=>(s.start||'').slice(11,16)+' '+(s.committee||'ועדה'))].join(' · '):''))}">
+      return `<button class="cal-cell ${inMonth?'':'other'} ${d===today?'today':''} ${d===agendaAnchor?'sel':''} ${(plenum.length||cmts.length)?'has-ev':''} ${plenum.length?'has-pl':''} ${cmts.length>=4?'busy':''}" ${outside?'disabled':''} onclick="agendaGoDay('${d}')" title="${esc(fmtDate(d)+(plenum.length||cmts.length?': '+[...plenum.map(s=>'מליאה '+(s.start||'').slice(11,16)),...cmts.map(s=>(s.start||'').slice(11,16)+' '+(s.committee||'ועדה'))].join(' · '):''))}">
         <span class="dnum">${agDate(d).getDate()}</span>${d===today?' <span class="chip acc" style="font-size:.6rem;padding:.05rem .4rem">היום</span>':''}
         ${plenum.map(s=>`<span class="ev pl" style="display:block"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> מליאה ${esc((s.start||'').slice(11,16))}</span>`).join('')}
         ${cmts.slice(0,2).map(s=>`<span class="ev ${(s.status||'').includes('מבוטלת')?'cx':''}" style="display:block">${esc((s.start||'').slice(11,16))} ${esc(s.committee||'ועדה')}</span>`).join('')}
