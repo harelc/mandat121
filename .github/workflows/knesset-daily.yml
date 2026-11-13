@@ -108,7 +108,7 @@ jobs:
 
       - name: Harvest per-MK vote results (K25)
         if: ${{ inputs.target != 'k26-only' }}
-        run: python3 -u build_k25_vote_results.py --knesset 25 # resumable; checkpoints to data/k25_vote_results.json
+        run: python3 -u build_vote_results.py --knesset 25 # resumable; checkpoints to data/k25_vote_results.json
 
       - name: Derived layers (analytics, contacts/presence, protocol search)
         if: ${{ inputs.target != 'k26-only' }}
@@ -146,7 +146,7 @@ jobs:
 
       - name: Harvest per-MK vote results (K26)
         if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_bills == 'true' }}
-        run: python3 -u build_k25_vote_results.py --knesset 26 # resumable; checkpoints to data/k26_vote_results.json
+        run: python3 -u build_vote_results.py --knesset 26 # resumable; checkpoints to data/k26_vote_results.json
 
       - name: Build K26 people layers (tenure, list order, committee members)
         if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_any == 'true' }}

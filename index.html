@@ -1126,7 +1126,22 @@ function renderPlenumTv(){
     <section class="card ptv-off rise"><span class="chip">המליאה לא בישיבה כעת</span><span class="small muted">${when}. השידור החי יופיע כאן כשהישיבה תתחיל.</span><span style="margin-inline-start:auto"><button class="btn ghost small" onclick="ptvOpen()">פתיחת ערוץ הכנסת בכל זאת ←</button></span></section>`;
   }
 }
-let K26B=[], K26V=[], K26CMT=null, K26CMEM={by_mk:{},by_committee:{}}; // K26 layers as the daily builders publish them (k26_bills/votes/committees/committee_members.json); empty until then, K26 views fall back to their "not yet" states
+let K26B=[], K26V=[], K26V_BY_ID={}, VOTE_RES26={names:[],votes:{}}, VOTE_MODELS26={}, K26CMT=null, K26CMEM={by_mk:{},by_committee:{}};
+/* K26 vote model — same shape as voteModel() but from k26_votes +
+   k26_vote_results (build_vote_results.py --knesset 26): the vote page,
+   "אני הייתי מצביע" and the agreement rankings run on it exactly like K25. */
+function voteModel26(id){
+  const key=String(id); if(VOTE_MODELS26[key]) return VOTE_MODELS26[key];
+  const v=K26V_BY_ID[key]; if(!v) return null;
+  const rows=VOTE_RES26.votes[key]||[];
+  const m={id:key,bill_id:v.item_id||null,lite:null,name:v.title||'',title:v.title||'',sub:v.desc||'',
+    vote_date:v.date,kind:v.kind||null,kind_label:v.kind_label||'',method_id:v.method_id||null,secret:v.secret||null,
+    has_tally:v.for!=null&&v.against!=null,bill_type:'',topics:[],doc_url:null,summary:null,synopsis:null,
+    total_for:v.for||0,total_against:v.against||0,total_abstain:v.abstain||0,
+    mk_votes:rows.map(([i,c])=>{const nm=VOTE_RES26.names[i]; const e=k26Entry(nm); return {mk_name:nm,result:c,faction:(e&&e.party)||''}})};
+  m.is_accepted=m.has_tally?m.total_for>m.total_against:(v.accepted!=null?!!v.accepted:null);
+  VOTE_MODELS26[key]=m; return m;
+} // K26 layers as the daily builders publish them (k26_bills/votes/committees/committee_members.json); empty until then, K26 views fall back to their "not yet" states
 let RANK26={}; // surname-first name -> CEC list position (build_k25_list_order.py --knesset 26); preview rank is the fallback
 const listRank26=n=>RANK26[n]??999;
 let CMT=null, CMT_BY_ID={}, IDX25={};
@@ -1138,7 +1153,7 @@ let HIST_SESS={}, cmtHist={id:null,kn:null,list:null,loading:false,limit:40}; //
 const AG_SHARD_CACHE={}; // `${kn}:${YYYY-MM}` -> Promise<shard>: month shards are fetched once per session, whichever committee/committees asked first
 let ALLB=[], ALLB_BY_ID={}, VOTES_ALL=[], MK_INITIATED={};
 let K25_READY=false, K25_ARCHIVE_PROMISE=null; // K25 archive bulk is loaded on demand only (ensureK25Archive) — never on the default K26 Now paint
-let VOTE_RES={names:[],votes:{}}, VOTE_BY_ID={}; // full per-MK results (build_k25_vote_results.py)
+let VOTE_RES={names:[],votes:{}}, VOTE_BY_ID={}; // full per-MK results (build_vote_results.py)
 let VOTE_MODELS={}; // vote id -> normalised vote model (voteModel()); the only vote shape the UI renders
 let OFFICIAL_PHOTOS={}; // name -> official-portrait manifest entry (build_k25_photos_official.py); covers MKs absent from the roster file, notably those who left mid-term
 let PROTO_IDX={}, PROTO_CUR=null, protoFilter={speaker:'',q:''}; // committee protocols (build_protocols.py)
@@ -1607,7 +1622,8 @@ async function load(){
   // Each view pulls what it needs via ensureAgenda()/ensureCmem()/…
   const [lor,tnr,oph,cor,b26,v26,lo26,c26,cm26,oph26,cor26]=await Promise.all([fetch('data/k25_list_order.json').catch(()=>null),fetch('data/k25_tenure.json').catch(()=>null),fetch('data/k25_official_photos.json').catch(()=>null),fetch('data/mk_contacts.json').catch(()=>null),fetch('data/k26_bills.json').catch(()=>null),fetch('data/k26_votes.json').catch(()=>null),fetch('data/k26_list_order.json').catch(()=>null),fetch('data/k26_committees.json').catch(()=>null),fetch('data/k26_committee_members.json').catch(()=>null),fetch('data/k26_official_photos.json').catch(()=>null),fetch('data/k26_contacts.json').catch(()=>null)]);
   if(b26&&b26.ok){ K26B=await b26.json(); K26B.forEach(b=>(b.initiators||[]).forEach(i=>i.name=normName(i.name))) }
-  if(v26&&v26.ok){ K26V=await v26.json() }
+  if(v26&&v26.ok){ K26V=await v26.json(); K26V.forEach(v=>K26V_BY_ID[String(v.id)]=v) }
+  { const vr26=await fetch('data/k26_vote_results.json').catch(()=>null); if(vr26&&vr26.ok){ const j=await vr26.json(); VOTE_RES26={names:(j.names||[]).map(normName),votes:j.votes||{}} } }
   if(lo26&&lo26.ok){ const lo=await lo26.json(); for(const[k,v]of Object.entries(lo.ranks||{})) if(v.rank) RANK26[normName(k)]=v.rank }
   if(c26&&c26.ok){ K26CMT=await c26.json() }
   if(cm26&&cm26.ok){ const cj=await cm26.json(); K26CMEM={by_mk:normKeys(cj.by_mk||{}),by_committee:cj.by_committee||{}}; for(const arr of Object.values(K26CMEM.by_committee)) arr.forEach(m=>m.name=normName(m.name)) }
@@ -1618,7 +1634,7 @@ async function load(){
   if(lor&&lor.ok){ const lo=await lor.json(); for(const[k,v]of Object.entries(lo.ranks||{})) if(v.rank) RANK25[normName(k)]=v.rank }
   if(cor&&cor.ok){ const cj=await cor.json(); CONTACTS=normKeys(cj.by_name); CONTACTS_META=cj._meta||{}; ROSTER25=new Set(Object.keys(CONTACTS)) }
   _loadMark('phase2a small files in');
-  { const y=window.scrollY; applyRoute(); window.scrollTo({top:y}); } // portraits/contacts/ranks now land on the already-painted page
+  { const y=window.scrollY; applyRoute(); if(view==='vote') renderVote(); window.scrollTo({top:y}); } // portraits/contacts/ranks/K26 votes now land on the already-painted page (a cold #vote= deep link may have rendered before k26_votes arrived)
   // No phase 2b any more: the K25 archive bulk is NOT fetched here. It
   // loads on first actual need via ensureK25Archive() (switching to
   // Knesset 25, a K25 bill/vote deep link, an MK page, global search…),
@@ -3025,7 +3041,52 @@ function absentSummaryHTML(absent){
    is on a bill, the bill layers on context (journey stepper, topics,
    text, and a ☆ to follow the bill) — it never becomes the vote's
    identity, and "my vote" keys by vote id, always. */
+function renderVote26(){
+  const app=$('#app'), b=viewArg?voteModel26(viewArg):null;
+  if(!b){ app.innerHTML=backBtnHTML('votes','› חזרה להצבעות')+'<div class="card empty" style="margin-top:.6rem"><div class="big">🗳️</div>ההצבעה לא נמצאה בכנסת ה־26.</div>'; return }
+  const reb=rebels(b);
+  const present=new Set(b.mk_votes.map(v=>v.mk_name));
+  const absentees=(K26CMEM&&Object.keys(K26CMEM.by_mk||{}).length?Object.keys(K26CMEM.by_mk):[]).filter(n=>!present.has(n)); // committee members are a proxy seat-pool; voters always seat
+  const seats=[...b.mk_votes.map(v=>({name:v.mk_name,faction:v.faction,result:v.result,absent:false,color:fcol(v.faction)}))]
+    .sort((x,y)=>partyRank(x.faction,26)-partyRank(y.faction,26)||listRank26(x.name)-listRank26(y.name)||disp(x.name).localeCompare(disp(y.name),'he'));
+  const byF={}; b.mk_votes.forEach(v=>{const f=shortF(v.faction); (byF[f]??={f:0,a:0,n:0,full:v.faction}); byF[f][v.result===1?'f':v.result===2?'a':'n']++});
+  const frows=Object.entries(byF).sort((x,y)=>(y[1].f+y[1].a+y[1].n)-(x[1].f+x[1].a+x[1].n));
+  app.innerHTML=`
+  ${backBtnHTML('votes','› חזרה להצבעות')}
+  <div class="sec-title" style="margin-top:.4rem">הצבעה במליאה · הכנסת ה־26 <small>דף הצבעה — מפת המליאה, פירוט לפי ח״כ ו״אני הייתי מצביע״</small></div>
+  <article class="card pad rise" style="margin-top:.6rem">
+    <div class="card-top">${b.kind_label?`<span class="chip acc">${esc(b.kind_label)}</span>`:''}${b.method_id&&b.method_id>=3?`<span class="chip">${esc(VOTE_METHOD[b.method_id])}</span>`:''}<span class="date">${fmtDate(b.vote_date)}</span></div>
+    <h1 style="font-size:1.45rem;line-height:1.35">${esc(b.title)}</h1>
+    ${b.sub&&b.sub!==b.title?`<div class="bill-name">${esc(b.sub)}</div>`:''}
+    <div style="margin:1rem 0">${b.has_tally?`${outcomeHTML(b.total_for,b.total_against,b.total_abstain,'ההצעה התקבלה','ההצעה לא התקבלה')}${scoreHTML(b,true)}`:b.is_accepted!=null?`<div class="outcome ${b.is_accepted?'for':'against'}" role="status"><span class="o-main"><b>${b.is_accepted?'ההצעה התקבלה':'ההצעה לא התקבלה'}</b></span></div>`:''}</div>
+    <div data-matchhost-host>
+      <div class="myvote" style="max-width:520px"><span class="lbl" style="font-size:.95rem;color:var(--text);font-weight:800">אני הייתי מצביע/ה בהצבעה הזאת:</span>${[1,2,3].map(v=>`<button class="mv ${S.myVotes[String(b.id)]===v?'sel':''}" data-v="${v}" style="padding:.75rem .2rem" onclick="castMine('${b.id}',${v},this)">${v===1?'✓ בעד':v===2?'✕ נגד':'– נמנע'}</button>`).join('')}</div>
+      <div data-matchhost>${matchStrip(b)}</div>
+    </div>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem">
+      <a class="btn" href="https://knesset.gov.il/vote/heb/Vote_Res_Map.asp?vote_id_t=${b.id}" target="_blank" rel="noopener">דף ההצבעה הרשמי ↗</a>
+    </div>
+  </article>
+  ${b.mk_votes.length?`
+  <div class="sec-title">המליאה בהצבעה הזאת</div>
+  <div class="card pad plenum-wrap"><div>${plenumSVG(seats,'actual')}</div>
+    <div class="legend"><span>מילוי = סיעה</span><span><i style="background:transparent;border:3px solid var(--for)"></i>טבעת: בעד</span><span><i style="background:transparent;border:3px solid var(--against)"></i>נגד</span><span><i style="background:transparent;border:3px solid var(--abstain)"></i>נמנע</span></div>
+    <div class="small dim" style="margin-top:.4rem">הצביעו ${seats.length} ח״כים · רחפו/לחצו על מושב לכרטיס הח״כ.</div></div>
+  <div class="grid c2" style="margin-top:.85rem">
+    <div class="card pad"><h3 style="margin-bottom:.6rem">איך הצביעה כל סיעה</h3>
+      ${frows.map(([f,c])=>{const t=c.f+c.a+c.n||1;const cell=(v,cls)=>`<span class="${cls}${v?'':' zero'}">${v}</span>`;return `<div class="fbar" style="cursor:pointer" onclick="openFactionIn(26,'${jsq(c.full||f)}')"><span class="nm" style="color:${fcol(c.full)}">${esc(f)} ←</span><span class="tr"><span class="scorebar"><i class="f" style="width:${c.f/t*100}%"></i><i class="a" style="width:${c.a/t*100}%"></i><i class="n" style="width:${c.n/t*100}%"></i></span></span><span class="ftallies">${cell(c.f,'f')}${cell(c.a,'a')}${cell(c.n,'n')}</span></div>`}).join('')}
+    </div>
+    <div class="card pad"><h3 style="margin-bottom:.4rem">⚡ חרגו מהסיעה (${reb.length})</h3>
+      ${reb.length?`<div class="rows" style="margin:0 -.9rem">${reb.slice(0,10).map(v=>`<div class="row" onclick="openMk('${jsq(v.mk_name)}')">${avatar(v.mk_name,v.faction,34)}<span class="flex">${esc(disp(v.mk_name))} · ${esc(shortF(v.faction))}</span><span class="vchip ${v.result===1?'f':v.result===2?'a':'n'}">${{1:'בעד',2:'נגד',3:'נמנע'}[v.result]}</span></div>`).join('')}</div>`:'<p class="muted small">אף אחד לא חרג מעמדת סיעתו בהצבעה הזאת.</p>'}
+    </div>
+  </div>
+  <div class="sec-title">מי הצביע איך <small>${b.mk_votes.length} ח״כים</small></div>
+  <div class="card rows">${b.mk_votes.slice().sort((x,y)=>(x.result-y.result)||disp(x.mk_name).localeCompare(disp(y.mk_name),'he')).map(v=>`<div class="row" onclick="openMk('${jsq(v.mk_name)}')">${avatar(v.mk_name,v.faction,34)}<span class="flex"><b>${esc(disp(v.mk_name))}</b> <span class="dim small">· ${esc(shortF(v.faction))}</span></span><span class="vchip ${v.result===1?'f':v.result===2?'a':'n'}">${{1:'בעד',2:'נגד',3:'נמנע'}[v.result]}</span></div>`).join('')}</div>`
+  :noMkVotesHTML(b)}`;
+  document.querySelectorAll('.plenum-svg .seat').forEach((el,i)=>el.addEventListener('click',()=>openMk(seats[i].name)));
+}
 function renderVote(){
+  if(KN===26) return renderVote26();
   ensurePlenumSearch();
   const app=$('#app'), b=viewArg?voteModel(viewArg):null;
   if(!b){ app.innerHTML=backBtnHTML('votes','› חזרה להצבעות')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg></div>ההצבעה לא נמצאה.</div>'; return }
@@ -3110,7 +3171,7 @@ function renderVote(){
 }
 function renderVotes(){
   if(KN===26){ if(K26V.length){ const rows=[...K26V].sort((a,b)=>(b.date||'').localeCompare(a.date||'')).slice(0,100);
-    $('#app').innerHTML=`<div class="sec-title">הצבעות <small>כנסת 26 · ${K26V.length} הצבעות מליאה</small></div><div class="card rows">${rows.map(v=>`<div class="row"><span class="chip acc">${esc(v.kind_label||'הצבעה')}</span><span class="flex">${esc(v.title||v.desc||'')}<br><span class="dim small">${fmtDate(v.date)}${v.for!=null?` · ${v.for} בעד – ${v.against} נגד${v.abstain?` – ${v.abstain} נמנעים`:''} · ${v.for>v.against?'עברה':'נדחתה'}`:' · ספירה לפי ח״כ תגיע עם קצירת התוצאות'}</span></span></div>`).join('')}</div><p class="small dim" style="margin-top:.6rem">רשימה בסיסית מהמאגר הרשמי — מפת המליאה ו״אני הייתי מצביע״ ייפתחו כשקצירת התוצאות לפי ח״כ תצטבר.</p>`; return }
+    $('#app').innerHTML=`<div class="sec-title">הצבעות <small>כנסת 26 · ${K26V.length} הצבעות מליאה — לחצו על הצבעה למפת המליאה ול״אני הייתי מצביע״</small></div><div class="card rows">${rows.map(v=>`<div class="row" style="cursor:pointer" onclick="openVote('${v.id}')"><span class="chip acc">${esc(v.kind_label||'הצבעה')}</span><span class="flex">${esc(v.title||v.desc||'')}<br><span class="dim small">${fmtDate(v.date)}${v.for!=null?` · ${v.for} בעד – ${v.against} נגד${v.abstain?` – ${v.abstain} נמנעים`:''} · ${v.for>v.against?'עברה':'נדחתה'}`:' · ספירה לפי ח״כ תגיע עם קצירת התוצאות'}</span></span><span class="dim">←</span></div>`).join('')}</div>`; return }
     $('#app').innerHTML=`<div class="sec-title">הצבעות <small>כנסת 26</small></div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg></div>עדיין לא התקיימה אף הצבעה במליאת כנסת 26.<br><span class="small">ברגע שהראשונות יתקיימו, הן יופיעו כאן בדיוק כמו בכנסת 25.</span><br>${k25CtaHTML('📚 לכנסת 25 המלאה ←')}</div>`; return }
   renderVotesAll();
 }
@@ -4355,22 +4416,20 @@ function siteTopStarsHTML(){
 function renderMine(){
   // Newest vote first: the list below is capped, so insertion order would
   // hide the most recently cast votes once more than a pageful exist.
-  const mineBills=Object.entries(S.myVotes).map(([id,v])=>({b:voteModel(id),v})).filter(x=>x.b)
+  const mineBills=Object.entries(S.myVotes).map(([id,v])=>({b:KN===26?voteModel26(id):voteModel(id),v})).filter(x=>x.b)
     .sort((a,b)=>(b.b.vote_date||'').localeCompare(a.b.vote_date||''));
-  // MK ranking
-  const scores={}; for(const{b,v}of mineBills) for(const mv of voteMkVotes(b)){const s=scores[mv.mk_name]??={s:0,t:0,f:mv.faction}; s.t++; s.s+= mv.result===v?1:(mv.result===3||v===3?.5:0); if(mv.faction)s.f=mv.faction}
+  // MK ranking (per current Knesset's vote models; K26 models carry their
+  // own mk_votes so this runs identically on both eras)
+  const scores={}; for(const{b,v}of mineBills) for(const mv of (KN===26?(b.mk_votes||[]):voteMkVotes(b))){const s=scores[mv.mk_name]??={s:0,t:0,f:mv.faction}; s.t++; s.s+= mv.result===v?1:(mv.result===3||v===3?.5:0); if(mv.faction)s.f=mv.faction}
   const rank=Object.entries(scores).filter(([,s])=>s.t>=2).map(([n,s])=>({n,...s,pct:Math.round(s.s/s.t*100)})).sort((a,b)=>b.pct-a.pct||b.t-a.t);
   const fscore={}; rank.forEach(r=>{const f=shortF(r.f); const a=fscore[f]??={s:0,t:0,n:0}; a.s+=r.s; a.t+=r.t; a.n++});
   const fr=Object.entries(fscore).map(([f,a])=>({f,pct:Math.round(a.s/a.t*100),n:a.n})).sort((a,b)=>b.pct-a.pct);
   // Furthest = the tail of the same ranking, never overlapping the top 8
   // shown as closest (with a short ranking there is no separate tail).
   const farRank=rank.length>8?rank.slice(-Math.min(5,rank.length-8)).reverse():[];
-  // By-party agreement is grouped per Knesset and never mixed: the only
-  // voting record in the app today is K25's, so there is one group, tagged
-  // כנסת 25. When K26 plenum votes land, their parties join as a second
-  // {kn:26, rows} group here — same renderer, own tag, own faction pages
-  // (openFactionIn), no name ever resolved against the wrong Knesset.
-  const partyGroups=[{kn:25,rows:fr}];
+  // By-party agreement is grouped per Knesset and never mixed: one group
+  // for the current Knesset (K26 runs on voteModel26 the same way).
+  const partyGroups=[{kn:KN,rows:fr}];
   const newSince=prevSeen? VOTES_ALL.filter(v=>(v.date||'')>prevSeen):[];
   // Followed bills are grouped by Knesset and never mixed (same rule as
   // partyGroups below): bills are era-specific, unlike followed MKs who

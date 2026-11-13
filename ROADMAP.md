@@ -140,7 +140,7 @@ construction — the feed serves only the current roster.
 
 **Also in sprint 1:** contact/social/presence card on every MK page
 (`build_mk_contacts.py`); harvester pagination bug fixed in
-`build_k25_vote_results.py` (service caps pages at 100 rows regardless of
+`build_vote_results.py` (service caps pages at 100 rows regardless of
 `$top` — 1,008 votes were silently truncated at exactly 100 rows; they are
 now queued for refetch).
 

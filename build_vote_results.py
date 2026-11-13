@@ -1,7 +1,7 @@
 #!/usr/bin/env python3
 """Full per-MK results for every plenum vote of a Knesset era.
 
-Usage: python3 build_k25_vote_results.py [--knesset 25|26]  (default 25;
+Usage: python3 build_vote_results.py [--knesset 25|26]  (default 25;
 run build_knesset.py --knesset N first — vote IDs come from k{N}_votes.json.
 Missing/empty vote file = exit 0, no write: safe no-op before OData
 publishes that Knesset's votes.)

@@ -239,7 +239,7 @@ class UnpublishedLayerNoOpTest(unittest.TestCase):
 
     def test_vote_results_noop_without_votes_file(self):
         with tempfile.TemporaryDirectory() as td:
-            r = self.run_builder("build_k25_vote_results.py", td)
+            r = self.run_builder("build_vote_results.py", td)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertFalse((Path(td) / "data" / "k26_vote_results.json").exists())
 
@@ -247,7 +247,7 @@ class UnpublishedLayerNoOpTest(unittest.TestCase):
         with tempfile.TemporaryDirectory() as td:
             (Path(td) / "data").mkdir()
             (Path(td) / "data" / "k26_votes.json").write_text("[]", "utf-8")
-            r = self.run_builder("build_k25_vote_results.py", td)
+            r = self.run_builder("build_vote_results.py", td)
             self.assertEqual(r.returncode, 0, r.stderr)
             self.assertFalse((Path(td) / "data" / "k26_vote_results.json").exists())
 

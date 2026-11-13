@@ -334,7 +334,7 @@ class VoteResultsResumeTest(unittest.TestCase):
     closed era's votes do not change), so no refetch happens at all."""
 
     def test_checkpointed_100_row_vote_is_trusted_and_counted_once(self):
-        mod = load_module("build_k25_vote_results.py")
+        mod = load_module("build_vote_results.py")
         with tempfile.TemporaryDirectory() as td, Cwd(td):
             data = Path(td) / "data"
             data.mkdir()
@@ -343,7 +343,7 @@ class VoteResultsResumeTest(unittest.TestCase):
             (data / "k25_vote_results.json").write_text(json.dumps(
                 {"names": ["a"], "votes": {"1": [[0, 1]] * 100}}), "utf-8")
             mod.fetch_vote = mock.Mock(side_effect=AssertionError("network!"))
-            with mock.patch.object(sys, "argv", ["build_k25_vote_results.py"]):
+            with mock.patch.object(sys, "argv", ["build_vote_results.py"]):
                 mod.main()
             votes = json.loads((data / "k25_votes.json").read_text("utf-8"))
             self.assertEqual(votes[0]["for"], 100)
@@ -356,7 +356,7 @@ class VoteResultsResumeTest(unittest.TestCase):
         keys anyway: unsorted, the file churned byte-wise every run
         with zero semantic change (seen in data commit f5d47e3) and
         retriggered the analytics rebuild gated on it."""
-        mod = load_module("build_k25_vote_results.py")
+        mod = load_module("build_vote_results.py")
         with tempfile.TemporaryDirectory() as td, Cwd(td):
             data = Path(td) / "data"
             data.mkdir()
@@ -366,7 +366,7 @@ class VoteResultsResumeTest(unittest.TestCase):
             (data / "k25_vote_results.json").write_text(json.dumps(
                 {"names": ["a"], "votes": {"2": [[0, 1]], "1": [[0, 2]]}}), "utf-8")
             mod.fetch_vote = mock.Mock(side_effect=AssertionError("network!"))
-            with mock.patch.object(sys, "argv", ["build_k25_vote_results.py"]):
+            with mock.patch.object(sys, "argv", ["build_vote_results.py"]):
                 mod.main()
             pairs = json.loads((data / "k25_vote_results.json").read_text("utf-8"),
                                object_pairs_hook=lambda p: p)
