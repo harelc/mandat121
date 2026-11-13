@@ -1779,16 +1779,20 @@ function plenumSVG(seats,mode){
   const circles=seats.map((s,i)=>{const p=assigned[i]; if(!p)return'';
     // Encoding: fill = party colour. Ring = how they voted (for/against/
     // abstain). Absent MKs keep their party colour, dark-shaded, with no ring.
-    const label=esc(disp(s.name))+' · '+esc(shortF(s.faction||''))+(mode==='k26'&&s.rank?` · מקום ${s.rank} ברשימה`:'')+(RANK25[s.name]?(mode==='k26'?` · מקום ${RANK25[s.name]} ברשימה לכנסת ה־25`:` · מקום ${RANK25[s.name]} ברשימת ${esc(shortF(s.faction||''))} לכנסת ה־25`):'')+(mode!=='k26'&&KN===25&&!MKP[s.name]?' · כיהן/ה אז, עזב/ה מאז':'')+(s.present===true?' · כעת במשכן הכנסת':s.present===false?' · לא במשכן כרגע':'')+(s.absent?' · לא השתתף/ה בהצבעה':s.result?' · '+({1:'בעד',2:'נגד',3:'נמנע'})[s.result]:'');
+    const label=esc(disp(s.name))+' · '+esc(shortF(s.faction||''))+(mode==='k26'&&s.rank?` · מקום ${s.rank} ברשימה`:'')+(RANK25[s.name]?(mode==='k26'?` · מקום ${RANK25[s.name]} ברשימה לכנסת ה־25`:` · מקום ${RANK25[s.name]} ברשימת ${esc(shortF(s.faction||''))} לכנסת ה־25`):'')+(mode!=='k26'&&KN===25&&!MKP[s.name]?' · כיהן/ה אז, עזב/ה מאז':'')+(s.present===true?' · כעת במשכן הכנסת':s.present===false?' · לא במשכן כרגע':'')+(s.absent?' · לא השתתף/ה בהצבעה':s.result?' · '+({1:'בעד',2:'נגד',3:'נמנע'})[s.result]:'')+(followedMk(s.name)?' · ★ במעקב שלי':'');
     const ini=initialsOf(s.name);
+    // MKs the visitor follows get a thin golden outer ring on every
+    // hemicycle view — outside the vote/presence ring, which keeps its
+    // own meaning. Drawn first so the seat circle sits inside it.
+    const goldRing=followedMk(s.name)?`<circle cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${(R+3.4).toFixed(1)}" fill="none" stroke="#c9a227" stroke-width="2.2" style="pointer-events:none"></circle>`:'';
     if(s.absent||s.present===false){ // not-in-building seats shade like vote-absent ones
       const dark=shade(s.color,0.32);
-      return `<circle class="seat absent" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${R}" fill="${dark}" stroke="rgba(0,0,0,.45)" stroke-width="0.8" aria-label="${label}"></circle>`+
+      return goldRing+`<circle class="seat absent" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${R}" fill="${dark}" stroke="rgba(0,0,0,.45)" stroke-width="0.8" aria-label="${label}"></circle>`+
         (ini?`<text x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}" text-anchor="middle" dy="0.36em" font-size="${(R*0.84).toFixed(1)}" font-weight="700" fill="rgba(255,255,255,.5)" style="pointer-events:none">${esc(ini)}</text>`:'');
     }
     const ring=s.present===true?'#3a8a18':VOTE_RING[s.result]||'rgba(0,0,0,.35)'; // in the building now: green ring, same green as a "for" vote ring
     const [ifill,istroke]=initColors(s.color);
-    return `<circle class="seat" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${R}" fill="${s.color}" stroke="${ring}" stroke-width="${s.result?5.6:s.present===true?4.2:0.8}" aria-label="${label}"></circle>`+
+    return goldRing+`<circle class="seat" cx="${p.x.toFixed(1)}" cy="${p.y.toFixed(1)}" r="${R}" fill="${s.color}" stroke="${ring}" stroke-width="${s.result?5.6:s.present===true?4.2:0.8}" aria-label="${label}"></circle>`+
       (ini?`<text x="${p.x.toFixed(1)}" y="${p.y.toFixed(1)}" text-anchor="middle" dy="0.36em" font-size="${(R*0.84).toFixed(1)}" font-weight="800" fill="${ifill}" stroke="${istroke}" stroke-width="0.7" paint-order="stroke" style="pointer-events:none">${esc(ini)}</text>`:'')}).join('');
   // No native <title> on the seats: it would pop over the rich card below.
   // The same text stays on aria-label for screen readers.
