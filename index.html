@@ -2058,7 +2058,7 @@ function searchGroups(qRaw){
     const all=ALLB.map(b=>{ const r=bestRank([b.name,b.summary,b.synopsis],q); return {b,r:r>=0?r:(billMatches(b,qRaw)?2:-1)} }).filter(x=>x.r>=0)
       .sort((a,b)=>a.r-b.r||(b.b.updated||'').localeCompare(a.b.updated||''));
     const items=all.slice(0,SEARCH_GROUP_LIMIT)
-      .map(({b})=>({html:`<span class="flex">${esc(b.name)}<span class="sub">${esc(statusBucket(b))} · עודכן ${fmtDate(b.updated)}</span></span>`,go:()=>openBillPage(b.id)}));
+      .map(({b})=>({html:`<span class="flex">${esc(b.name)}<span class="sub">${esc(statusBucket(b))}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}</span></span>`,go:()=>openBillPage(b.id)}));
     push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> חוקים',all,items,total=>searchMoreItem(total,items.length,'החוקים',()=>{ allFilter.q=qRaw; allFilter.limit=30; go('bills') }));
   }
   { // Plenum votes (era index) — titles/descriptions the bill index misses
@@ -2759,6 +2759,23 @@ function renderNow(){
 
 /* ============ BILLS ============ */
 function filterTopic(t){eraFilter.topic=eraFilter.topic===t?'':t;eraFilter.limit=30;go('votes')}
+/* A bill's meaningful date is its last REAL event — the latest plenum
+   vote on it, or its law-publication date — never OData's LastUpdatedDate
+   (`b.updated`): that timestamp moves on every sync/republish (e.g. a bill
+   rejected 2024-06-05 showed "updated 10 Nov 2026"). Use this everywhere
+   a bill date is shown or sorted by. Returns '' when nothing is known. */
+function billActivityDate(b){
+  let d=b.publication_date||'';
+  for(const v of (b.votes||[])) if((v.date||'')>d) d=v.date;
+  return d;
+}
+function billActivityLabel(b){
+  const d=billActivityDate(b); if(!d) return '';
+  if(b.status_id===118||b.publication_date) return `הפך לחוק · פורסם ${fmtDate(d)}`;
+  const vs=(b.votes||[]).filter(v=>v.date===d);
+  if(vs.length){ const v=vs[vs.length-1]; return v.accepted===0?`נדחה/נדחתה בהצבעה ${fmtDate(d)}`:`הצבעה אחרונה ${fmtDate(d)}` }
+  return `פעילות אחרונה ${fmtDate(d)}`;
+}
 function statusBucket(b){
   if(b.status_id===118||b.publication_date) return 'הפכה לחוק';
   if(b.status_id===122) return 'מוזגה';
@@ -2800,10 +2817,10 @@ function renderBillsAll(){
   // Same chip sorts as the votes/MKs lists, on fields a bill actually has:
   // last activity, name, plenum votes, sponsors, and stage reached. Every
   // order falls back to most-recently-updated, then name, so ties are stable.
-  const byUpdated=(a,b)=>(b.updated||'').localeCompare(a.updated||'');
+  const byUpdated=(a,b)=>billActivityDate(b).localeCompare(billActivityDate(a)); // last real activity (vote/publication), NOT OData updated — see billActivityDate
   const byName=(a,b)=>(a.name||'').trim().localeCompare((b.name||'').trim(),'he')||byUpdated(a,b); // trim: many official names carry a leading space, which would sort them as a block ahead of unspaced names
   if(allFilter.sort==='alpha') list.sort(byName);
-  else if(allFilter.sort==='old') list.sort((a,b)=>(a.updated||'').localeCompare(b.updated||'')||byName(a,b));
+  else if(allFilter.sort==='old') list.sort((a,b)=>billActivityDate(a).localeCompare(billActivityDate(b))||byName(a,b));
   else if(allFilter.sort==='votes') list.sort((a,b)=>(b.votes||[]).length-(a.votes||[]).length||byUpdated(a,b));
   else if(allFilter.sort==='initiators') list.sort((a,b)=>(b.initiators||[]).length-(a.initiators||[]).length||byUpdated(a,b));
   else if(allFilter.sort==='stage') list.sort((a,b)=>billStage(b)-billStage(a)||byUpdated(a,b));
@@ -2818,9 +2835,9 @@ function renderBillsAll(){
     <select style="max-width:230px" onchange="allFilter.committee=this.value;allFilter.limit=30;renderBills()"><option value="">כל הוועדות</option>${topCommittees.map(([s,n])=>`<option ${allFilter.committee===s?'selected':''} value="${esc(s)}">${esc(s)} (${n})</option>`).join('')}</select>
     <select onchange="allFilter.type=this.value;allFilter.limit=30;renderBills()"><option value="">כל הסוגים</option>${['ממשלתית','פרטית','ועדה'].map(t=>`<option ${allFilter.type===t?'selected':''}>${t}</option>`).join('')}</select>
   </div>
-  <div class="chips" role="group" aria-label="מיון"><span class="pill-lbl">מיון:</span>${[['new','עודכנו לאחרונה'],['old','ממתינות הכי הרבה'],['alpha','שם א–ת'],['votes','הכי הרבה הצבעות'],['initiators','הכי הרבה יוזמים ומצטרפים'],['stage','הכי מתקדמות בהליך'],['stars','★ הכי נעקבים']].map(([k,v])=>`<button class="chip ${allFilter.sort===k?'on':''}" onclick="allFilter.sort='${k}';allFilter.limit=30;renderBills()">${v}</button>`).join('')}</div>
+  <div class="chips" role="group" aria-label="מיון"><span class="pill-lbl">מיון:</span>${[['new','פעילות אחרונה (הצבעה/פרסום)'],['old','ממתינות הכי הרבה'],['alpha','שם א–ת'],['votes','הכי הרבה הצבעות'],['initiators','הכי הרבה יוזמים ומצטרפים'],['stage','הכי מתקדמות בהליך'],['stars','★ הכי נעקבים']].map(([k,v])=>`<button class="chip ${allFilter.sort===k?'on':''}" onclick="allFilter.sort='${k}';allFilter.limit=30;renderBills()">${v}</button>`).join('')}</div>
   ${shown.length?`<div class="grid c2">${shown.map(b=>`<article class="card bill-card rise ${followedBill(b.id)?'followed':''}" onclick="openBillAll(${b.id})">
-    <div class="card-top"><span class="chip acc">${esc(statusBucket(b))}</span><span class="chip">${esc(b.type||'')}</span>${b.committee?`<span class="chip cmt" title="${esc(b.committee)}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(b.committee)}</span>`:''}<span class="date">עודכן ${b.updated?fmtDate(b.updated):''}</span></div>
+    <div class="card-top"><span class="chip acc">${esc(statusBucket(b))}</span><span class="chip">${esc(b.type||'')}</span>${b.committee?`<span class="chip cmt" title="${esc(b.committee)}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(b.committee)}</span>`:''}<span class="date">${esc(billActivityLabel(b))}</span></div>
     <div class="syn" style="font-size:.98rem">${esc(b.name)}</div>
     ${b.initiators&&b.initiators.length?`<div class="small muted" style="margin-top:.35rem">יוזמים: ${b.initiators.filter(i=>i.initiator).slice(0,3).map(i=>esc(disp(i.name))).join(', ')}${b.initiators.length>3?` · ועוד ${b.initiators.length-3}`:''}</div>`:''}
     <div class="small" style="margin-top:.4rem">${b.votes&&b.votes.length?`<span class="chip for"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> ${b.votes.length} הצבעות מתועדות — בדף ההצעה ←</span>`:`<span class="dim">${esc(b.status||'')}</span>`}</div>
@@ -2856,7 +2873,7 @@ function renderBillLite(){
   ${backBtnHTML('bills','› חזרה')}
   <article class="card pad rise" style="margin-top:.6rem">
     <div style="display:flex;gap:.6rem;align-items:flex-start"><div style="flex:1">
-    <div class="card-top"><span class="chip acc">${esc(statusBucket(b))}</span><span class="chip">${esc(b.type||'')}</span>${b.committee?`<span class="chip cmt" title="${esc(b.committee)}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(b.committee)}</span>`:''}<span class="date">עודכן ${b.updated?fmtDate(b.updated):''}</span></div>
+    <div class="card-top"><span class="chip acc">${esc(statusBucket(b))}</span><span class="chip">${esc(b.type||'')}</span>${b.committee?`<span class="chip cmt" title="${esc(b.committee)}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(b.committee)}</span>`:''}<span class="date">${esc(billActivityLabel(b))}</span></div>
     <h1 style="font-size:1.35rem;line-height:1.4">${esc(b.name)}</h1>
     </div><div style="text-align:center">${starBtn('bill',b.id,b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.id)?'במעקב ★':'מעקב'}</div></div></div>
     <div class="small muted" style="margin-top:.5rem;line-height:1.9">
@@ -2884,8 +2901,8 @@ function renderBillLite(){
   window.scrollTo(0,0);
 }
 function renderBills(){
-  if(KN===26){ if(K26B.length){ const rows=[...K26B].sort((a,b)=>(b.updated||'').localeCompare(a.updated||'')).slice(0,100);
-    $('#app').innerHTML=`<div class="sec-title">חוקים <small>כנסת 26 · ${K26B.length} הצעות</small></div><div class="card rows">${rows.map(b=>`<div class="row"><span class="flex">${esc(b.name||'')}<br><span class="dim small">${esc(b.status||'')}${b.committee?` · ${esc(b.committee)}`:''}${b.type?` · ${esc(b.type)}`:''}${b.updated?` · עודכן ${fmtDate(b.updated)}`:''}${(b.initiators||[]).some(i=>i.initiator)?` · יוזמים: ${b.initiators.filter(i=>i.initiator).slice(0,3).map(i=>esc(disp(i.name))).join(', ')}`:''}</span></span>${b.votes?.length?`<span class="chip acc">${b.votes.length} הצבעות</span>`:''}</div>`).join('')}</div><p class="small dim" style="margin-top:.6rem">רשימה בסיסית מהמאגר הרשמי — מסע החוק המלא ייפתח כשיצטברו הצבעות וישיבות ועדה בכנסת 26.</p>`; return }
+  if(KN===26){ if(K26B.length){ const rows=[...K26B].sort((a,b)=>billActivityDate(b).localeCompare(billActivityDate(a))).slice(0,100);
+    $('#app').innerHTML=`<div class="sec-title">חוקים <small>כנסת 26 · ${K26B.length} הצעות</small></div><div class="card rows">${rows.map(b=>`<div class="row"><span class="flex">${esc(b.name||'')}<br><span class="dim small">${esc(b.status||'')}${b.committee?` · ${esc(b.committee)}`:''}${b.type?` · ${esc(b.type)}`:''}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}${(b.initiators||[]).some(i=>i.initiator)?` · יוזמים: ${b.initiators.filter(i=>i.initiator).slice(0,3).map(i=>esc(disp(i.name))).join(', ')}`:''}</span></span>${b.votes?.length?`<span class="chip acc">${b.votes.length} הצבעות</span>`:''}</div>`).join('')}</div><p class="small dim" style="margin-top:.6rem">רשימה בסיסית מהמאגר הרשמי — מסע החוק המלא ייפתח כשיצטברו הצבעות וישיבות ועדה בכנסת 26.</p>`; return }
     $('#app').innerHTML=`<div class="sec-title">חוקים <small>כנסת 26</small></div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg></div>עדיין אין הצעות חוק בכנסת 26.<br><span class="small">ברגע שהראשונות יוגשו, הן יופיעו כאן בדיוק כמו בכנסת 25 — עם מסע החוק ועבודת הוועדה.</span><br><button class="btn primary" style="margin-top:.8rem" onclick="switchKnesset(25)">לכנסת 25 המלאה ←</button></div>`; return }
   if(ALLB.length){ renderBillsAll(); return }
   $('#app').innerHTML=`<div class="sec-title">חוקים</div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg></div>מאגר הצעות החוק המלא לא נטען.</div>`;
@@ -3328,7 +3345,7 @@ function mkInitiatedHTML(name,hideEmpty=false){
     if(!roles.length) continue;
     if(roles.some(i=>i.initiator)) led.push(b); else joinedN++;
   }
-  led.sort((a,b)=>(b.updated||'').localeCompare(a.updated||''));
+  led.sort((a,b)=>billActivityDate(b).localeCompare(billActivityDate(a)));
   if(!led.length&&hideEmpty) return '';
   const lawN=led.filter(b=>b.status_id===118||b.publication_date).length;
   const voteN=led.filter(b=>(b.votes||[]).length).length;
@@ -3352,7 +3369,7 @@ function mkInitiatedHTML(name,hideEmpty=false){
   return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> הצעות חוק שחבר הכנסת יזמ/ה <small class="dim">${led.length.toLocaleString('he-IL')} הצעות בכנסת 25 שבהן ${esc(disp(name))} יוזם/ת</small></h3>
   ${led.length?`<div class="small muted" style="margin-top:.35rem;line-height:1.9">${lawN?`<b style="color:var(--for)">${lawN}</b> הפכו לחוק · `:''}<b>${voteN}</b> הגיעו להצבעת מליאה${joinedN?` · בנוסף הצטרף/ה כחותם/ת ל־${joinedN} הצעות של אחרים`:''}</div>${pipeHTML}
   ${pipeSel>=0?`<div class="small" style="margin-top:.55rem">מוצגות <b>${ledShown.length.toLocaleString('he-IL')}</b> הצעות בשלב ״${esc(pipe[pipeSel][0])}״ מתוך ${led.length.toLocaleString('he-IL')}:</div>`:''}
-  <div class="rows" style="margin:.5rem -.9rem 0">${shown.map(b=>{const others=(b.initiators||[]).filter(i=>i.initiator&&i.name!==name).length;return `<div class="row" onclick="openBillPage('${b.id}')"><span class="flex">${esc(b.name)}<br><span class="dim small">${esc(statusBucket(b))}${b.committee?` · ${esc(b.committee)}`:''} · עודכן ${b.updated?fmtDate(b.updated):''}${others?` · עם עוד ${others} יוזמים`:''}</span></span><span class="chip acc">להצעה ←</span></div>`}).join('')}</div>
+  <div class="rows" style="margin:.5rem -.9rem 0">${shown.map(b=>{const others=(b.initiators||[]).filter(i=>i.initiator&&i.name!==name).length;return `<div class="row" onclick="openBillPage('${b.id}')"><span class="flex">${esc(b.name)}<br><span class="dim small">${esc(statusBucket(b))}${b.committee?` · ${esc(b.committee)}`:''}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}${others?` · עם עוד ${others} יוזמים`:''}</span></span><span class="chip acc">להצעה ←</span></div>`}).join('')}</div>
   ${ledShown.length>shown.length?`<div style="text-align:center;margin-top:.7rem"><button class="btn" onclick="mkBillsShowAll=true;renderMkDetail()">הצגת כל ${ledShown.length.toLocaleString('he-IL')} ההצעות</button></div>`:mkBillsShowAll&&ledShown.length>12?`<div style="text-align:center;margin-top:.7rem"><button class="btn ghost" onclick="mkBillsShowAll=false;renderMkDetail()">קיפול הרשימה</button></div>`:''}`
   :`<p class="muted small" style="margin-top:.4rem">לא נמצאו הצעות חוק שחבר הכנסת יזמ/ה בכנסת 25${joinedN?` — אבל הצטרף/ה כחותם/ת ל־${joinedN} הצעות של ח״כים אחרים`:''}.</p>`}</div>`;
 }
@@ -3886,7 +3903,7 @@ function renderFactionDetail(){
   // Rebels: THE shared definition over all documented plenum votes — the
   // same numbers the MK cards show.
   const rebelsList=Object.entries(eraFactionRebelCounts(f.name)).sort((a,b)=>b[1]-a[1]).slice(0,6);
-  const initiated=ALLB.filter(b=>(b.initiators||[]).some(i=>memberSet.has(i.name))).sort((a,b)=>(b.updated||'').localeCompare(a.updated||'')).slice(0,12);
+  const initiated=ALLB.filter(b=>(b.initiators||[]).some(i=>memberSet.has(i.name))).sort((a,b)=>billActivityDate(b).localeCompare(billActivityDate(a))).slice(0,12);
   // Served in this faction during K25 but are not in its current line-up:
   // left the Knesset mid-term, or moved to another faction. Faction stints
   // (PositionID=54) are the source — a name qualifies on any stint here,
@@ -3911,7 +3928,7 @@ function renderFactionDetail(){
   <div class="grid c2" style="margin-top:.85rem">
     <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> חברי הסיעה כיום <small class="dim">בסדר הרשימה המקורי</small></h3><div class="rows" style="margin:.5rem -.9rem 0">${f.members.map(n=>{const m=mkIndex[n]; const a=myAgreement(n); return `<div class="row" onclick="openMk('${jsq(n)}')"><b style="width:1.7rem;color:${f.color}">${RANK25[n]||''}</b>${avatar(n,f.full,34)}<span class="flex">${esc(disp(n))}<br><span class="dim small">${m?.votes.length||0} הצבעות${a?` · ${a.pct}% כמוך`:''}</span></span><span class="chip acc">לכרטיס ←</span></div>`}).join('')}</div></div>
     <div class="card pad"><h3>↗️ חרגו הכי הרבה מהסיעה <small class="dim">בכל הצבעות המליאה המתועדות — כמו בכרטיס הח״כ</small></h3>${rebelsList.length?`<div class="rows" style="margin:.5rem -.9rem 0">${rebelsList.map(([n,c])=>`<div class="row" onclick="openMk('${jsq(n)}')">${avatar(n,f.full,34)}<span class="flex">${esc(disp(n))}<br><span class="dim small">${MKP[n]?'מכהן/ת כיום':'כיהן/ה במהלך הקדנציה'}</span></span><b style="color:var(--against)">${c}×</b></div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">לא נמצאו חריגות מתועדות.</p>'}
-    <h3 style="margin-top:1rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> הצעות אחרונות של חברי הסיעה</h3>${initiated.length?`<div class="rows" style="margin:.5rem -.9rem 0">${initiated.map(b=>`<div class="row" onclick="openBillPage('${b.id}')"><span class="flex">${esc(b.name)}<br><span class="dim small">${esc(b.status||'')} · עודכן ${b.updated?fmtDate(b.updated):''}</span></span><span class="chip acc">להצעה ←</span></div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">לא נמצאו הצעות של חברי הסיעה הנוכחיים במאגר המלא.</p>'}</div>
+    <h3 style="margin-top:1rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> הצעות אחרונות של חברי הסיעה</h3>${initiated.length?`<div class="rows" style="margin:.5rem -.9rem 0">${initiated.map(b=>`<div class="row" onclick="openBillPage('${b.id}')"><span class="flex">${esc(b.name)}<br><span class="dim small">${esc(b.status||'')}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}</span></span><span class="chip acc">להצעה ←</span></div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">לא נמצאו הצעות של חברי הסיעה הנוכחיים במאגר המלא.</p>'}</div>
   </div>
   ${leavers.length?`<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M13.5 4H20v16h-6.5"/><path d="M10 8l-4 4 4 4"/><path d="M6 12h11"/></svg> עזבו במהלך הקדנציה <small class="dim">${leavers.length} ח״כים כיהנו בסיעה ואינם בה כיום — עזבו את הכנסת או עברו לסיעה אחרת</small></h3><div class="rows" style="margin:.5rem -.9rem 0">${leavers.map(l=>`<div class="row" onclick="openMk('${jsq(l.n)}')">${avatar(l.n,f.full,34)}<span class="flex">${esc(disp(l.n))}<br><span class="dim small">בסיעה: ${esc(l.period)} · ${l.votes.toLocaleString('he-IL')} הצבעות מתועדות${l.cur?` · כיום: ${esc(l.cur)}`:''}</span></span><span class="chip">${l.cur?'בסיעה אחרת כיום':esc(formerBadgeText(l.n))}</span></div>`).join('')}</div></div>`:''}
   <div class="sec-title">ההצבעות האחרונות של הסיעה <small>לפי הסיעה ביום ההצבעה</small></div>
@@ -4299,7 +4316,13 @@ function renderMine(){
   // (openFactionIn), no name ever resolved against the wrong Knesset.
   const partyGroups=[{kn:25,rows:fr}];
   const newSince=prevSeen? VOTES_ALL.filter(v=>(v.date||'')>prevSeen):[];
-  const fb=ALLB.filter(b=>followedBill(b.id)); const fm=S.followMks.map(n=>mkIndex[n]||{name:n,faction:(k26Entry(n)||{}).party?.name||'',votes:[]});
+  // Followed bills are grouped by Knesset and never mixed (same rule as
+  // partyGroups below): bills are era-specific, unlike followed MKs who
+  // are shared across eras. Both groups show in Mine — it's the personal
+  // command center — but each is tagged with its Knesset.
+  const fb25=ALLB.filter(b=>(STORE['25'].followBills||[]).includes(String(b.id)));
+  const fb26=(typeof K26B!=='undefined'&&K26B?K26B:[]).filter(b=>(STORE['26'].followBills||[]).includes(String(b.id)));
+  const fb=[...fb25,...fb26]; const fm=S.followMks.map(n=>mkIndex[n]||{name:n,faction:(k26Entry(n)||{}).party?.name||'',votes:[]});
   const fc=(S.followCommittees||[]).map(id=>committeeById(id)).filter(Boolean); // followed committees may belong to either Knesset
   const ff=(S.followFactions||[]);
   const topMk=rank[0], topFac=fr[0];
@@ -4322,7 +4345,7 @@ function renderMine(){
   const pushFeed=(date,icon,title,sub,go)=>{ if(!date) return; const k=icon+'|'+title+'|'+date; if(feedSeen.has(k)) return; feedSeen.add(k); feed.push({date,icon,title,sub,go}) };
   const fbIds=new Set(fb.map(b=>String(b.id)));
   for(const b of fb){
-    pushFeed(b.updated,'📜',`חוק במעקב עודכן: ${displayText(b)}`,`השלב כעת: ${statusBucket(b)}${b.status?` · ${b.status}`:''}`,`openBillPage('${b.id}')`);
+    pushFeed(billActivityDate(b),'📜',`פעילות בחוק במעקב: ${displayText(b)}`,`${billActivityLabel(b)} · השלב כעת: ${statusBucket(b)}`,`openBillPage('${b.id}')`);
   }
   for(const v of VOTES_ALL){
     if(v.item_id&&fbIds.has(String(v.item_id))){ const b=ALLB_BY_ID[v.item_id]; pushFeed(v.date,'🗳️',`הצבעה על חוק במעקב: ${b?displayText(b):''}`,`${v.for??''}–${v.against??''} · ${RL[v.reading]||v.kind_label||'הצבעת מליאה'}`,`openVote('${v.id}')`) }
@@ -4338,7 +4361,7 @@ function renderMine(){
   for(const b of ALLB){
     const inits=(b.initiators||[]).filter(i=>i.initiator);
     const mineMk=inits.find(i=>S.followMks.includes(i.name));
-    if(mineMk&&!fbIds.has(String(b.id))) pushFeed(b.updated,'✍️',`הצעת חוק חדשה של ${disp(mineMk.name)}`,`${b.name} · ${statusBucket(b)}`,`openBillPage('${b.id}')`);
+    if(mineMk&&!fbIds.has(String(b.id))) pushFeed(billActivityDate(b),'✍️',`הצעת חוק חדשה של ${disp(mineMk.name)}`,`${b.name} · ${statusBucket(b)}`,`openBillPage('${b.id}')`);
   }
   const sessSrc=[...(CMT?.recent_sessions||[]),...(K26CMT?.recent_sessions||[])];
   for(const s of sessSrc){ if((S.followCommittees||[]).map(String).includes(String(s.committee_id))) pushFeed((s.start||s.date||'').slice(0,10),'🏛️',`ישיבת ועדה במעקב: ${cmtName(s.committee_id)}`,`${s.title||'ישיבת ועדה'}`,`openCommittee('${s.committee_id}')`) }
@@ -4346,7 +4369,7 @@ function renderMine(){
     const memberNames=new Set();
     for(const f of ff){ const cf=currentFactions().find(x=>x.name===f||shortF(x.name)===f); if(cf) cf.members.forEach(n=>memberNames.add(n));
       const p=(K26?.parties||[]).find(x=>x.name===f); if(p) (p.elected||[]).forEach(n=>memberNames.add(n)) }
-    for(const b of ALLB){ const hit=(b.initiators||[]).find(i=>i.initiator&&memberNames.has(i.name)); if(hit&&!fbIds.has(String(b.id))) pushFeed(b.updated,'👥',`חבר/ת ${ff[0]} יזם/ה הצעת חוק`,`${b.name} · יוזם/ת: ${disp(hit.name)} · ${statusBucket(b)}`,`openBillPage('${b.id}')`) }
+    for(const b of ALLB){ const hit=(b.initiators||[]).find(i=>i.initiator&&memberNames.has(i.name)); if(hit&&!fbIds.has(String(b.id))) pushFeed(billActivityDate(b),'👥',`חבר/ת ${ff[0]} יזם/ה הצעת חוק`,`${b.name} · יוזם/ת: ${disp(hit.name)} · ${statusBucket(b)}`,`openBillPage('${b.id}')`) }
   }
   feed.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const feedTop=feed.slice(0,18);
@@ -4355,7 +4378,7 @@ function renderMine(){
   <section class="cc-hero rise"><div style="display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap"><h2>🎛️ מרכז הבקרה שלי</h2><span class="small muted">המנדט ה־121 שלך — הצבעות, מעקב ומי מייצג אותך · נשמר מקומית בדפדפן זה בלבד</span><span style="margin-inline-start:auto"><button class="btn small" onclick="go('bills')">לחוקים ←</button> <button class="btn small" onclick="go('mks')">לח״כים ←</button> <button class="btn small" onclick="go('votes')">להצבעות ←</button> <button class="btn small" onclick="go('now')">לעכשיו ←</button></span></div>
   <div class="cc-tiles">
     <div class="cc-tile"><b>${mineBills.length.toLocaleString('he-IL')}</b><span>הצבעות שסימנתי “אני הייתי מצביע/ה”</span></div>
-    <div class="cc-tile gold"><b>${followCount().toLocaleString('he-IL')}</b><span>במעקב שלי ★ — ${fb.length} חוקים · ${fm.length} ח״כים · ${fc.length} ועדות · ${ff.length} סיעות${(S.followTopics||[]).length?` · ${S.followTopics.length} נושאים`:''}</span></div>
+    <div class="cc-tile gold"><b>${followCount().toLocaleString('he-IL')}</b><span>במעקב שלי ★ — ${fb.length} חוקים (${fb25.length} מכנסת 25 · ${fb26.length} מכנסת 26) · ${fm.length} ח״כים · ${fc.length} ועדות · ${ff.length} סיעות${(S.followTopics||[]).length?` · ${S.followTopics.length} נושאים`:''}</span></div>
     <div class="cc-tile"><b>${newSince.length.toLocaleString('he-IL')}</b><span>הצבעות מליאה חדשות מאז הביקור הקודם</span></div>
     <div class="cc-tile green"><b>${topMk?topMk.pct+'%':'—'}</b><span>${topMk?'הכי כמוני: '+esc(disp(topMk.n))+' ('+topMk.t+' משותפות)':'הכי כמוני — אחרי 2–3 סימונים'}</span></div>
     <div class="cc-tile green"><b>${topFac?topFac.pct+'%':'—'}</b><span>${topFac?'הסיעה הקרובה אליי: '+esc(topFac.f):'הסיעה הקרובה אליי'}</span></div>
@@ -4374,7 +4397,8 @@ function renderMine(){
     </div>
     <div class="card pad"><h3>★ במעקב שלי (${followCount()})</h3>
       ${followCount()?`
-        ${fb.length?`<div class="small dim" style="margin-top:.5rem">חוקים</div>${fb.slice(0,6).map(b=>`<div class="row" style="margin:0 -.9rem" onclick="openBillPage('${b.id}')"><span class="flex">${esc(displayText(b))}</span><span class="dim small">${esc(statusBucket(b))}${b.updated?` · עודכן ${fmtDate(b.updated)}`:''}</span></div>`).join('')}`:''}
+        ${fb25.length?`<div class="small dim" style="margin-top:.5rem">חוקים · <span class="chip acc" style="font-size:.68rem">כנסת 25</span></div>${fb25.slice(0,6).map(b=>`<div class="row" style="margin:0 -.9rem" onclick="openBillPage('${b.id}')"><span class="flex">${esc(displayText(b))}</span><span class="dim small">${esc(statusBucket(b))}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}</span></div>`).join('')}`:''}
+        ${fb26.length?`<div class="small dim" style="margin-top:.5rem">חוקים · <span class="chip acc" style="font-size:.68rem">כנסת 26</span></div>${fb26.slice(0,6).map(b=>`<div class="row" style="margin:0 -.9rem" onclick="if(KN!==26)switchKnesset(26);go('bills')"><span class="flex">${esc(b.name||'')}</span><span class="dim small">${esc(b.status||'')}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}</span></div>`).join('')}`:''}
         ${fm.length?`<div class="small dim" style="margin-top:.5rem">ח״כים</div>${fm.slice(0,6).map(m=>{const sc=scores[m.name]; const pct=sc&&sc.t>=2?Math.round(sc.s/sc.t*100):null; return `<div class="row" style="margin:0 -.9rem" onclick="openMk('${jsq(m.name)}')">${avatar(m.name,m.faction,30)}<span class="flex">${esc(disp(m.name))}<br><span class="dim small">${esc(shortF(m.faction||''))}</span></span>${pct!=null?`<b style="color:${pct>=50?'var(--for)':'var(--against)'}">${pct}% <span class="dim small" style="font-weight:600">כמוני</span></b>`:''}</div>`}).join('')}`:''}
         ${fc.length?`<div class="small dim" style="margin-top:.5rem">ועדות במעקב</div>${fc.slice(0,6).map(c=>`<div class="row" style="margin:0 -.9rem" onclick="openCommittee('${c.id}')"><span class="flex">${esc(c.name)}<br><span class="dim small">ישיבה אחרונה: ${c.last_session?fmtDate(c.last_session):'—'} · ${c.dataset_bills||0} חוקים מהמאגר</span></span><span class="chip acc">לוועדה ←</span></div>`).join('')}`:''}
         ${ff.length?`<div class="small dim" style="margin-top:.5rem">סיעות במעקב</div>${ff.slice(0,6).map(f=>`<div class="row" style="margin:0 -.9rem" onclick="openFaction('${jsq(f)}')"><span class="flex" style="color:${fcol(f)};font-weight:700">${esc(f)}</span>${starCountOf('faction',f)?`<span class="dim small">★ ${starCountOf('faction',f).toLocaleString('he-IL')} עוקבים באתר</span>`:''}<span class="chip acc">לסיעה ←</span></div>`).join('')}`:''}
