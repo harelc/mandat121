@@ -57,7 +57,7 @@ T(R, 356, "כוכבי מעקב עם מוני עוקבים חיים · ״שלי״
 T(R, 402, "ומסלול החקיקה המלא של כל חבר כנסת", 31, MID)
 
 # --- Card 1: MK lawmaking pipeline histogram (the headline feature) ---
-card(M, 478, R, 896)
+card(M, 478, R, 872)
 T(R - 36, 512, "היסטוגרמת שלבי החקיקה של כל ח״כ", 36, TEXT, "ra", "Rubik", 800)
 T(R - 36, 566, "הצעות חוק שחבר הכנסת יזמ/ה בכנסת 25 — לאן הן הגיעו?", 27, DIM)
 segs = [(9, FOR), (7, (122, 182, 72)), (3, ABSTAIN), (62, (216, 198, 144)), (14, AGAINST), (5, (154, 143, 122))]
@@ -76,33 +76,38 @@ for i, (label, n, col) in enumerate(lines):
     d.ellipse([colx - 18, yy + 7, colx, yy + 25], fill=col)
     T(colx - 30, yy, f"{label} · {n}", 26)
     if i % 2 == 1: yy += 44
-T(R - 36, 838, "לחיצה על שלב בהיסטוגרמה מסננת את רשימת ההצעות של הח״כ", 24, ACCENT)
+T(R - 36, 824, "לחיצה על שלב בהיסטוגרמה מסננת את רשימת ההצעות של הח״כ", 24, ACCENT)
 
 # --- Card 2: stars ---
-card(M, 930, R, 1152)
-T(R - 36, 964, "★ מעקב שעובד בשבילכם", 36, TEXT, "ra", "Rubik", 800)
-rr([R - 250, 1022, R - 36, 1082], 30, fill=(247, 236, 196), outline=GOLD, w=2)
-T(R - 143, 1034, "★  128 עוקבים", 29, GOLD_TX, "ma")
+card(M, 902, R, 1086)
+T(R - 36, 930, "★ מעקב שעובד בשבילכם", 36, TEXT, "ra", "Rubik", 800)
+rr([R - 250, 988, R - 36, 1044], 30, fill=(247, 236, 196), outline=GOLD, w=2)
+T(R - 143, 998, "★  128 עוקבים", 29, GOLD_TX, "ma")
 for i, lbl in enumerate(["חוק ☆", "ח״כ ☆", "ועדה ☆", "סיעה ☆"]):
     xx = R - 286 - i * 178
-    rr([xx - 158, 1022, xx, 1082], 30, fill=SURF2, outline=LINE, w=2)
-    T(xx - 79, 1036, lbl, 26, MID, "ma")
-T(R - 36, 1104, "כולל סיעות — ומיון חדש בכל רשימה: ★ הכי נעקבים", 26, DIM)
+    rr([xx - 158, 988, xx, 1044], 30, fill=SURF2, outline=LINE, w=2)
+    T(xx - 79, 1000, lbl, 26, MID, "ma")
+T(R - 36, 1058, "כולל סיעות — ומיון חדש: ★ הכי נעקבים", 25, DIM)
 
-# --- Card 3: command center tiles ---
-card(M, 1186, R, 1362)
-T(R - 36, 1218, "״שלי״ — מרכז הבקרה האישי", 36, TEXT, "ra", "Rubik", 800)
-tiles = [("42", "הצבעות שסימנתי"), ("17", "במעקב שלי ★"), ("87%", "הכי כמוני"), ("12", "עכשיו באתר")]
-tw = (bw - 24) // 2
-for i, (n, lbl) in enumerate(tiles[:2]):
-    tx = R - 36 - i * (tw + 24)
-    rr([tx - tw, 1276, tx, 1338], 16, fill=SURF2, outline=LINE, w=1)
-    T(tx - 18, 1286, n, 34, ACCENT)
-    T(tx - 90, 1292, lbl, 23, MID)
+# --- Card 3: Mine activity feed ---
+card(M, 1116, R, 1396)
+T(R - 36, 1148, "״שלי״ — מרכז בקרה עם פיד פעילות חי", 34, TEXT, "ra", "Rubik", 800)
+feed = [
+    ("●", "הצבעה על חוק במעקב: 52–41 · התקבל", "היום"),
+    ("●", "ח״כ במעקב יזם/ה הצעת חוק חדשה", "אתמול"),
+    ("●", "ישיבה בוועדה במעקב — עם סדר יום", "אתמול"),
+    ("●", "ח״כ במעקב דיבר/ה במליאה · 6 קטעים", "לפני יומיים"),
+]
+yy = 1196
+for icon, txt, when in feed:
+    rr([M + 30, yy, R - 30, yy + 42], 12, fill=SURF2, outline=LINE, w=1)
+    T(R - 48, yy + 8, icon + "  " + txt, 24, TEXT)
+    T(M + 48, yy + 10, when, 20, DIM, "la")
+    yy += 52
 
 # footer
-T(R, 1406, "mandat121.netlify.app", 34, ACCENT)
-T(M, 1414, "חינם · בלי הרשמה · המעקב נשמר רק בדפדפן שלכם", 25, DIM, "la")
+T(R, 1432, "mandat121.netlify.app", 34, ACCENT)
+T(M, 1440, "חינם · בלי הרשמה · המעקב נשמר רק בדפדפן שלכם", 25, DIM, "la")
 
 img.save("/Users/harel/Developer/biapia/examples/twitter-hero.png")
 print("saved")
