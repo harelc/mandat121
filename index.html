@@ -151,12 +151,16 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 .star.on{color:#8a660a;border-color:#c9a227;background:linear-gradient(180deg,#f9efc9,#f3e3a1);box-shadow:0 2px 10px rgba(201,162,39,.35)}
 .star-n{font-size:.72rem;font-weight:800;background:rgba(138,102,10,.14);border-radius:999px;padding:.05rem .4rem;line-height:1.5}
 .star:not(.on) .star-n{background:var(--surface2);color:var(--dim)}
-.cc-hero{background:linear-gradient(135deg,#2b2413,#4a3a10 55%,#6b5518);color:#fdf6dd;border-radius:20px;padding:1.1rem 1.2rem;box-shadow:var(--shadow);margin-bottom:.9rem}
-.cc-hero h2{font-size:1.35rem;margin:0}
-.cc-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:.6rem;margin-top:.8rem}
-.cc-tile{background:rgba(255,255,255,.08);border:1px solid rgba(255,255,255,.16);border-radius:14px;padding:.6rem .7rem}
-.cc-tile b{display:block;font-size:1.45rem;line-height:1.1;color:#ffe98a}
-.cc-tile span{font-size:.75rem;opacity:.85}
+.cc-hero{background:linear-gradient(180deg,#fffdf7,var(--surface) 55%,var(--bg2));border:1px solid var(--line);border-radius:20px;padding:1.1rem 1.2rem;box-shadow:var(--shadow);margin-bottom:.9rem}
+.cc-hero h2{font-size:1.35rem;margin:0;color:var(--text)}
+.cc-hero .btn{background:var(--surface);border:1px solid var(--line);color:var(--text)}
+.cc-hero .btn:hover{border-color:var(--accent);color:var(--accent)}
+.cc-tiles{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.6rem;margin-top:.8rem}
+.cc-tile{background:var(--surface2);border:1px solid var(--line);border-radius:14px;padding:.65rem .75rem}
+.cc-tile b{display:block;font-size:1.5rem;line-height:1.1;color:var(--accent)}
+.cc-tile.gold b{color:#8a660a}
+.cc-tile.green b{color:var(--for)}
+.cc-tile span{font-size:.75rem;color:var(--mid)}
 .pipe{display:flex;height:1.5rem;border-radius:999px;overflow:hidden;border:1px solid var(--line);margin:.55rem 0 .35rem}
 .pipe i{display:block;height:100%}
 .pipe-legend{display:grid;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));gap:.3rem .8rem;font-size:.8rem;margin-top:.4rem}
@@ -4272,14 +4276,17 @@ function renderMine(){
   const ff=(S.followFactions||[]);
   const topMk=rank[0], topFac=fr[0];
   $('#app').innerHTML=`
-  <section class="cc-hero rise"><div style="display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap"><h2>🎛️ מרכז הבקרה שלי</h2><span class="small" style="opacity:.8">המנדט ה־121 שלך — כל מה שעוקבים אחריו, במקום אחד · נשמר מקומית בדפדפן זה</span><span style="margin-inline-start:auto"><button class="btn small" onclick="go('bills')">לחוקים ←</button> <button class="btn small" onclick="go('mks')">לח״כים ←</button> <button class="btn small" onclick="go('now')">לעכשיו ←</button></span></div>
+  <section class="cc-hero rise"><div style="display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap"><h2>🎛️ מרכז הבקרה שלי</h2><span class="small muted">המנדט ה־121 שלך — הצבעות, מעקב ומי מייצג אותך · נשמר מקומית בדפדפן זה בלבד</span><span style="margin-inline-start:auto"><button class="btn small" onclick="go('bills')">לחוקים ←</button> <button class="btn small" onclick="go('mks')">לח״כים ←</button> <button class="btn small" onclick="go('votes')">להצבעות ←</button> <button class="btn small" onclick="go('now')">לעכשיו ←</button></span></div>
   <div class="cc-tiles">
     <div class="cc-tile"><b>${mineBills.length.toLocaleString('he-IL')}</b><span>הצבעות שסימנתי “אני הייתי מצביע/ה”</span></div>
-    <div class="cc-tile"><b>${followCount().toLocaleString('he-IL')}</b><span>במעקב שלי ★ (${fb.length} חוקים · ${fm.length} ח״כים · ${fc.length} ועדות · ${ff.length} סיעות)</span></div>
+    <div class="cc-tile gold"><b>${followCount().toLocaleString('he-IL')}</b><span>במעקב שלי ★ — ${fb.length} חוקים · ${fm.length} ח״כים · ${fc.length} ועדות · ${ff.length} סיעות${(S.followTopics||[]).length?` · ${S.followTopics.length} נושאים`:''}</span></div>
     <div class="cc-tile"><b>${newSince.length.toLocaleString('he-IL')}</b><span>הצבעות מליאה חדשות מאז הביקור הקודם</span></div>
-    <div class="cc-tile"><b>${topMk?topMk.pct+'%':'—'}</b><span>${topMk?'הכי כמוני: '+esc(disp(topMk.n)):'הכי כמוני — אחרי 2–3 סימונים'}</span></div>
-    <div class="cc-tile"><b>${topFac?topFac.pct+'%':'—'}</b><span>${topFac?'הסיעה הקרובה אליי: '+esc(topFac.f):'הסיעה הקרובה אליי'}</span></div>
-  </div></section>
+    <div class="cc-tile green"><b>${topMk?topMk.pct+'%':'—'}</b><span>${topMk?'הכי כמוני: '+esc(disp(topMk.n))+' ('+topMk.t+' משותפות)':'הכי כמוני — אחרי 2–3 סימונים'}</span></div>
+    <div class="cc-tile green"><b>${topFac?topFac.pct+'%':'—'}</b><span>${topFac?'הסיעה הקרובה אליי: '+esc(topFac.f):'הסיעה הקרובה אליי'}</span></div>
+    <div class="cc-tile gold"><b>${fb.filter(b=>b.status_id===118||b.publication_date).length.toLocaleString('he-IL')}</b><span>מהחוקים שבמעקב שלי כבר הפכו לחוק</span></div>
+  </div>
+  ${(S.followTopics||[]).length?`<div class="chips" style="margin-top:.7rem"><span class="pill-lbl">הנושאים שלי:</span>${S.followTopics.map(t=>`<button class="chip on" onclick="filterTopic('${jsq(t)}');go('votes')">${esc(t)}</button>`).join('')}</div>`:''}
+  </section>
   <div class="sec-title">שלי <small>הצבעות, מעקב ומי מייצג אותי — נשמר מקומית</small></div>
   ${prevSeen&&newSince.length?`<div class="card pad rise" style="margin-bottom:.85rem"><b>מאז הביקור הקודם (${fmtDate(prevSeen)}):</b> <span class="muted">${newSince.length} הצבעות חדשות במליאה.</span> <button class="btn" style="margin-inline-start:.5rem" onclick="go('now')">לראות ←</button></div>`:''}
   <div class="grid c2">
@@ -4292,7 +4299,13 @@ function renderMine(){
         ${fm.length?`<div class="small dim" style="margin-top:.5rem">ח״כים</div>${fm.slice(0,6).map(m=>{const sc=scores[m.name]; const pct=sc&&sc.t>=2?Math.round(sc.s/sc.t*100):null; return `<div class="row" style="margin:0 -.9rem" onclick="openMk('${jsq(m.name)}')">${avatar(m.name,m.faction,30)}<span class="flex">${esc(disp(m.name))}<br><span class="dim small">${esc(shortF(m.faction||''))}</span></span>${pct!=null?`<b style="color:${pct>=50?'var(--for)':'var(--against)'}">${pct}% <span class="dim small" style="font-weight:600">כמוני</span></b>`:''}</div>`}).join('')}`:''}
         ${fc.length?`<div class="small dim" style="margin-top:.5rem">ועדות במעקב</div>${fc.slice(0,6).map(c=>`<div class="row" style="margin:0 -.9rem" onclick="openCommittee('${c.id}')"><span class="flex">${esc(c.name)}<br><span class="dim small">ישיבה אחרונה: ${c.last_session?fmtDate(c.last_session):'—'} · ${c.dataset_bills||0} חוקים מהמאגר</span></span><span class="chip acc">לוועדה ←</span></div>`).join('')}`:''}
         ${ff.length?`<div class="small dim" style="margin-top:.5rem">סיעות במעקב</div>${ff.slice(0,6).map(f=>`<div class="row" style="margin:0 -.9rem" onclick="openFaction('${jsq(f)}')"><span class="flex" style="color:${fcol(f)};font-weight:700">${esc(f)}</span>${starCountOf('faction',f)?`<span class="dim small">★ ${starCountOf('faction',f).toLocaleString('he-IL')} עוקבים באתר</span>`:''}<span class="chip acc">לסיעה ←</span></div>`).join('')}`:''}
-      `:'<p class="muted small" style="margin-top:.4rem">לחצו ☆ על חוק, ח״כ או ועדה — והם יופיעו כאן עם עדכונים. ככה עוקבים אחרי הכנסת בלי לרדוף אחרי אתר הכנסת.</p>'}
+      `:'<p class="muted small" style="margin-top:.4rem">לחצו ☆ על חוק, ח״כ, ועדה או סיעה — והם יופיעו כאן עם עדכונים. ככה עוקבים אחרי הכנסת בלי לרדוף אחרי אתר הכנסת.</p>'}
+    </div>
+    <div class="card pad"><h3>★ הכי נעקבים באתר <small class="dim">מתוך מה שאתם עוקבים אחריו — ומה שכולם עוקבים אחריו</small></h3>
+      ${(()=>{ const mineStarred=[...fb.map(b=>({lbl:displayText(b),n:starCountOf('bill',b.id),go:`openBillPage('${b.id}')`})),...fm.map(m=>({lbl:disp(m.name),n:starCountOf('mk',m.name),go:`openMk('${jsq(m.name)}')`})),...fc.map(c=>({lbl:c.name,n:starCountOf('committee',c.id),go:`openCommittee('${c.id}')`})),...ff.map(f=>({lbl:f,n:starCountOf('faction',f),go:`openFaction('${jsq(f)}')`}))].filter(x=>x.n>0).sort((a,b)=>b.n-a.n).slice(0,6);
+        const siteTop=Object.entries(STAR_COUNTS).sort((a,b)=>b[1]-a[1]).slice(0,6);
+        return `${mineStarred.length?`<div class="small dim" style="margin-top:.4rem">מהמעקב שלי</div>${mineStarred.map(x=>`<div class="row" style="margin:0 -.9rem" onclick="${x.go}"><span class="flex">${esc(x.lbl)}</span><span class="chip" style="color:#8a660a;border-color:#c9a227;background:#f6ebc3;font-weight:800">★ ${x.n.toLocaleString('he-IL')}</span></div>`).join('')}`:'<p class="muted small" style="margin-top:.4rem">עוד אין מוני עוקבים למה שסימנתם — הם יופיעו כאן ככל שהמעקב באתר יצטבר.</p>'}
+        ${siteTop.length?`<div class="small dim" style="margin-top:.6rem">הכי נעקבים באתר כרגע</div><div class="chips" style="margin-top:.35rem">${siteTop.map(([k,n])=>`<span class="chip">★ ${n.toLocaleString('he-IL')} · ${esc(k.split(':').slice(1).join(':').slice(0,28))}</span>`).join('')}</div>`:''}` })()}
     </div>
   </div>
   ${rank.length?`<div class="sec-title">מי מצביע כמוני <span class="chip acc">כנסת 25</span> <small>על ${mineBills.length} ההצבעות שסימנת בכנסת 25</small></div>
