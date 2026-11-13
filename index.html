@@ -446,7 +446,8 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 
 /* MK */
 .mk-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(158px,1fr));gap:.7rem}
-.mk-card{padding:.9rem .6rem;text-align:center;cursor:pointer;transition:transform .15s}
+.mk-card{padding:.9rem .6rem;text-align:center;cursor:pointer;transition:transform .15s;position:relative}
+.mk-card .star-corner{position:absolute;top:.4rem;left:.4rem;z-index:1}
 .mk-card:hover{transform:translateY(-3px)}
 .mk-card .avatar{margin:0 auto .5rem}
 /* currently in the Knesset building (live MkLobby read): green frame +
@@ -3354,7 +3355,7 @@ function renderMks(){
   ${mkSortPillsHTML()}
   ${list.length?`<div class="mk-grid">${list.map(n=>{const m=mkIndex[n]; const f=factionOf(n); const cnt=m?.votes.length||0; const former=isFormerMk(n);
     const mine=agreements[n]; const initiated=initiatedCount(n); const present=livePresenceOf(n)===true;
-    return `<div class="card mk-card${present?' present':''}" onclick="openMk('${jsq(n)}')">${avatar(n,f,62)}<div style="font-weight:800">${esc(disp(n))}${followedMk(n)?' <span style="color:#c9a227">★</span>':''}</div>${starChip('mk',n)}<div class="small" style="color:${fcol(f)}">${esc(shortF(f))}</div>${presencePillHTML(n)}
+    return `<div class="card mk-card${present?' present':''}" onclick="openMk('${jsq(n)}')">${avatar(n,f,62)}<div style="font-weight:800">${esc(disp(n))}${followedMk(n)?' <span style="color:#c9a227">★</span>':''}</div><span class="star-corner">${starChip('mk',n)}</span><div class="small" style="color:${fcol(f)}">${esc(shortF(f))}</div>${presencePillHTML(n)}
     ${former?`<span class="chip" style="margin-top:.3rem">${formerBadgeText(n)}</span><div class="small dim" style="margin-top:.3rem">כהונה: ${esc(mkTenureText(n)||'במהלך הקדנציה')}</div>`:''}
     <div class="small dim">${cnt} הצבעות${initiated?` · ${initiated} יוזמות חקיקה`:''}</div>${mine?`<div class="progress" style="margin-top:.45rem"><i style="width:${mine.pct}%;background:linear-gradient(90deg,var(--accent),var(--for))"></i></div><div class="small" style="color:var(--accent);font-weight:700">${mine.pct}% כמוני (${mine.n})</div>`:''}</div>`}).join('')}</div>`:'<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg></div>לא נמצאו ח״כים בסינון הזה.</div>'}`;
 }
@@ -3388,7 +3389,7 @@ function renderMks26(){
   <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.9rem"><input type="search" data-keep="mkQ" placeholder="חיפוש נבחר/ת…" value="${esc(mkFilter.q)}" style="flex:1;min-width:170px" oninput="mkFilter.q=this.value;renderMksKeep(this)">
   <select onchange="mkFilter.faction=this.value;if(this.value)mkFilter.sort='list';renderMks()" aria-label="סינון לפי סיעה"><option value="">כל הסיעות</option>${parties.map(f=>`<option ${mkFilter.faction===f?'selected':''}>${esc(f)}</option>`).join('')}</select></div>
   ${mkSortPillsHTML()}
-  <div class="mk-grid">${list.map(x=>{const rec=IDX25[x.n]; const initiated=initiatedCount(x.n); const present=livePresenceOf(x.n)===true; const pdays=mkPresenceDays(x.n); const todayArr=presenceTodayArrivals(); const tIdx=todayArr?todayArr.findIndex(a=>a.name===normName(x.n)):-1; return `<div class="card mk-card${present?' present':''}" onclick="openMk('${jsq(x.n)}')">${avatar(x.n,x.p,62)}<div style="font-weight:800">${esc(disp(x.n))}${followedMk(x.n)?' <span style="color:#c9a227">★</span>':''}</div>${starChip('mk',x.n)}<div class="small" style="color:${x.color}">${esc(x.p)}</div>${presencePillHTML(x.n)}
+  <div class="mk-grid">${list.map(x=>{const rec=IDX25[x.n]; const initiated=initiatedCount(x.n); const present=livePresenceOf(x.n)===true; const pdays=mkPresenceDays(x.n); const todayArr=presenceTodayArrivals(); const tIdx=todayArr?todayArr.findIndex(a=>a.name===normName(x.n)):-1; return `<div class="card mk-card${present?' present':''}" onclick="openMk('${jsq(x.n)}')">${avatar(x.n,x.p,62)}<div style="font-weight:800">${esc(disp(x.n))}${followedMk(x.n)?' <span style="color:#c9a227">★</span>':''}</div><span class="star-corner">${starChip('mk',x.n)}</span><div class="small" style="color:${x.color}">${esc(x.p)}</div>${presencePillHTML(x.n)}
   <div class="small dim">מקום ${RANK26[x.n]??x.rank} ברשימת ${esc(x.p)}</div>${PRESENCE26&&presenceTrackedDays()?`<div class="small dim">נוכחות: ${pdays} מתוך ${presenceTrackedDays()} ימי מעקב${tIdx>=0?` · היום מקום ${tIdx+1} בהגעה`:''}</div>`:''}${rec?`<div class="small" style="color:var(--accent)">כנסת 25: ${rec.votes.length} הצבעות${initiated?` · ${initiated} יוזמות חקיקה`:''}</div>`:K25_READY?'<div class="small dim">לא כיהן/ה בכנסת 25</div>':'<div class="small dim">היסטוריית כנסת 25 נטענת…</div>'}</div>`}).join('')}</div>
   ${PRESENCE26&&presenceTrackedDays()?`<p class="small dim" style="margin-top:.7rem;line-height:1.8">ימי נוכחות = ב־כמה מימי המעקב (ראשון–חמישי, מאז ${fmtDate(PRESENCE26._meta?.tracking_since||'')}, נדגם כל 5 דקות מאפליקציית לובי הח״כים) הח״כ נראה/תה במשכן לפחות פעם אחת — בלי קשר למשך השהות. המעקב צעיר וגדל מדי יום; אין נתוני נוכחות לכנסת 25, כי הלובי משרת רק את הסגל המכהן.</p>`:''}`;
 }
