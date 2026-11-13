@@ -101,7 +101,7 @@ feed = [
 yy = 1196
 for icon, txt, when in feed:
     rr([M + 30, yy, R - 30, yy + 42], 12, fill=SURF2, outline=LINE, w=1)
-    T(R - 48, yy + 8, icon + "  " + txt, 24, TEXT)
+    T(R - 48, yy + 8, txt, 24, TEXT)
     T(M + 48, yy + 10, when, 20, DIM, "la")
     yy += 52
 
