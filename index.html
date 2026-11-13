@@ -846,7 +846,30 @@ let STAR_COUNTS={};
 function starUid(){ try{ let u=localStorage.getItem('m121-uid'); if(!u){ u=(crypto.randomUUID?crypto.randomUUID():'u'+Date.now().toString(36)+Math.random().toString(36).slice(2,14)); localStorage.setItem('m121-uid',u) } return u }catch(e){ return null } }
 function starCountOf(kind,key){ return STAR_COUNTS[kind+':'+key]||0 }
 function paintStarCounts(){ document.querySelectorAll('[data-starc]').forEach(el=>{ const n=STAR_COUNTS[el.dataset.starc]||0; el.textContent=n? n.toLocaleString('he-IL'):''; el.style.display=n?'':'none' }) }
-function loadStarCounts(){ fetch('/.netlify/functions/stars',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.counts){ STAR_COUNTS=j.counts; paintStarCounts() } }).catch(()=>{}) }
+function loadStarCounts(){ fetch('/.netlify/functions/stars',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.counts){ STAR_COUNTS=j.counts; paintStarCounts() } }).catch(()=>{}); migrateLocalStars() }
+/* One-time backfill: follows made before server counts existed live only
+   in localStorage, so the server has never heard of them (they'd show 0
+   followers and toggling would "unfollow" into a no-op). On first load
+   after the upgrade, register every locally-followed entity for this
+   visitor's uid — no re-starring needed. Deduped across both Knesset
+   stores; flagged in localStorage so it runs once. New follows after
+   that sync immediately in toggleFollow. */
+function migrateLocalStars(){
+  try{ if(localStorage.getItem('m121-stars-migrated')==='1') return }catch(e){ return }
+  const uid=starUid(); if(!uid) return;
+  const seen=new Set(), jobs=[];
+  const push=(kind,key)=>{ const id=kind+':'+key; if(seen.has(id)) return; seen.add(id);
+    jobs.push(fetch('/.netlify/functions/stars',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind,key,uid,on:true}),cache:'no-store'})
+      .then(r=>r.ok?r.json():null).then(j=>{ if(j) STAR_COUNTS[id]=j.count }).catch(()=>{})) };
+  for(const st of [STORE['25'],STORE['26']]){
+    (st.followBills||[]).forEach(id=>push('bill',String(id)));
+    (st.followMks||[]).forEach(n=>push('mk',n));
+    (st.followCommittees||[]).forEach(id=>push('committee',String(id)));
+    (st.followFactions||[]).forEach(f=>push('faction',f));
+    (st.followTopics||[]).forEach(t=>push('topic',t));
+  }
+  Promise.all(jobs).then(()=>{ try{ localStorage.setItem('m121-stars-migrated','1') }catch(e){} paintStarCounts() });
+}
 function syncStar(kind,key,on){ const uid=starUid(); if(!uid) return;
   fetch('/.netlify/functions/stars',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind,key,uid,on}),cache:'no-store'})
     .then(r=>r.ok?r.json():null).then(j=>{ if(j){ STAR_COUNTS[kind+':'+key]=j.count; paintStarCounts() } }).catch(()=>{}) }
