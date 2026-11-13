@@ -10,6 +10,17 @@
   # (Netlify: exit 0 from `ignore` = skip build). Saves deploy credits.
   ignore = "git diff --quiet HEAD^ HEAD -- . ':(exclude)biapia'"
 
+# Secret admin dashboard at a clean URL (rewrite, URL stays /admin/;
+# the function itself is token-gated — see netlify/functions/admin.mjs).
+[[redirects]]
+  from = "/admin"
+  to = "/.netlify/functions/admin"
+  status = 200
+[[redirects]]
+  from = "/admin/"
+  to = "/.netlify/functions/admin"
+  status = 200
+
 # The daily GitHub Actions workflow commits refreshed data/ back to main;
 # once this site is git-connected, that commit is what republishes the app
 # with fresh Knesset data — no manual deploy needed.
