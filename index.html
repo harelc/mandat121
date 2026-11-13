@@ -4487,7 +4487,7 @@ function renderMine(){
     if(mineMk&&!fbIds.has(String(b.id))) pushFeed(billActivityDate(b),'✍️',`הצעת חוק של ${disp(mineMk.name)}: ${b.name}`,`${billActivityLabel(b)||statusBucket(b)} · השלב כעת: ${statusBucket(b)}`,`openBillPage('${b.id}')`);
   }
   const sessSrc=[...(CMT?.recent_sessions||[]),...(K26CMT?.recent_sessions||[])];
-  for(const s of sessSrc){ if((S.followCommittees||[]).map(String).includes(String(s.committee_id))) pushFeed((s.start||s.date||'').slice(0,10),'🏛️',`ישיבת ועדה במעקב: ${cmtName(s.committee_id)}`,`${s.title||'ישיבת ועדה'}`,`openCommittee('${s.committee_id}')`) }
+  for(const s of sessSrc){ if((S.followCommittees||[]).map(String).includes(String(s.committee_id))) pushFeed((s.start||s.date||'').slice(0,10),'🏛️',`ישיבה של ועדה במעקב: ${cmtName(s.committee_id)}`,`${s.title||'ישיבת ועדה'}`,`openCommittee('${s.committee_id}')`) }
   if(ff.length){
     const memberNames=new Set();
     for(const f of ff){ const cf=currentFactions().find(x=>x.name===f||shortF(x.name)===f); if(cf) cf.members.forEach(n=>memberNames.add(n));
