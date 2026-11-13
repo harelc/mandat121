@@ -1937,7 +1937,7 @@ const icon=n=>`<svg class="icn" viewBox="0 0 24 24" aria-hidden="true">${ICON_PA
 const TABS=[['now','home','עכשיו'],['mine','mine','שלי'],['bills','bill','חוקים'],['votes','vote','הצבעות'],['mks','mks','ח״כים'],['factions','factions','סיעות'],['plenum','plenum','דברי הכנסת'],['committees','committees','ועדות'],['analysis','analysis','ניתוח']];
 function myCount(){return Object.keys(S.myVotes).length}
 function followCount(){return S.followBills.length+S.followMks.length+(S.followCommittees?.length||0)+(S.followFactions?.length||0)+(S.followTopics?.length||0)}
-function buildTabs(){const active=view==='vote'?'votes':view==='billAll'?'bills':view==='mk'?'mks':view==='faction'?'factions':(view==='committee'||view==='session')?'committees':view==='plenumSession'?'plenum':view; $('#tabs').innerHTML=TABS.map(([v,ic,l])=>`<button class="tab ${active===v?'active':''}" onclick="go('${v}')"><span class="ic">${icon(ic)}</span>${l}${v==='mine'&&(myCount()||followCount())?`<span class="dot">${myCount()+followCount()}</span>`:''}</button>`).join('')}
+function buildTabs(){const active=view==='vote'?'votes':(view==='billAll'||view==='bill26')?'bills':view==='mk'?'mks':view==='faction'?'factions':(view==='committee'||view==='session')?'committees':view==='plenumSession'?'plenum':view; $('#tabs').innerHTML=TABS.map(([v,ic,l])=>`<button class="tab ${active===v?'active':''}" onclick="go('${v}')"><span class="ic">${icon(ic)}</span>${l}${v==='mine'&&(myCount()||followCount())?`<span class="dot">${myCount()+followCount()}</span>`:''}</button>`).join('')}
 function updateTabsBadge(){buildTabs()}
 function go(v,arg=null){ navTo('tab='+v,()=>{view=v;viewArg=arg;buildTabs();render();window.scrollTo({top:0})}) }
 function render(){({now:renderNow,bills:renderBills,votes:renderVotes,plenum:renderPlenum,mks:renderMks,factions:renderFactions,committees:renderCommittees,analysis:renderAnalysis,mine:renderMine,about:renderAbout}[view]||renderNow)(); paintStarCounts()}
@@ -2000,6 +2000,7 @@ function applyRoute(){
   else if(h.get('committee')){ view='committee'; viewArg=h.get('committee'); buildTabs(); renderCommitteeDetail() }
   else if(h.get('session')){ view='session'; viewArg=h.get('session'); buildTabs(); renderSessionDetail() }
   else if(h.get('plenum')){ view='plenumSession'; viewArg=h.get('plenum'); buildTabs(); renderPlenumSession() }
+  else if(h.get('bill26')){ view='bill26'; viewArg=h.get('bill26'); buildTabs(); renderBill26() }
   else if(h.get('vote')){ view='vote'; viewArg=h.get('vote'); buildTabs(); renderVote() }
   else { view=['now','bills','votes','plenum','mks','factions','committees','analysis','mine','about'].includes(h.get('tab'))?h.get('tab'):'now'; viewArg=null; buildTabs(); render() }
   window.scrollTo({top:0});
@@ -2942,9 +2943,36 @@ function renderBillLite(){
   </div>`;
   window.scrollTo(0,0);
 }
+function openBill26(id){ navTo('bill26='+id,()=>{viewArg=String(id); view='bill26'; buildTabs(); renderBill26(); window.scrollTo({top:0})}) }
+function renderBill26(){
+  const app=$('#app'), b=K26B.find(x=>String(x.id)===String(viewArg));
+  if(!b){ app.innerHTML=backBtnHTML('bills','› חזרה לחוקים')+'<div class="card empty" style="margin-top:.6rem"><div class="big">📄</div>ההצעה לא נמצאה בכנסת ה־26.</div>'; return }
+  const eraVotes=K26V.filter(v=>String(v.item_id)===String(b.id)).sort((a,b)=>(a.date||'').localeCompare(b.date||''));
+  app.innerHTML=`
+  ${backBtnHTML('bills','› חזרה לחוקים')}
+  <article class="card pad rise" style="margin-top:.6rem">
+    <div style="display:flex;gap:.6rem;align-items:flex-start"><div style="flex:1">
+    <div class="card-top"><span class="chip acc">${esc(b.status||'')}</span>${b.type?`<span class="chip">${esc(b.type)}</span>`:''}${b.committee?`<span class="chip cmt">${esc(b.committee)}</span>`:''}<span class="date">${esc(billActivityLabel(b))}</span></div>
+    <h1 style="font-size:1.35rem;line-height:1.4">${esc(b.name)}</h1>
+    </div><div style="text-align:center">${starBtn('bill',b.id,b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.id)?'במעקב ★':'מעקב'}</div></div></div>
+    <div class="small muted" style="margin-top:.5rem;line-height:1.9">
+      ${b.publication_date?`פורסם בספר החוקים: ${fmtDate(b.publication_date)}<br>`:''}
+      ${b.private_number?`מספר פ׳: ${esc(b.private_number)}<br>`:''}
+    </div>
+    ${b.summary?`<p style="margin-top:.7rem"><span class="chip">תקציר רשמי · הכנסת</span><br><span style="display:block;margin-top:.35rem">${esc(b.summary)}</span></p>`:''}
+    ${b.initiators&&b.initiators.length?`<h3 style="margin-top:1rem">יוזמים ומצטרפים (${b.initiators.length})</h3><div class="chips" style="margin-top:.4rem">${b.initiators.map(i=>{const fol=followedMk(i.name); return `<button class="chip" ${fol?'style="background:linear-gradient(180deg,#f9efc9,#f3e3a1);border-color:#c9a227;color:#8a660a" title="במעקב שלי"':''} onclick="openMk('${jsq(i.name)}')">${fol?'★ ':''}${esc(disp(i.name))}${i.initiator?' · יוזם/ת':''}</button>`}).join('')}</div>`:''}
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem">
+      <a class="btn" href="https://main.knesset.gov.il/Activity/Legislation/Laws/Pages/LawBill.aspx?t=lawsuggestionssearch&lawitemid=${b.id}" target="_blank" rel="noopener">דף ההצעה בכנסת ↗</a>
+      ${b.doc_url?`<a class="btn" href="${esc(b.doc_url)}" target="_blank" rel="noopener">נוסח ההצעה ↗</a>`:''}
+    </div>
+  </article>
+  <div class="card pad" style="margin-top:.85rem"><h3>🗳️ כל אירועי המליאה על ההצעה (${eraVotes.length})</h3>
+  ${eraVotes.length?`<div class="small dim" style="margin-top:.3rem">כל שורה היא הצבעה נפרדת — לחיצה פותחת את דף ההצבעה שלה, עם מפת המליאה ו״אני הייתי מצביע״.</div><div class="rows" style="margin:.5rem -.9rem 0">${eraVotes.map(v=>`<div class="row" onclick="openVote('${v.id}')"><span class="chip acc">${esc(v.kind_label||'')}</span><span class="flex">${esc(v.desc||v.title||'')}<br><span class="dim small">${fmtDate(v.date)}${v.for!=null?` · ${v.for}–${v.against} · ${v.for>v.against?'עברה':'נדחתה'}`:''}</span></span><span class="chip acc">להצבעה ←</span></div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">ההצעה עדיין לא הגיעה להצבעה במליאה.</p>'}
+  </div>`;
+}
 function renderBills(){
   if(KN===26){ if(K26B.length){ const rows=[...K26B].sort((a,b)=>billActivityDate(b).localeCompare(billActivityDate(a))).slice(0,100);
-    $('#app').innerHTML=`<div class="sec-title">חוקים <small>כנסת 26 · ${K26B.length} הצעות</small></div><div class="card rows">${rows.map(b=>`<div class="row"><span class="flex">${esc(b.name||'')}<br><span class="dim small">${esc(b.status||'')}${b.committee?` · ${esc(b.committee)}`:''}${b.type?` · ${esc(b.type)}`:''}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}${(b.initiators||[]).some(i=>i.initiator)?` · יוזמים: ${b.initiators.filter(i=>i.initiator).slice(0,3).map(i=>esc(disp(i.name))).join(', ')}`:''}</span></span>${b.votes?.length?`<span class="chip acc">${b.votes.length} הצבעות</span>`:''}</div>`).join('')}</div><p class="small dim" style="margin-top:.6rem">רשימה בסיסית מהמאגר הרשמי — מסע החוק המלא ייפתח כשיצטברו הצבעות וישיבות ועדה בכנסת 26.</p>`; return }
+    $('#app').innerHTML=`<div class="sec-title">חוקים <small>כנסת 26 · ${K26B.length} הצעות — לחצו על הצעה לדף שלה</small></div><div class="card rows">${rows.map(b=>`<div class="row" style="cursor:pointer" onclick="openBill26('${b.id}')"><span class="flex">${esc(b.name||'')}<br><span class="dim small">${esc(b.status||'')}${b.committee?` · ${esc(b.committee)}`:''}${b.type?` · ${esc(b.type)}`:''}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}${(b.initiators||[]).some(i=>i.initiator)?` · יוזמים: ${b.initiators.filter(i=>i.initiator).slice(0,3).map(i=>esc(disp(i.name))).join(', ')}`:''}</span></span>${b.votes?.length?`<span class="chip acc">${b.votes.length} הצבעות</span>`:''}<span class="dim">←</span></div>`).join('')}</div>`; return }
     $('#app').innerHTML=`<div class="sec-title">חוקים <small>כנסת 26</small></div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg></div>עדיין אין הצעות חוק בכנסת 26.<br><span class="small">ברגע שהראשונות יוגשו, הן יופיעו כאן בדיוק כמו בכנסת 25 — עם מסע החוק ועבודת הוועדה.</span><br>${k25CtaHTML('📚 לכנסת 25 המלאה ←')}</div>`; return }
   if(ALLB.length){ renderBillsAll(); return }
   $('#app').innerHTML=`<div class="sec-title">חוקים</div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg></div>מאגר הצעות החוק המלא לא נטען.</div>`;
