@@ -4310,7 +4310,16 @@ function renderMine(){
       ${(()=>{ const mineStarred=[...fb.map(b=>({lbl:displayText(b),n:starCountOf('bill',b.id),go:`openBillPage('${b.id}')`})),...fm.map(m=>({lbl:disp(m.name),n:starCountOf('mk',m.name),go:`openMk('${jsq(m.name)}')`})),...fc.map(c=>({lbl:c.name,n:starCountOf('committee',c.id),go:`openCommittee('${c.id}')`})),...ff.map(f=>({lbl:f,n:starCountOf('faction',f),go:`openFaction('${jsq(f)}')`}))].filter(x=>x.n>0).sort((a,b)=>b.n-a.n).slice(0,6);
         const siteTop=Object.entries(STAR_COUNTS).sort((a,b)=>b[1]-a[1]).slice(0,6);
         return `${mineStarred.length?`<div class="small dim" style="margin-top:.4rem">מהמעקב שלי</div>${mineStarred.map(x=>`<div class="row" style="margin:0 -.9rem" onclick="${x.go}"><span class="flex">${esc(x.lbl)}</span><span class="chip" style="color:#8a660a;border-color:#c9a227;background:#f6ebc3;font-weight:800">★ ${x.n.toLocaleString('he-IL')}</span></div>`).join('')}`:'<p class="muted small" style="margin-top:.4rem">עוד אין מוני עוקבים למה שסימנתם — הם יופיעו כאן ככל שהמעקב באתר יצטבר.</p>'}
-        ${siteTop.length?`<div class="small dim" style="margin-top:.6rem">הכי נעקבים באתר כרגע</div><div class="chips" style="margin-top:.35rem">${siteTop.map(([k,n])=>`<span class="chip">★ ${n.toLocaleString('he-IL')} · ${esc(k.split(':').slice(1).join(':').slice(0,28))}</span>`).join('')}</div>`:''}` })()}
+        ${siteTop.length?`<div class="small dim" style="margin-top:.6rem">הכי נעקבים באתר כרגע</div><div class="chips" style="margin-top:.35rem">${siteTop.map(([k,n])=>{ const i=k.indexOf(':'); const kind=k.slice(0,i), key=k.slice(i+1);
+          // Resolve the stored entity key to a human name — bill/committee
+          // keys are numeric internal ids (e.g. bill:4290), never show those raw.
+          let lbl=key, go='';
+          if(kind==='bill'){ lbl=(ALLB_BY_ID[key]&&displayText(ALLB_BY_ID[key]))||'הצעת חוק'; go=`openBillPage('${key}')` }
+          else if(kind==='mk'){ lbl=disp(key); go=`openMk('${jsq(key)}')` }
+          else if(kind==='committee'){ const c=committeeById(key); lbl=c?c.name:'ועדה'; go=`openCommittee('${key}')` }
+          else if(kind==='faction'){ go=`openFaction('${jsq(key)}')` }
+          const kindLbl={bill:'חוק',mk:'ח״כ',committee:'ועדה',faction:'סיעה',topic:'נושא'}[kind]||'';
+          return `<button class="chip" ${go?`onclick="${go}"`:''} title="${esc(kindLbl)}: ${esc(lbl)}">★ ${n.toLocaleString('he-IL')} · ${esc(kindLbl)}: ${esc(lbl.slice(0,30))}</button>` }).join('')}</div>`:''}` })()}
     </div>
   </div>
   ${rank.length?`<div class="sec-title">מי מצביע כמוני <span class="chip acc">כנסת 25</span> <small>על ${mineBills.length} ההצבעות שסימנת בכנסת 25</small></div>
