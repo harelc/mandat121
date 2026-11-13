@@ -3363,16 +3363,20 @@ function billExtrasHTML(b){
   if(!lineage.length&&!lawHTML) return '';
   return `<div class="card pad" style="margin-top:.85rem"><h3>🧬 שושלת ההצעה ופרסומה <small class="dim">מיזוגים, פיצולים וספר החוקים · מהמאגר הרשמי</small></h3><div style="margin-top:.5rem">${lineage.join('')}${lawHTML}</div></div>`;
 }
-function committeeExtrasHTML(c){
+function committeeJointHTML(c){ // the one in-app link this data has: a joint committee's parent committees — kept up top
+  if(!EXTRAS) return '';
+  const parents=(EXTRAS.joint?.[String(c.id)]||[]).map(id=>CMT_BY_ID[id]).filter(Boolean);
+  if(!parents.length) return '';
+  return `<div class="chips" style="margin-top:.85rem"><span class="small dim" style="align-self:center">ועדה משותפת של:</span>${parents.map(p=>`<button class="chip" onclick="openCommittee('${p.id}')">${esc(p.name)} ←</button>`).join('')}</div>`;
+}
+function committeeExtrasHTML(c){ // secondary legislation: rows have no in-app page to link to (only external doc downloads), so this sits at the bottom of the committee page
   if(!EXTRAS) return '';
   const sec=EXTRAS.secondary_by_committee?.[String(c.id)];
-  const parents=(EXTRAS.joint?.[String(c.id)]||[]).map(id=>CMT_BY_ID[id]).filter(Boolean);
-  if(!sec&&!parents.length) return '';
-  return `<div class="card pad" style="margin-top:.85rem"><h3>⚖️ חקיקת משנה והרכב <small class="dim">מהמאגר הרשמי</small></h3>
-  ${parents.length?`<div class="small muted" style="margin-top:.4rem;line-height:1.9"><b style="color:var(--text)">ועדה משותפת של:</b></div><div class="chips" style="margin:.3rem 0 .7rem">${parents.map(p=>`<button class="chip" onclick="openCommittee('${p.id}')">${esc(p.name)} ←</button>`).join('')}</div>`:''}
-  ${sec?`<div class="small muted" style="line-height:1.9">אושרו/טופלו בוועדה <b>${sec.total.toLocaleString('he-IL')}</b> תקנות, צווים ודיווחים (חקיקת משנה) בכנסת 25</div>
+  if(!sec) return '';
+  return `<div class="card pad" style="margin-top:.85rem"><h3>⚖️ חקיקת משנה <small class="dim">מהמאגר הרשמי · לקריאה נוספת בסוף הדף</small></h3>
+  <div class="small muted" style="line-height:1.9">אושרו/טופלו בוועדה <b>${sec.total.toLocaleString('he-IL')}</b> תקנות, צווים ודיווחים (חקיקת משנה) בכנסת 25 — לפריטים אין דף באתר; הקישורים הם למסמכים הרשמיים.</div>
   <div class="rows" style="margin:.5rem -.9rem 0">${sec.items.map(it=>`<div class="row" style="cursor:default"><span class="flex">${esc(it.name)}<br><span class="dim small">${esc(it.cause||'')}${it.date?` · ${fmtDate(it.date)}`:''}</span></span>${it.status?`<span class="chip">${esc(it.status)}</span>`:''}${(it.docs||[]).map(d=>`<a class="chip" href="${esc(d.url)}" target="_blank" rel="noopener" onclick="event.stopPropagation()">${esc(d.group||'מסמך')} ↗</a>`).join('')}</div>`).join('')}</div>
-  ${sec.total>sec.items.length?`<div class="small dim" style="margin-top:.45rem">מוצגים ${sec.items.length} האחרונים מתוך ${sec.total.toLocaleString('he-IL')}.</div>`:''}`:''}</div>`;
+  ${sec.total>sec.items.length?`<div class="small dim" style="margin-top:.45rem">מוצגים ${sec.items.length} האחרונים מתוך ${sec.total.toLocaleString('he-IL')}.</div>`:''}</div>`;
 }
 function lobbyBrowserHTML(){
   if(!EXTRAS?.lobbyists) return `<div class="card empty"><div class="big">🕴️</div>מרשם השדלנים טוען…</div>`;
@@ -4173,15 +4177,16 @@ function renderCommitteeDetail(){
     <h1 style="font-size:1.45rem;line-height:1.35">${esc(c.name)}</h1></div>${starBtn('committee',c.id,c.name)}</div>
     <div class="kpis"><div class="kpi"><b>${(c.sessions_total||0).toLocaleString('he-IL')}</b><span>ישיבות בקדנציה</span></div><div class="kpi"><b>${bills.length.toLocaleString('he-IL')}</b><span>חוקים מהמאגר נידונו כאן</span></div><div class="kpi"><b>${c.last_session?fmtDate(c.last_session):'—'}</b><span>ישיבה אחרונה</span></div></div>
   </article>
+  ${committeeJointHTML(c)}
   ${committeeMembersHTML(c)}
-  ${committeeExtrasHTML(c)}
   <div class="grid c2" style="margin-top:.85rem;align-items:start">
     ${committeeSessionsHTML(c,recent)}
     <div style="display:flex;flex-direction:column;gap:.85rem;min-width:0">
     <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4v16M8 20h8M4.5 7h15"/><path d="M6.5 7 4 12.5a2.9 2.9 0 0 0 5 0L6.5 7zM17.5 7 15 12.5a2.9 2.9 0 0 0 5 0L17.5 7z"/><path d="M12 4v3"/></svg> חוקים שנידונו בוועדה (${bills.length})</h3>${bills.length?`<div class="rows" style="margin:.5rem -.9rem 0">${bills.slice(0,35).map(({bid,h})=>{const b=ALLB_BY_ID[bid]; return `<div class="row" onclick="openBillPage('${bid}')"><span class="flex">${esc(b?.name||('הצעת חוק '+bid))}<br><span class="dim small">${fmtDate(h.date)} · ${esc(h.status||'')}</span></span><span class="chip acc">לחוק ←</span></div>`}).join('')}</div>${bills.length>35?`<div class="small dim" style="margin-top:.45rem">מוצגים 35 האחרונים.</div>`:''}`:'<p class="muted small" style="margin-top:.4rem">לא נמצאו חוקים מהמאגר המשויכים לוועדה זו.</p>'}</div>
     ${docs.length?`<div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> מסמכים אחרונים</h3><div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.45rem">${docs.map(d=>`<a class="chip" href="${esc(d.path)}" target="_blank" rel="noopener"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> ${esc(d.group)} · ${fmtDate(d.date)}</a>`).join('')}</div></div>`:''}
     </div>
-  </div>`;
+  </div>
+  ${committeeExtrasHTML(c)}`;
 }
 
 /* ============ MINE ============ */
