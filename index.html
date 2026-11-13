@@ -140,6 +140,17 @@ mark.cur{background:var(--accent);color:#fdfbf6;outline:2px solid var(--accent);
 .proto-turn.turn-target,.proto-topic.turn-target{background:#fdf0c0;box-shadow:0 0 0 2px var(--abstain);transition:background .3s}
 .proto-av{flex:0 0 auto;width:36px;height:36px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-weight:800;font-size:.8rem;color:#211d13}
 .proto-topic{text-align:center;font-weight:800;color:var(--accent);background:var(--accent-dim);border-radius:10px;padding:.45rem .6rem;margin:.7rem 0;font-size:.85rem}
+.proto-layout{display:flex;gap:1rem;align-items:flex-start}
+.proto-toc{position:sticky;top:.6rem;flex:0 0 225px;max-height:calc(100vh - 6rem);overflow:auto;background:var(--surface);border:1px solid var(--line);border-radius:12px;padding:.6rem}
+.proto-toc-h{font-weight:800;font-size:.8rem;margin-bottom:.4rem}
+.proto-toc-i{display:block;width:100%;text-align:start;background:none;border:none;border-inline-start:3px solid transparent;font:inherit;font-size:.74rem;line-height:1.45;color:var(--mid);padding:.28rem .4rem;cursor:pointer;border-radius:6px}
+.proto-toc-i:hover{background:var(--surface2);color:var(--text)}
+.proto-toc-i.on{border-inline-start-color:var(--accent);color:var(--accent);font-weight:700;background:var(--accent-dim)}
+.proto-flash{animation:protoFlash 1.6s ease-out}
+@keyframes protoFlash{0%{background:#f3e3a1}100%{background:transparent}}
+.hitbar{position:fixed;bottom:5.2rem;left:50%;transform:translateX(-50%);z-index:80;display:flex;gap:.45rem;align-items:center;background:var(--surface);border:1.5px solid #c9a227;border-radius:999px;padding:.35rem .5rem;box-shadow:0 8px 28px rgba(60,45,5,.28)}
+@media(max-width:900px){.proto-layout{flex-direction:column}.proto-toc{position:sticky;top:.4rem;flex:none;width:100%;max-height:32vh;z-index:5}}
+@media(min-width:761px){.hitbar{bottom:1.2rem}}
 .spk-chip{display:inline-flex;gap:.35rem;align-items:center;cursor:pointer}
 .spk-chip.off{opacity:.38}
 .muted{color:var(--mid)} .dim{color:var(--dim)} .small{font-size:.82rem}
@@ -2297,9 +2308,11 @@ function renderProtocol(){
   box.innerHTML=`
   <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,14).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${protoFilter.speaker&&protoFilter.speaker!==n?'off':''}" onclick="protoFilter.speaker=protoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderProtocol()" title="${s.turns} קטעים · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
   ${protoFilter.speaker?`<button class="chip" onclick="protoFilter.speaker='';renderProtocol()">✕ כל הדוברים</button>`:''}</div>
-  <input type="search" placeholder="חיפוש בפרוטוקול…" value="${esc(protoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="protoFilter.q=this.value;$('#protoTurns').innerHTML=protoTurnsHTML()">
-  <div class="small dim" style="margin-bottom:.5rem">${PROTO_CUR.turns.filter(t=>t.role!=='topic').length} קטעים · ${spk.length} דוברים${protoFilter.q?` · ${protoOccurrences(PROTO_CUR,protoFilter.q)} אזכורים מודגשים`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו</div>
-  <div id="protoTurns">${protoTurnsHTML()}</div>`;
+  <input type="search" placeholder="חיפוש בפרוטוקול…" value="${esc(protoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="protoFilter.q=this.value;protoFilter.hlOnly=true;protoFilter.hl=this.value.trim()?[this.value.trim()]:[];_markState.proto={i:-1};$('#protoTurns').innerHTML=protoTurnsHTML();protoSyncHitBar('proto')">
+  <div class="small dim" style="margin-bottom:.5rem">${PROTO_CUR.turns.filter(t=>t.role!=='topic').length} קטעים · ${spk.length} דוברים${protoFilter.q?` · ${protoOccurrences(PROTO_CUR,protoFilter.q)} אזכורים מודגשים בכל הפרוטוקול`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו</div>
+  <div class="proto-layout">${protoTocHTML(PROTO_CUR,'proto')}<div id="protoTurns" style="flex:1;min-width:0">${protoTurnsHTML()}</div></div>
+  ${protoHitBarHTML('proto')}`;
+  protoSyncHitBar('proto');
 }
 /* Plenum reader: turns come from the on-demand Netlify function
    (netlify/functions/plenum.mjs — fs.knesset has no CORS, pre-parsing
@@ -2308,13 +2321,42 @@ function renderProtocol(){
    exist — the fallback points at the official document instead. */
 let PLENUM_CUR=null, plenumProtoFilter={speaker:'',q:'',hl:[],hlOnly:true};
 let _markI=-1; // current <mark> in the plenum reader (search-hit navigation)
-function plenumMarkNav(dir){
-  const ms=[...document.querySelectorAll('#plenumTurns mark')];
+/* Shared protocol-reader navigation (plenum + committee): search hits are
+   highlighted inside the FULL protocol (never filtered to hit rows), a
+   floating prev/next bar stays on screen wherever you've scrolled, and a
+   sticky table of contents (the protocol's own topic headings) is always
+   available for jumping across a long sitting. */
+const _markState={};
+function protoMarkNav(scope,dir){
+  const st=_markState[scope]??={i:-1};
+  const ms=[...document.querySelectorAll(`#${scope}Turns mark`)];
   if(!ms.length) return;
-  _markI=((_markI+dir)%ms.length+ms.length)%ms.length;
-  ms.forEach((m,i)=>m.classList.toggle('cur',i===_markI));
-  ms[_markI].scrollIntoView({block:'center',behavior:'smooth'});
-  const el=$('#plenumMarkPos'); if(el) el.textContent=`${_markI+1} / ${ms.length}`;
+  st.i=((st.i+dir)%ms.length+ms.length)%ms.length; _markState[scope]=st; if(scope==='plenum') _markI=st.i;
+  ms.forEach((m,i)=>m.classList.toggle('cur',i===st.i));
+  ms[st.i].scrollIntoView({block:'center',behavior:'smooth'});
+  const el=document.querySelector(`#${scope}HitPos`); if(el) el.textContent=`${st.i+1} / ${ms.length}`;
+  const bar=document.querySelector(`#${scope}HitBar`); if(bar) bar.style.display='flex';
+}
+function plenumMarkNav(dir){ protoMarkNav('plenum',dir) }
+function protoTocHTML(doc,scope){
+  const topics=[]; let last='';
+  doc.turns.forEach((t,ti)=>{ if(t.role==='topic'&&t.text&&t.text!==last){ topics.push([ti,t.text]); last=t.text } });
+  if(!topics.length) return '';
+  return `<nav class="proto-toc" id="${scope}Toc" aria-label="תוכן הישיבה"><div class="proto-toc-h">📑 תוכן הישיבה (${topics.length})</div>${topics.map(([ti,tx])=>`<button class="proto-toc-i" data-ti="${ti}" onclick="protoJump('${scope}',${ti})">${esc(tx)}</button>`).join('')}</nav>`;
+}
+function protoJump(scope,ti){
+  const el=document.querySelector(`#${scope}Turns [data-turn="${ti}"]`); if(!el) return;
+  el.scrollIntoView({block:'start',behavior:'smooth'});
+  el.classList.remove('proto-flash'); void el.offsetWidth; el.classList.add('proto-flash');
+  document.querySelectorAll(`#${scope}Toc .proto-toc-i`).forEach(b=>b.classList.toggle('on',+b.dataset.ti===ti));
+}
+function protoHitBarHTML(scope){
+  return `<div class="hitbar" id="${scope}HitBar" style="display:none"><button class="btn" onclick="protoMarkNav('${scope}',-1)">› הקודם</button><span id="${scope}HitPos" class="small" style="min-width:3.2rem;text-align:center"></span><button class="btn primary" onclick="protoMarkNav('${scope}',1)">הבא ‹</button><button class="btn ghost" onclick="document.querySelector('#${scope}HitBar').style.display='none'" aria-label="סגירת סרגל התוצאות">✕</button></div>`;
+}
+function protoSyncHitBar(scope){
+  const has=!!document.querySelector(`#${scope}Turns mark`);
+  const bar=document.querySelector(`#${scope}HitBar`); if(bar) bar.style.display=has?'flex':'none';
+  const pos=document.querySelector(`#${scope}HitPos`); if(pos&&has) pos.textContent=`${(_markState[scope]?.i??-1)+1||''} / ${document.querySelectorAll(`#${scope}Turns mark`).length}`.replace(/^0 /,'');
 }
 async function togglePlenumProtocol(sid){
   const box=$('#plenumProtoBox'); if(!box) return;
@@ -2341,10 +2383,12 @@ function renderPlenumProtocol(){
   box.innerHTML=`
   <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,16).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${plenumProtoFilter.speaker&&plenumProtoFilter.speaker!==n?'off':''}" onclick="plenumProtoFilter.speaker=plenumProtoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderPlenumProtocol()" title="${s.turns} קטעים · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
   ${plenumProtoFilter.speaker?`<button class="chip" onclick="plenumProtoFilter.speaker='';renderPlenumProtocol()">✕ כל הדוברים</button>`:''}</div>
-  <input type="search" placeholder="חיפוש בפרוטוקול…" value="${esc(plenumProtoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="plenumProtoFilter.q=this.value;plenumProtoFilter.hl=this.value.trim()?[this.value.trim()]:[];_markI=-1;$('#plenumTurns').innerHTML=protoTurnsHTML(PLENUM_CUR,plenumProtoFilter);const o=$('#plenumOcc');if(o)o.textContent=plenumProtoFilter.hl.length?protoOccurrences(PLENUM_CUR,plenumProtoFilter.hl):'';const n=$('#plenumMarkNav');if(n)n.style.display=plenumProtoFilter.hl.length&&document.querySelector('#plenumTurns mark')?'':'none'">
+  <input type="search" placeholder="חיפוש בפרוטוקול…" value="${esc(plenumProtoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="plenumProtoFilter.q=this.value;plenumProtoFilter.hl=this.value.trim()?[this.value.trim()]:[];_markI=-1;$('#plenumTurns').innerHTML=protoTurnsHTML(PLENUM_CUR,plenumProtoFilter);const o=$('#plenumOcc');if(o)o.textContent=plenumProtoFilter.hl.length?protoOccurrences(PLENUM_CUR,plenumProtoFilter.hl):'';_markState.plenum={i:-1};protoSyncHitBar('plenum')">
   <div class="small dim" style="margin-bottom:.5rem">${PLENUM_CUR.turns.filter(t=>t.role!=='topic').length} קטעים · ${spk.length} דוברים${HL?` · <span id="plenumOcc">${occ}</span> אזכורים מודגשים בכל הפרוטוקול`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו
-  <span id="plenumMarkNav" style="display:${occ?'':'none'};white-space:nowrap"> · <button class="chip" onclick="plenumMarkNav(-1)">› הקודם</button> <span id="plenumMarkPos"></span> <button class="chip" onclick="plenumMarkNav(1)">הבא ‹</button></span></div>
-  <div id="plenumTurns">${protoTurnsHTML(PLENUM_CUR,plenumProtoFilter)}</div>`;
+  <span id="plenumMarkNav" style="display:${occ?'':'none'};white-space:nowrap"> · ניווט בין התוצאות: בסרגל הצף למטה</span></div>
+  <div class="proto-layout">${protoTocHTML(PLENUM_CUR,'plenum')}<div id="plenumTurns" style="flex:1;min-width:0">${protoTurnsHTML(PLENUM_CUR,plenumProtoFilter)}</div></div>
+  ${protoHitBarHTML('plenum')}`;
+  protoSyncHitBar('plenum');
 }
 /* Home hero info pills — ONE set for both Knesset homes, same slots in the
    same order with the same labels, so switching 25 ↔ 26 never reshuffles
