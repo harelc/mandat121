@@ -1164,7 +1164,7 @@ function protoColor(name,hint){
 const initiatedCount=n=>MK_INITIATED[n]||0;
 let RANK25={}; // surname-first name -> position in own faction's list sequence for the 25th Knesset (build_k25_list_order.py; within-faction, not the joint submitted list for joint runs)
 const listRank25=n=>RANK25[n]??999;
-let TENURE={}; // name -> [[from,to|null],...] official MK stints (build_k25_tenure.py, KNS_PersonToPosition)
+let TENURE={}; // name -> [[from,to|null],...] official MK stints (build_k25_tenure.py, official position records)
 let FACTION25={}; // name -> faction (official, latest stint) — fills leavers, whose vote rows carry no faction
 let FACTION_STINTS={}; // name -> [[from,to,faction],...] — faction on any given date (build_k25_tenure.py)
 function factionOn(name,date){ const st=FACTION_STINTS[name]; if(st&&date){ for(const [f,t,fac] of st) if(date>=f&&(!t||date<=t)) return fac } return FACTION25[name]||'' }
@@ -1979,7 +1979,7 @@ function openFaction(name){ navTo('faction='+encodeURIComponent(name),()=>{viewA
    Knesset's votes opens that Knesset's faction page, switching instance
    first, exactly like the switchKnesset(25);openMk(…) pattern for people. */
 function openFactionIn(kn,name){ if(KN!==kn) switchKnesset(kn); openFaction(name) }
-/* Committee ids are global KNS_Committee ids (K25: 4185–4287, K26:
+/* Committee ids are the official committee ids (K25: 4185–4287, K26:
    4288–…), so an id alone says which Knesset's dataset owns it. Every
    committee entry point — search, deep link, in-app chip — resolves the
    era from the id and switches first, exactly like MK search does for
@@ -2333,7 +2333,7 @@ function k26Entry(name){
   return null;
 }
 const k26HasPage=name=>{ const e=k26Entry(name); return !!(e&&(e.elected||e.serving)) };
-/* Who is actually in Knesset 26: once OData publishes KNS_PersonToPosition
+/* Who is actually in Knesset 26: once the official roster feed publishes member positions
    (KnessetNum=26) and build_k25_tenure.py --knesset 26 writes
    data/k26_tenure.json, the hemicycle seats the serving roster — open
    tenure stints only, so Norwegian-law resignations drop out and their
@@ -4029,7 +4029,7 @@ function renderPlenumSession(){
    ('perm'|'sub'|'special'|'joint'), not a raw type string. */
 const CMT_TIER=c=>(c.type==='ועדה ראשית'||c.type==='ועדת הכנסת')?'perm':c.type==='ועדת משנה'?'sub':c.type==='ועדה מיוחדת'?'special':'joint';
 /* K25 is an archive: OData now reports every K25 committee IsCurrent=false
-   and closes every KNS_PersonToPosition stint at term end, so "!to" / c.current
+   and closes every member-position stint at term end, so "!to" / c.current
    no longer mean "was a member / was operating". Show each K25 committee as it
    was when active: the roster in force on its last session date (fallback:
    latest stint end). K26 keeps the live !to semantics. */
