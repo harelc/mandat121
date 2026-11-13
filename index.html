@@ -819,6 +819,12 @@ try{ const raw=JSON.parse(localStorage.getItem(LS)||localStorage.getItem('openkn
   if(raw.myVotes) STORE['25']=Object.assign(freshState(),raw); // migrate v1 (K25-only)
   else for(const k of ['25','26']) if(raw[k]) STORE[k]=Object.assign(freshState(),raw[k]);
 }catch(e){}
+// MK follows are shared across Knessets: you follow the person, not the
+// term — matching the server star entity (mk:<name>, no Knesset qualifier).
+// Union any per-era lists saved before this change, and keep both eras'
+// arrays identical from here on (toggleFollow mirrors every MK toggle).
+{ const u=[...new Set([...(STORE['25'].followMks||[]),...(STORE['26'].followMks||[])])];
+  STORE['25'].followMks=[...u]; STORE['26'].followMks=[...u]; }
 let S=STORE['26'];
 let prevSeen=S.lastSeen;
 function save(){S.lastSeen=new Date().toISOString().slice(0,10);localStorage.setItem(LS,JSON.stringify(STORE))}
@@ -1113,6 +1119,8 @@ let protoQuery='';
 let pairState={a:'',b:'',show:'agreed',limit:80}; // matrix pair inspector
 let mkRebelShowAll=false; // MK page: expand the against-the-faction vote list
 let mkBillsShowAll=false; // MK page: expand the initiated-bills list
+let mkPipeSel={name:null,i:-1}; // MK page: pipeline-stage filter for that list
+function mkPipeFilter(i,name){ mkPipeSel={name,i:mkPipeSel.name===name&&mkPipeSel.i===i?-1:i}; mkBillsShowAll=false; renderMkDetail() }
 let mkPastCmtShowAll=false; // MK page: expand the past-committees list
 const GUEST_PALETTE=['#94a3b8','#a8a29e','#9ca3af','#b08968','#8d99ae','#a3b18a','#bc6c25','#6d6875'];
 function protoSpeakerKey(name){ // protocol names are given-first; our keys are surname-first
@@ -1675,7 +1683,7 @@ function starBtn(kind,key,label=''){
   return `<button class="star ${on?'on':''}" title="${on?'במעקב שלך — לחצו להסרה':'מעקב אחרי זה'}" aria-label="מעקב ${esc(label)}" aria-pressed="${on}" onclick="event.stopPropagation();toggleFollow('${kind}','${jsq(key)}',this)"><span class="star-ic">${on?'★':'☆'}</span><span class="star-n" data-starc="${esc(kind)}:${esc(key)}" ${n?'':'style="display:none"'}>${n?n.toLocaleString('he-IL'):''}</span></button>`;
 }
 function toggleFollow(kind,key,el){
-  if(kind==='bill')toggleIn(S.followBills,String(key)); else if(kind==='mk')toggleIn(S.followMks,key); else if(kind==='committee')toggleIn(S.followCommittees,String(key)); else if(kind==='faction')toggleIn(S.followFactions||(S.followFactions=[]),key); else toggleIn(S.followTopics,key);
+  if(kind==='bill')toggleIn(S.followBills,String(key)); else if(kind==='mk'){ toggleIn(S.followMks,key); STORE['25'].followMks=[...S.followMks]; STORE['26'].followMks=[...S.followMks]; save(); } else if(kind==='committee')toggleIn(S.followCommittees,String(key)); else if(kind==='faction')toggleIn(S.followFactions||(S.followFactions=[]),key); else toggleIn(S.followTopics,key);
   const on=el.classList.toggle('on'); el.setAttribute('aria-pressed',on); const ic=el.querySelector('.star-ic'); if(ic) ic.textContent=on?'★':'☆'; else el.textContent=on?'★':'☆';
   syncStar(kind,kind==='bill'||kind==='committee'?String(key):key,on);
   const cap=el.parentElement&&el.parentElement.querySelector('.star-cap'); if(cap) cap.textContent=on?'במעקב ★':'מעקב';
@@ -1936,7 +1944,7 @@ function applyRoute(){
 window.addEventListener('hashchange',applyRoute);
 /* One vote page for every plenum vote, addressed by vote id. */
 function openVote(id){ navTo('vote='+id,()=>{viewArg=String(id); view='vote'; buildTabs(); renderVote(); window.scrollTo({top:0})}) }
-function openMk(name){ mkRebelShowAll=false; mkBillsShowAll=false; mkPastCmtShowAll=false; navTo('mk='+encodeURIComponent(name),()=>{viewArg=name; view='mk'; buildTabs(); renderMkDetail(); window.scrollTo({top:0})}) }
+function openMk(name){ mkRebelShowAll=false; mkBillsShowAll=false; mkPastCmtShowAll=false; mkPipeSel={name:null,i:-1}; navTo('mk='+encodeURIComponent(name),()=>{viewArg=name; view='mk'; buildTabs(); renderMkDetail(); window.scrollTo({top:0})}) }
 function openFaction(name){ navTo('faction='+encodeURIComponent(name),()=>{viewArg=name; view='faction'; buildTabs(); renderFactionDetail(); window.scrollTo({top:0})}) }
 /* Faction names are per-Knesset (a K25 faction and a K26 party may share a
    name, a spelling — רע"ם vs רע״ם — or neither). Anything computed from one
@@ -3301,25 +3309,24 @@ function mkInitiatedHTML(name,hideEmpty=false){
      became law > reached a plenum vote (by deepest reading) > in
      committee prep > tabled/preliminary > halted/rejected > merged/converted. */
   const pipe=[['הפכו לחוק',0,'#3a8a18'],['הגיעו להצבעת מליאה',0,'#7ab648'],['בוועדה / בהכנה לקריאה',0,'#c9a227'],['הונחו / דיון מוקדם',0,'#d8c690'],['נעצרו / נדחו',0,'#cf3f1d'],['מוזגו / הוסבו',0,'#9a8f7a']];
-  for(const b of led){
-    if(b.status_id===118||b.publication_date) pipe[0][1]++;
-    else if(b.status_id===122||b.status_id===124) pipe[5][1]++;
-    else if(b.status_id===177) pipe[4][1]++;
-    else if((b.votes||[]).length) pipe[1][1]++;
-    else if(/הכנה|בוועדת/.test(b.status||'')) pipe[2][1]++;
-    else pipe[3][1]++;
-  }
+  const bucketOf=b=> b.status_id===118||b.publication_date?0 : b.status_id===122||b.status_id===124?5 : b.status_id===177?4 : (b.votes||[]).length?1 : /הכנה|בוועדת/.test(b.status||'')?2 : 3;
+  for(const b of led) pipe[bucketOf(b)][1]++;
   const pipeTot=led.length||1;
-  const pipeHTML=led.length?`<div style="margin-top:.7rem"><div class="small" style="font-weight:700">לאן הגיעו ההצעות שיזם/ה? <span class="dim" style="font-weight:400">התפלגות לפי השלב האחרון במסלול החקיקה · ${Math.round(lawN/pipeTot*100)}% הפכו לחוק · ${Math.round(voteN/pipeTot*100)}% הגיעו להצבעה</span></div>
-  <div class="pipe" role="img" aria-label="התפלגות שלבי חקיקה">${pipe.filter(p=>p[1]).map(p=>`<i style="width:${p[1]/pipeTot*100}%;background:${p[2]}" title="${esc(p[0])}: ${p[1]}"></i>`).join('')}</div>
-  <div class="pipe-legend">${pipe.map(p=>`<span><span style="color:${p[2]}">●</span> ${p[0]}: <b>${p[1].toLocaleString('he-IL')}</b> (${Math.round(p[1]/pipeTot*100)}%)</span>`).join('')}</div></div>`:'';
+  // The histogram doubles as the bill-list selector: clicking a segment or
+  // a legend chip filters the list below to that pipeline stage (again = all).
+  const pipeSel=(typeof mkPipeSel!=='undefined'&&mkPipeSel.name===name)?mkPipeSel.i:-1;
+  const pipeHTML=led.length?`<div style="margin-top:.7rem"><div class="small" style="font-weight:700">לאן הגיעו הצעות החוק שחבר הכנסת יזמ/ה? <span class="dim" style="font-weight:400">התפלגות לפי השלב האחרון במסלול החקיקה · ${Math.round(lawN/pipeTot*100)}% הפכו לחוק · ${Math.round(voteN/pipeTot*100)}% הגיעו להצבעה · לחיצה על שלב מסננת את הרשימה</span></div>
+  <div class="pipe" role="group" aria-label="סינון לפי שלב חקיקה">${pipe.map((p,i)=>p[1]?`<i style="width:${p[1]/pipeTot*100}%;background:${p[2]};cursor:pointer;${pipeSel>=0&&pipeSel!==i?'opacity:.35':''}" title="${esc(p[0])}: ${p[1]} — סינון הרשימה" onclick="mkPipeFilter(${i},'${jsq(name)}')"></i>`:'').join('')}</div>
+  <div class="chips" style="margin-top:.45rem" role="group" aria-label="סינון לפי שלב">${pipe.map((p,i)=>`<button class="chip ${pipeSel===i?'on':''}" ${p[1]?'':'disabled style="opacity:.4"'} onclick="mkPipeFilter(${i},'${jsq(name)}')"><span style="color:${p[2]}">●</span> ${p[0]}: ${p[1].toLocaleString('he-IL')} (${Math.round(p[1]/pipeTot*100)}%)</button>`).join('')}${pipeSel>=0?`<button class="chip" onclick="mkPipeFilter(-1,'${jsq(name)}')">✕ כל השלבים</button>`:''}</div></div>`:'';
 
-  const shown=mkBillsShowAll?led:led.slice(0,12);
-  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> הצעות חוק שיזם/ה <small class="dim">${led.length.toLocaleString('he-IL')} הצעות בכנסת 25 שבהן ${esc(disp(name))} יוזם/ת</small></h3>
+  const ledShown=pipeSel>=0?led.filter(b=>bucketOf(b)===pipeSel):led;
+  const shown=mkBillsShowAll?ledShown:ledShown.slice(0,12);
+  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> הצעות חוק שחבר הכנסת יזמ/ה <small class="dim">${led.length.toLocaleString('he-IL')} הצעות בכנסת 25 שבהן ${esc(disp(name))} יוזם/ת</small></h3>
   ${led.length?`<div class="small muted" style="margin-top:.35rem;line-height:1.9">${lawN?`<b style="color:var(--for)">${lawN}</b> הפכו לחוק · `:''}<b>${voteN}</b> הגיעו להצבעת מליאה${joinedN?` · בנוסף הצטרף/ה כחותם/ת ל־${joinedN} הצעות של אחרים`:''}</div>${pipeHTML}
+  ${pipeSel>=0?`<div class="small" style="margin-top:.55rem">מוצגות <b>${ledShown.length.toLocaleString('he-IL')}</b> הצעות בשלב ״${esc(pipe[pipeSel][0])}״ מתוך ${led.length.toLocaleString('he-IL')}:</div>`:''}
   <div class="rows" style="margin:.5rem -.9rem 0">${shown.map(b=>{const others=(b.initiators||[]).filter(i=>i.initiator&&i.name!==name).length;return `<div class="row" onclick="openBillPage('${b.id}')"><span class="flex">${esc(b.name)}<br><span class="dim small">${esc(statusBucket(b))}${b.committee?` · ${esc(b.committee)}`:''} · עודכן ${b.updated?fmtDate(b.updated):''}${others?` · עם עוד ${others} יוזמים`:''}</span></span><span class="chip acc">להצעה ←</span></div>`}).join('')}</div>
-  ${led.length>shown.length?`<div style="text-align:center;margin-top:.7rem"><button class="btn" onclick="mkBillsShowAll=true;renderMkDetail()">הצגת כל ${led.length.toLocaleString('he-IL')} ההצעות שיזם/ה</button></div>`:mkBillsShowAll&&led.length>12?`<div style="text-align:center;margin-top:.7rem"><button class="btn ghost" onclick="mkBillsShowAll=false;renderMkDetail()">קיפול הרשימה</button></div>`:''}`
-  :`<p class="muted small" style="margin-top:.4rem">לא נמצאו הצעות חוק ש${esc(disp(name))} יזם/ה בכנסת 25${joinedN?` — אבל הצטרף/ה כחותם/ת ל־${joinedN} הצעות של ח״כים אחרים`:''}.</p>`}</div>`;
+  ${ledShown.length>shown.length?`<div style="text-align:center;margin-top:.7rem"><button class="btn" onclick="mkBillsShowAll=true;renderMkDetail()">הצגת כל ${ledShown.length.toLocaleString('he-IL')} ההצעות</button></div>`:mkBillsShowAll&&ledShown.length>12?`<div style="text-align:center;margin-top:.7rem"><button class="btn ghost" onclick="mkBillsShowAll=false;renderMkDetail()">קיפול הרשימה</button></div>`:''}`
+  :`<p class="muted small" style="margin-top:.4rem">לא נמצאו הצעות חוק שחבר הכנסת יזמ/ה בכנסת 25${joinedN?` — אבל הצטרף/ה כחותם/ת ל־${joinedN} הצעות של ח״כים אחרים`:''}.</p>`}</div>`;
 }
 /* ============ P1 OData extras (build_odata_extras.py -> data/k25_extras.json) ============ */
 function mkExtrasHTML(name){
