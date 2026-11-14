@@ -1320,6 +1320,8 @@ const listRank25=n=>RANK25[n]??999;
 let TENURE={}; // name -> [[from,to|null],...] official MK stints (build_k25_tenure.py, official position records)
 let FACTION25={}; // name -> faction (official, latest stint) — fills leavers, whose vote rows carry no faction
 let FACTION_STINTS={}; // name -> [[from,to,faction],...] — faction on any given date (build_k25_tenure.py)
+let TENURE_FETCH=null; // started at the top of load(): the K25 archive MUST await this before deriving any faction — otherwise a warm-cache archive build bakes faction:'' into every cached vote model (vote 45487 rendered everyone "ללא סיעה")
+function applyTenure(tj){ if(!tj) return; const nk=o=>{ const r={}; for(const[k,v]of Object.entries(o||{})) r[normName(k)]=v; return r }; TENURE=nk(tj.tenure); FACTION_STINTS=nk(tj.faction_stints); for(const[k,v]of Object.entries(tj.factions||{})) FACTION25[normName(k)]=String(v).trim() }
 function factionOn(name,date){ const st=FACTION_STINTS[name]; if(st&&date){ for(const [f,t,fac] of st) if(date>=f&&(!t||date<=t)) return fac } return FACTION25[name]||'' }
 function mkVotesFor(voteId,date){ const rows=VOTE_RES.votes[String(voteId)]||[]; return rows.map(([i,c])=>({mk_name:VOTE_RES.names[i],result:c,faction:factionOn(VOTE_RES.names[i],date)})) }
 let VOTE_TENURE={}; // fallback: first/last vote dates seen
@@ -1474,7 +1476,7 @@ function noMkVotesHTML(b){
   if(b.method_id===3) return wrap(searchIcon,`הצבעה זו נערכה <b>בהצבעה חשאית</b> מאחורי פרגוד — לא נרשם איך הצביע כל ח״כ, ולכן אין מפת מליאה ואין רשימת ״מי הצביע איך״.${b.secret&&b.secret.length?`<div class="rows" style="margin:.7rem -.9rem 0;text-align:start">${b.secret.map(s=>`<div class="row"><span class="flex">${esc(s.name)}</span><span class="vchip f">${s.votes} קולות</span></div>`).join('')}</div>`:''}`);
   return wrap(searchIcon,`פירוט ההצבעה לפי ח״כ עדיין באיסוף מהמאגר הרשמי — התוצאה המספרית למעלה מעודכנת.`);
 }
-function voteMkVotes(m){ if(m&&!m.mk_votes) m.mk_votes=mkVotesFor(m.id,m.vote_date); return (m&&m.mk_votes)||[] }
+function voteMkVotes(m){ if(!m) return []; if(!m.mk_votes) m.mk_votes=mkVotesFor(m.id,m.vote_date); else for(const v of m.mk_votes) if(!v.faction) v.faction=factionOn(v.mk_name,m.vote_date); return m.mk_votes } // refresh empty factions: a model cached before tenure loaded must not stay faction-less forever
 /* Saved "my vote" keys were once split two ways: a bill id for a bill's
    chosen vote, '__v<voteId>' for every other vote. Normalise both to the
    vote id itself — the only key from here on. Bill ids and vote ids never
@@ -1674,6 +1676,7 @@ function ensureK25Archive(){
        may link to a bill (item_id -> ALLB); the bill layers on context
        (topics, text, journey), never a second identity for the vote. */
     migrateMyVotes();
+    if(TENURE_FETCH && !Object.keys(FACTION_STINTS).length) applyTenure(await TENURE_FETCH); // factions below are baked into cached models — never derive them before tenure lands
     // MK index over every vote with per-MK results.
     const KIND_READING={reading3:3,reading2:2,reading1:1,pre1:0};
     for(const v of VOTES_ALL){
@@ -1716,6 +1719,7 @@ function ensureK25Archive(){
 async function load(){
   const _loadT0=performance.now();
   const _loadMark=phase=>console.info(`[load] ${phase} ${Math.round(performance.now()-_loadT0)}ms`);
+  if(!TENURE_FETCH) TENURE_FETCH=fetch('data/k25_tenure.json').then(r=>r.ok?r.json():null).catch(()=>null);
   // Phase 1 proper: only what renderNow26 needs to paint (preview +
   // serving tenure + portraits). Everything else K26 is phase 2 too —
   // the sooner the first paint lands, the sooner the browser drops
@@ -1747,7 +1751,7 @@ async function load(){
   // pages whole within seconds, even on a slow connection.
   // Secondary datasets are NOT fetched here — see the lazy loaders above.
   // Each view pulls what it needs via ensureAgenda()/ensureCmem()/…
-  const [lor,tnr,oph,cor,b26,v26,lo26,c26,cm26,oph26,cor26]=await Promise.all([fetch('data/k25_list_order.json').catch(()=>null),fetch('data/k25_tenure.json').catch(()=>null),fetch('data/k25_official_photos.json').catch(()=>null),fetch('data/mk_contacts.json').catch(()=>null),fetch('data/k26_bills.json').catch(()=>null),fetch('data/k26_votes.json').catch(()=>null),fetch('data/k26_list_order.json').catch(()=>null),fetch('data/k26_committees.json').catch(()=>null),fetch('data/k26_committee_members.json').catch(()=>null),fetch('data/k26_official_photos.json').catch(()=>null),fetch('data/k26_contacts.json').catch(()=>null)]);
+  const [lor,tnr,oph,cor,b26,v26,lo26,c26,cm26,oph26,cor26]=await Promise.all([fetch('data/k25_list_order.json').catch(()=>null),TENURE_FETCH,fetch('data/k25_official_photos.json').catch(()=>null),fetch('data/mk_contacts.json').catch(()=>null),fetch('data/k26_bills.json').catch(()=>null),fetch('data/k26_votes.json').catch(()=>null),fetch('data/k26_list_order.json').catch(()=>null),fetch('data/k26_committees.json').catch(()=>null),fetch('data/k26_committee_members.json').catch(()=>null),fetch('data/k26_official_photos.json').catch(()=>null),fetch('data/k26_contacts.json').catch(()=>null)]);
   if(b26&&b26.ok){ K26B=await b26.json(); K26B.forEach(b=>(b.initiators||[]).forEach(i=>i.name=normName(i.name))) }
   if(v26&&v26.ok){ K26V=await v26.json(); K26V.forEach(v=>K26V_BY_ID[String(v.id)]=v) }
   { const vr26=await fetch('data/k26_vote_results.json').catch(()=>null); if(vr26&&vr26.ok){ const j=await vr26.json(); VOTE_RES26={names:(j.names||[]).map(normName),votes:j.votes||{}} } }
@@ -1759,7 +1763,7 @@ async function load(){
   if(cor26&&cor26.ok){ const cj=await cor26.json(); CONTACTS26=normKeys(cj.by_name); CONTACTS26_META=cj._meta||{} }
   if(oph&&oph.ok){ OFFICIAL_PHOTOS={...normKeys((await oph.json()).photos||{}),...OFFICIAL_PHOTOS} }
   if(oph26&&oph26.ok){ Object.assign(OFFICIAL_PHOTOS,normKeys((await oph26.json()).photos||{})) } // K26 portraits merge on top (build_k26_photos_official.py), as before
-  if(tnr&&tnr.ok){ const tj=await tnr.json(); TENURE=normKeys(tj.tenure); FACTION_STINTS=normKeys(tj.faction_stints); for(const[k,v]of Object.entries(tj.factions||{})) FACTION25[normName(k)]=String(v).trim() }
+  if(tnr) applyTenure(tnr);
   if(lor&&lor.ok){ const lo=await lor.json(); for(const[k,v]of Object.entries(lo.ranks||{})) if(v.rank) RANK25[normName(k)]=v.rank }
   if(cor&&cor.ok){ const cj=await cor.json(); CONTACTS=normKeys(cj.by_name); CONTACTS_META=cj._meta||{}; ROSTER25=new Set(Object.keys(CONTACTS)) }
   _loadMark('phase2a small files in');
