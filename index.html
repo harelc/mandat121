@@ -3111,9 +3111,9 @@ function renderBillLite(){
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem">
       <a class="btn" href="https://main.knesset.gov.il/Activity/Legislation/Laws/Pages/LawBill.aspx?t=lawsuggestionssearch&lawitemid=${b.id}" target="_blank" rel="noopener">דף ההצעה בכנסת ↗</a>
       ${b.doc_url?`<a class="btn" href="${esc(b.doc_url)}" target="_blank" rel="noopener"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> נוסח ההצעה ↗</a>`:''}
+      <button class="btn ghost" onclick="sharePage('${jsq('הצעת חוק בכנסת: '+(b.name||'')+' — סטטוס, ועדות והצבעות, במנדט ה־121')}')" title="שיתוף דף המעקב אחרי החוק הזה — כדי שעוד אזרחים יעקבו אחריו">⤴ שיתוף המעקב</button>
     </div>
   </article>
-  ${shareHTML('הצעת חוק בכנסת: '+(b.name||'')+' — סטטוס, ועדות והצבעות, במנדט ה־121')}
   ${oversightQHTML('מי שינה את החוק הזה בדרך — ומי ניסה לעצור אותו?', 'עקבו אחרי מסע החוק למעלה: באיזו ועדה נידון, מי היוזמים, ומה קרה בכל הצבעת מליאה מתחת. הוועדה היא המקום שבו הממשלה והכנסת באמת מנהלות משא ומתן — שם הפיקוח עובד או נכשל.')}
   ${billHistoryHTML(b)}
   ${billDocsHTML(b)}
