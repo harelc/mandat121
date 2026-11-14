@@ -24,6 +24,7 @@ import hmac
 import json
 import os
 import sys
+import urllib.parse
 import urllib.request
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
@@ -41,10 +42,14 @@ def _sign(key, msg):
     return hmac.new(key, msg.encode(), hashlib.sha256).digest()
 
 
-def s3_request(method, key, body=b"", content_type=None, cache_control=None):
-    endpoint = os.environ["R2_ENDPOINT"].rstrip("/")
-    access = os.environ["R2_ACCESS_KEY_ID"]
-    secret = os.environ["R2_SECRET_ACCESS_KEY"]
+def s3_request(method, key, body=b"", content_type=None, cache_control=None,
+               query=""):
+    # .strip() everything: a secret pasted with a trailing newline
+    # otherwise lands in the URL/host and urllib rejects it (probe run
+    # 43625340335 failed exactly that way on all 1,743 PUTs).
+    endpoint = os.environ["R2_ENDPOINT"].strip().rstrip("/")
+    access = os.environ["R2_ACCESS_KEY_ID"].strip()
+    secret = os.environ["R2_SECRET_ACCESS_KEY"].strip()
     now = datetime.now(timezone.utc)
     amzdate = now.strftime("%Y%m%dT%H%M%SZ")
     datestamp = now.strftime("%Y%m%d")
@@ -59,7 +64,7 @@ def s3_request(method, key, body=b"", content_type=None, cache_control=None):
         headers["cache-control"] = cache_control
     signed = ";".join(sorted(headers))
     canon_headers = "".join(f"{k}:{headers[k]}\n" for k in sorted(headers))
-    canon = "\n".join([method, uri, "", canon_headers, signed, payload_hash])
+    canon = "\n".join([method, uri, query, canon_headers, signed, payload_hash])
     scope = f"{datestamp}/auto/s3/aws4_request"
     to_sign = "\n".join(["AWS4-HMAC-SHA256", amzdate, scope,
                          hashlib.sha256(canon.encode()).hexdigest()])
@@ -71,10 +76,46 @@ def s3_request(method, key, body=b"", content_type=None, cache_control=None):
     headers["Authorization"] = (
         f"AWS4-HMAC-SHA256 Credential={access}/{scope}, "
         f"SignedHeaders={signed}, Signature={sig}")
-    req = urllib.request.Request(endpoint + uri, data=body or None,
+    req = urllib.request.Request(endpoint + uri + (f"?{query}" if query else ""),
+                                 data=body or None,
                                  method=method, headers=headers)
     with urllib.request.urlopen(req, timeout=120) as r:
         return r.status, r.read()
+
+
+# --- 2 GB storage guard -------------------------------------------------
+# R2's free tier is 10 GB, but this bucket is capped at 2 GB by policy:
+# the uploader accounts the whole bucket (S3 LIST), projects the
+# post-upload total (and the transient peak before stale generations
+# are cleaned up), and REFUSES to write anything if either would exceed
+# the cap. After a successful manifest flip it deletes stale shard
+# generations, so steady state is one generation + manifest.
+CAP_BYTES = int(os.environ.get("R2_CAP_BYTES", 2_000_000_000))
+
+
+def list_objects():
+    import xml.etree.ElementTree as ET
+    out, token = {}, ""
+    while True:
+        q = "list-type=2" + (f"&continuation-token={urllib.parse.quote(token)}" if token else "")
+        _, body = s3_request("GET", "", query=q)
+        root = ET.fromstring(body)
+        nxt = ""
+        for el in root.iter():
+            if el.tag.endswith("Contents"):
+                key = size = None
+                for ch in el:
+                    if ch.tag.endswith("Key"):
+                        key = ch.text
+                    elif ch.tag.endswith("Size"):
+                        size = int(ch.text)
+                if key is not None:
+                    out[key] = size or 0
+            elif el.tag.endswith("NextContinuationToken"):
+                nxt = el.text or ""
+        if not nxt:
+            return out
+        token = nxt
 
 
 def local_corpus(d):
@@ -118,6 +159,28 @@ def main():
             jobs.append((f"shards/{version}/search_{corpus}/{n}", d / n,
                          "application/json",
                          "public, max-age=86400, immutable"))
+    # 2 GB guard (pre-flight): account the bucket as it is, project the
+    # peak (current + new, before cleanup) and the steady state (after
+    # stale generations are deleted). Refuse BEFORE any write if either
+    # exceeds the cap.
+    existing = list_objects()
+    cur_total = sum(existing.values())
+    new_bytes = sum(p.stat().st_size for _, p, _, _ in jobs)
+    job_keys = {k for k, _, _, _ in jobs}
+    overwritten = sum(s for k, s in existing.items() if k in job_keys)
+    versions = {c["version"] for c in manifest["corpora"].values()}
+    stale = {k: s for k, s in existing.items()
+             if k.startswith("shards/")
+             and not any(k.startswith(f"shards/{v}/") for v in versions)}
+    peak = cur_total - overwritten + new_bytes
+    steady = peak - sum(stale.values())
+    print(f"R2 guard: bucket now {cur_total/1e9:.3f} GB, peak projection "
+          f"{peak/1e9:.3f} GB, steady state {steady/1e9:.3f} GB, "
+          f"cap {CAP_BYTES/1e9:.1f} GB")
+    if peak > CAP_BYTES or steady > CAP_BYTES:
+        print(f"REFUSED: projection exceeds the {CAP_BYTES/1e9:.1f} GB cap — "
+              "nothing uploaded. Prune the index or raise R2_CAP_BYTES.")
+        return 1
     done, failed = 0, []
     with ThreadPoolExecutor(max_workers=8) as ex:
         futs = {ex.submit(s3_request, "PUT", k, p.read_bytes(), ct, cc): k
@@ -137,6 +200,21 @@ def main():
         print("manifest.json updated")
     else:
         print("nothing changed — manifest untouched")
+    # Cleanup (only after the manifest points at the live generation):
+    # delete stale generations so the bucket holds one generation, not
+    # one per upload. Failures are warnings, never fatal to the upload.
+    if stale:
+        deleted = 0
+        with ThreadPoolExecutor(max_workers=8) as ex:
+            futs = {ex.submit(s3_request, "DELETE", k): k for k in stale}
+            for fut in as_completed(futs):
+                try:
+                    fut.result(); deleted += 1
+                except Exception:  # noqa: BLE001
+                    pass
+        print(f"cleaned {deleted}/{len(stale)} stale objects "
+              f"({sum(stale.values())/1e6:.1f} MB) — bucket steady state "
+              f"~{steady/1e9:.3f} GB of {CAP_BYTES/1e9:.1f} GB cap")
     return 0
 
 
