@@ -1516,7 +1516,7 @@ function ensureAgenda(){ const kn=KN; if(AG_CACHE[kn]){ AGENDA=AG_CACHE[kn]; agR
 function ensureProtoIdx(){ if(Object.keys(PROTO_IDX).length) return Promise.resolve(PROTO_IDX); return _lazyOnce('protoIdx',async()=>{ const j=await _fetchJson('data/protocols_index.json'); if(j){ PROTO_IDX=j; if(view==='session') renderSessionDetail() } return PROTO_IDX }) }
 function ensureCmem(){ return _lazyOnce('cmem',async()=>{ const j=await _fetchJson('data/k25_committee_members.json'); if(j){ CMEM=j; CMEM.by_mk=_normKeys(CMEM.by_mk); for(const arr of Object.values(CMEM.by_committee||{})) arr.forEach(m=>m.name=normName(m.name)); if(view==='mk') renderMkDetail(); else if(view==='committee') renderCommitteeDetail(); else if(view==='committees') renderCommittees() } return CMEM }) }
 function ensureAnalytics(){ if(ANALYTICS) return Promise.resolve(ANALYTICS); return _lazyOnce('analytics',async()=>{ const j=await _fetchJson('data/k25_analytics.json'); if(j){ ANALYTICS=j; if(view==='analysis') renderAnalysis(); else if(view==='mk') renderMkDetail() } return ANALYTICS }) }
-function ensureProtoSearch(){ return _lazyOnce('protoSearch',async()=>{ const j=await _fetchJson('data/protocol_search.json'); if(j){ PROTO_SEARCH=j; if(view==='protocols') renderProtocols() } return PROTO_SEARCH }) }
+function ensureProtoSearch(){ return _lazyOnce('protoSearch',async()=>{ const j=await _fetchJson('data/protocol_search.json'); if(j){ PROTO_SEARCH=j; if(view==='protocols') renderProtocols(); else if(view==='session') renderSessionDetail() } return PROTO_SEARCH }) }
 function ensurePlenumSearch(){ return _lazyOnce('plenumSearch',async()=>{ const j=await _fetchJson('data/plenum_search.json'); if(j){ PLENUM_SEARCH=j; if(view==='plenum') renderPlenum(); else if(view==='protocols') renderProtocols(); else if(view==='vote') renderVote(); else if(view==='plenumSession') renderPlenumSession() } return PLENUM_SEARCH }) }
 function ensureWiki(){ return _lazyOnce('wiki',async()=>{ const j=await _fetchJson('data/mk_wiki_abstracts.json'); if(j){ WIKI=_normKeys(j.by_name); WIKI_META=j._meta||{}; if(view==='mk') renderMkDetail() } return WIKI }) }
 function ensureExtras(){ if(EXTRAS) return Promise.resolve(EXTRAS); return _lazyOnce('extras',async()=>{ const j=await _fetchJson('data/k25_extras.json'); if(j){ j.queries_by_mk=_normKeys(j.queries_by_mk); j.agendas_by_mk=_normKeys(j.agendas_by_mk); EXTRAS=j; if(view==='mk') renderMkDetail(); else if(view==='billAll') renderBillLite(); else if(view==='committee') renderCommitteeDetail(); else if(view==='session') renderSessionDetail(); else if(view==='committees') renderCommittees() } return EXTRAS }) }
@@ -2366,7 +2366,7 @@ function openSession(id){ _protoAutoFor=null; const kn=sessionKn(id); if(kn&&kn!
 // session lives here; the only external links are the stable fs.knesset.gov.il
 // document files (protocols, background material), which do deep-link fine.
 function renderSessionDetail(){
-  ensureAgenda(); ensureExtras();
+  ensureAgenda(); ensureExtras(); ensureProtoSearch();
   const app=$('#app'), id=viewArg;
   // K26 sessions live in K26CMT.recent_sessions, not CMT (K25) — without
   // this source a K26 committee-page row dead-ends at "not found" for any
@@ -2376,6 +2376,17 @@ function renderSessionDetail(){
     try{ const meta=JSON.parse(sessionStorage.getItem('archSess:'+id)||'null');
       if(meta&&(meta.committee||meta.date)) s={committee:meta.committee||'',start:meta.date||'',items:[],docs:meta.doc?[{group:'פרוטוקול הוועדה — המסמך הרשמי',path:meta.doc}]:[]};
     }catch(e){}
+  }
+  if(!s){ // protocol-search metadata covers every indexed sitting (9,372
+    // after the full backfill) — without this shell, search hits and
+    // #session= deep links to any sitting outside the recent window
+    // dead-ended at "not found" even though its protocol loads on
+    // demand. Committee id is resolved by name so the chip still links.
+    const p=PROTO_SEARCH[String(id)];
+    if(p&&(p.committee||p.date)){
+      const cid=(CMT?.committees||[]).find(c=>c.name===p.committee)?.id;
+      s={committee:p.committee||'',committee_id:cid,start:p.date||'',items:[],docs:[]};
+    }
   }
   // Bills discussed in this session, from per-bill committee histories.
   const bills=[]; if(CMT) for(const [bid,hist] of Object.entries(CMT.bill_committees)) for(const h of hist) if(String(h.session_id)===String(id)) bills.push({bid,h});
