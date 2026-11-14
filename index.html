@@ -4101,7 +4101,29 @@ function renderMkDetail(){
     ${peers26.length?`<div class="chips" style="margin-top:.6rem"><span class="small dim" style="align-self:center">חברי סיעה:</span>${peers26.map(n=>`<button class="chip" onclick="openMk('${jsq(n)}')">${esc(disp(n))}</button>`).join('')}${partyMks26.length-1>peers26.length?`<button class="chip" onclick="openFaction('${jsq(e.party.name)}')">ועוד ${partyMks26.length-1-peers26.length}…</button>`:''}</div>`:''}
     </div>` })()}`;
     window.scrollTo(0,0); return }
-  const m=mkIndex[name]; if(!m){app.innerHTML=backBtnHTML('mks','› כל הח״כים')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצאו הצבעות מתועדות לח״כ הזה/זו באתר — לא בכנסת 25 ולא בכנסת 26.</div>';return}
+  const m=mkIndex[name];
+  if(!m&&(TENURE[name]||FACTION_STINTS[name]||CONTACTS[name]||ROSTER25.has(name))){ // served in K25 but never voted in a documented plenum vote (e.g. a late replacement who entered after the last vote) — mkIndex is built from vote results only, so they have no entry; they still get a page
+    const pf=realFaction(factionOn(name,'9999-12-31')||FACTION25[name]||MKP[name]?.faction||''); const ps=shortF(pf);
+    app.innerHTML=`
+  ${backBtnHTML('mks','› כל הח״כים')}
+  <div class="card pad rise" style="margin-top:.6rem">
+    <div style="display:flex;gap:1rem;align-items:center">
+      ${avatar(name,pf,84)}
+      <div style="flex:1"><h1 style="font-size:1.5rem">${esc(disp(name))} ${followedMk(name)?'★':''}</h1>
+      ${pf&&pf!=='ללא סיעה'?`<button class="chip" style="color:${fcol(pf)};font-weight:700" onclick="openFaction('${jsq(ps)}')">${esc(ps)} · כנסת 25 ←</button>`:'<span class="chip">ללא סיעה</span>'}
+      <div class="small dim">כהונה: ${esc(mkTenureText(name)||'—')}</div>
+      </div>${starBtn('mk',name,name)}
+    </div>
+    <p class="muted small" style="margin-top:1rem;line-height:1.9">לא הצביע/ה באף הצבעת מליאה מתועדת בכנסת 25 — נכנס/ה לכנסת אחרי ההצבעה המתועדת האחרונה או לא השתתף/ה בהצבעות בתקופת כהונתו/ה. לכן אין דונאט הצבעות, נאמנות לסיעה או היסטוריית הצבעות; שאר פרטי הכהונה — למטה.</p>
+  </div>
+  ${mkContactHTML(name)}
+  ${mkKnStrip(name)}
+  ${mkWikiHTML(name)}
+  ${mkRolesHTML(name)}
+  ${mkCommitteesHTML(name)}
+  ${mkHighlightsHTML(name)}`;
+    window.scrollTo(0,0); return }
+  if(!m){app.innerHTML=backBtnHTML('mks','› כל הח״כים')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצאו הצבעות מתועדות לח״כ הזה/זו באתר — לא בכנסת 25 ולא בכנסת 26.</div>';return}
   const pfaction=realFaction(MKP[name]?.faction||m.faction||FACTION25[name]||'');
   const pshort=shortF(pfaction);
   // RANK25 is the place in this faction's own list sequence (see
@@ -4625,7 +4647,7 @@ function renderFactionDetail(){
     ${topTopics.length?`<div class="chips" style="margin-top:.9rem"><span class="small dim" style="align-self:center">נושאים מרכזיים בהצבעות:</span>${topTopics.map(([t,n])=>`<button class="chip" onclick="filterTopic('${jsq(t)}')">${esc(t)} · ${n}</button>`).join('')}</div>`:''}
   </article>
   <div class="grid c2" style="margin-top:.85rem">
-    <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> חברי הסיעה <small class="dim">כל מי שכיהן/ה בה בקדנציה — מקוריים, מצטרפים ועוזבים ברשימה אחת</small></h3><div class="rows" style="margin:.5rem -.9rem 0">${rosterAll.map(p=>{const a=myAgreement(p.n); const chip=p.kind==='orig'?'<span class="chip acc">מההרכב המקורי</span>':p.kind==='late'?`<span class="chip acc">הצטרף/ה · ${fmtDate(p.joined)}</span>`:`<span class="chip">עזב/ה · ${fmtDate(p.left)}</span>`; return `<div class="row" style="${p.kind==='leaver'?'opacity:.62;':''}cursor:pointer" onclick="openMk('${jsq(p.n)}')"><b style="width:1.7rem;color:${f.color}">${RANK25[p.n]||''}</b>${avatar(p.n,f.full,34)}<span class="flex">${esc(disp(p.n))}<br><span class="dim small">${p.votes} הצבעות${a?` · ${a.pct}% כמוך`:''} · בסיעה: ${esc(p.period)}</span></span>${chip}</div>`}).join('')}</div></div>
+    <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> חברי הסיעה <small class="dim">כל מי שכיהן/ה בה בקדנציה — מקוריים, מצטרפים ועוזבים ברשימה אחת</small></h3><div class="rows" style="margin:.5rem -.9rem 0">${rosterAll.map(p=>{const a=myAgreement(p.n); const chip=p.kind==='orig'?'<span class="chip acc">מההרכב המקורי</span>':p.kind==='late'?`<span class="chip acc">הצטרף/ה · ${fmtDate(p.joined)}</span>`:`<span class="chip">עזב/ה · ${fmtDate(p.left)}</span>`; return `<div class="row" style="${p.kind==='leaver'?'opacity:.62;':''}cursor:pointer" onclick="openMk('${jsq(p.n)}')"><b style="width:1.7rem;color:${f.color}" ${RANK25[p.n]?'':`title="אין מספר ברשימת המועמדים המקורית במאגר — הצטרף/ה במהלך הקדנציה"`}>${RANK25[p.n]||'—'}</b>${avatar(p.n,f.full,34)}<span class="flex">${esc(disp(p.n))}<br><span class="dim small">${p.votes} הצבעות${a?` · ${a.pct}% כמוך`:''} · בסיעה: ${esc(p.period)}</span></span>${chip}</div>`}).join('')}</div></div>
     <div class="card pad"><h3>↗️ חרגו הכי הרבה מהסיעה <small class="dim">בכל הצבעות המליאה המתועדות — כמו בכרטיס הח״כ</small></h3>${rebelsList.length?`<div class="rows" style="margin:.5rem -.9rem 0">${rebelsList.map(([n,c])=>`<div class="row" onclick="openMk('${jsq(n)}')">${avatar(n,f.full,34)}<span class="flex">${esc(disp(n))}<br><span class="dim small">${isCurrentMk(n)?'מכהן/ת כיום':'כיהן/ה במהלך הקדנציה'}</span></span><b style="color:var(--against)">${c}×</b></div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">לא נמצאו חריגות מתועדות.</p>'}
     <h3 style="margin-top:1rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> הצעות אחרונות של חברי הסיעה</h3>${initiated.length?`<div class="rows" style="margin:.5rem -.9rem 0">${initiated.map(b=>`<div class="row" onclick="openBillPage('${b.id}')"><span class="flex">${esc(b.name)}<br><span class="dim small">${esc(b.status||'')}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}</span></span><span class="chip acc">להצעה ←</span></div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">לא נמצאו הצעות של חברי הסיעה הנוכחיים במאגר המלא.</p>'}</div>
   </div>
