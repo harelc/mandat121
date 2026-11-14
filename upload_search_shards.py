@@ -122,7 +122,15 @@ def list_objects():
     import urllib.parse as _up
     out, token = {}, ""
     while True:
-        q = "list-type=2" + (f"&continuation-token={_up.quote(token)}" if token else "")
+        # SigV4 canonical query: parameters SORTED by name, values fully
+        # encoded. The unsorted form signed fine on page 1 (no token)
+        # and 403ed on every later page — which looked exactly like a
+        # missing LIST permission (it never was one).
+        parts = {"list-type": "2", "max-keys": "1000"}
+        if token:
+            parts["continuation-token"] = token
+        q = "&".join(f"{k}={_up.quote(str(v), safe='')}"
+                     for k, v in sorted(parts.items()))
         _, body = s3_request("GET", "", query=q)
         root = ET.fromstring(body)
         nxt = ""
