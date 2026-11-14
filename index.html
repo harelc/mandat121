@@ -3308,12 +3308,10 @@ function exportVotePNG(id){
   const hemiH=seats.length?552:0;
   const detailRows=Math.max(frows.length, Math.min(reb.length||1,10), 1);
   const detailH=seats.length? 64+detailRows*34+58 : 0;
-  const noVotesH=seats.length?0:120; // no full MK name list — it crowded the image; the hemicycle + faction/rebel/absentee summaries carry the detail
-  const H=Math.round(210+titleLines.length*46+subLines.length*30+86+hemiH+detailH+(absent.length&&seats.length?26:0)+noVotesH+150); // +150: footer band with site link + QR
+  let H=0; // set from the real content flow below — a pre-estimated height formula under-counted long titles and overlapped the footer
   let y=0; const el=[];
   const T=(x,yy,str,o={})=>el.push(`<text x="${x}" y="${yy}" font-family="${o.serif?"'Frank Ruhl Libre','Rubik'":"'Heebo','Rubik',Arial"} ,sans-serif" font-size="${o.s||16}" font-weight="${o.w||400}" fill="${o.c||C.text}" text-anchor="${o.anchor||'end'}" ${o.extra||''}>${xe(str)}</text>`);
   const card=(yy,h)=>el.push(`<rect x="${PAD}" y="${yy}" width="${CW}" height="${h}" rx="20" fill="${C.surface}" stroke="${C.line}"/>`);
-  el.push(`<rect width="${W}" height="${H}" fill="${C.bg}"/>`);
   // Masthead
   T(W-PAD,58,'המנדט ה־121',{s:30,w:900,serif:1}); T(W-PAD,86,`הצבעה במליאה · הכנסת ה־${KN===26?'26':'25'} · ${fmtDate(b.vote_date)}`,{s:16,c:C.mid});
   el.push(`<line x1="${PAD}" y1="106" x2="${W-PAD}" y2="106" stroke="${C.gold}" stroke-width="3"/>`); y=118;
@@ -3359,10 +3357,11 @@ function exportVotePNG(id){
     if(reb.length) reb.slice(0,10).forEach(v=>{ ry+=34; T(PAD+24+half-16,ry,`${disp(v.mk_name)} · ${shortF(v.faction)}`,{s:15}); T(PAD+36,ry,{1:'בעד',2:'נגד',3:'נמנע'}[v.result]||'',{s:14,w:800,c:[,C.for,C.against,C.abstain][v.result],anchor:'start'}) });
     else { ry+=34; T(PAD+24,ry,'אף אחד לא חרג מעמדת סיעתו.',{s:15,c:C.mid,anchor:'start'}) }
     y=cardY+detailH+18;
-    if(absent.length){ T(W-PAD,y+8,`לא השתתפו ${absent.length} ח״כים — ${absGroups.map(([g,c])=>`${g} ${c}`).join(' · ')}`,{s:14,c:C.mid}); y+=26 }
+    if(absent.length){ const absLines=wrap(`לא השתתפו ${absent.length} ח״כים — ${absGroups.map(([g,c])=>`${g} ${c}`).join(' · ')}`,108).slice(0,3); absLines.forEach(l=>{ T(W-PAD,y+8,l,{s:14,c:C.mid}); y+=22 }) }
   } else {
     card(y,110); T(W-PAD-24,y+44,'אין רישום לפי ח״כ להצבעה זו',{s:19,w:800}); T(W-PAD-24,y+76,b.method_id?`הצבעה ${VOTE_METHOD[b.method_id]||''} — לא נרשם איך הצביע כל ח״כ, ולכן אין מפת מליאה ורשימת מצביעים.`:'פירוט לפי ח״כ טרם נאסף מהמאגר הרשמי.',{s:15,c:C.mid}); y+=128;
   }
+  H=Math.round(y+138); el.unshift(`<rect width="${W}" height="${H}" fill="${C.bg}"/>`);
   // Footer band: source on the right, site deep link + QR on the left
   el.push(`<line x1="${PAD}" y1="${H-128}" x2="${W-PAD}" y2="${H-128}" stroke="${C.line}" stroke-width="1.5"/>`);
   T(W-PAD,H-92,`מקור: נתוני ההצבעות הרשמיים של הכנסת · הצבעה מס׳ ${b.id}`,{s:14,c:C.mid});
