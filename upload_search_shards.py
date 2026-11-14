@@ -171,6 +171,19 @@ def diagnose():
                   "or rename the target.")
             return 1
         print("bucket name + account match ✓")
+        try:
+            objs = list_objects()
+            total = sum(objs.values())
+            gens = {}
+            for k, sz in objs.items():
+                gens[k.split("/")[1] if k.startswith("shards/") else k] = \
+                    gens.get(k.split("/")[1] if k.startswith("shards/") else k, 0) + sz
+            print(f"bucket objects: {len(objs)}, total {total/1e9:.3f} GB; "
+                  f"by generation/root: " +
+                  ", ".join(f"{g}={sz/1e6:.1f}MB" for g, sz in sorted(gens.items())))
+        except Exception as e:  # noqa: BLE001
+            print(f"object LIST failed: {e}")
+            return 1
         return 0
     except Exception as e:  # noqa: BLE001
         print(f"ListBuckets failed: {e}")
