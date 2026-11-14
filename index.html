@@ -3067,7 +3067,7 @@ function sharePage(text){
 }
 function shareHTML(text){
   const t=encodeURIComponent(text), u=encodeURIComponent(location.href);
-  return `<div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.7rem;align-items:center"><span class="small dim">שיתוף הוא פעולת פיקוח:</span><button class="btn ghost small" onclick="sharePage('${jsq(text)}')">⤴ שתפו</button><a class="btn ghost small" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${t}&url=${u}">𝕏 ב־X</a><a class="btn ghost small" target="_blank" rel="noopener" href="https://wa.me/?text=${t}%20${u}">בוואטסאפ</a></div>`;
+  return `<div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.7rem;align-items:center"><span class="small dim">שיתוף הוא פעולת פיקוח:</span><button class="btn ghost small" onclick="sharePage('${jsq(text)}')">⤴ שתפו</button><a class="btn ghost small" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${t}&url=${u}">שתפו ב־𝕏</a><a class="btn ghost small" target="_blank" rel="noopener" href="https://wa.me/?text=${t}%20${u}">בוואטסאפ</a></div>`;
 }
 function oversightQHTML(q,a){
   return `<div class="card pad" style="margin-top:.85rem"><h3>שאלת פיקוח</h3><p style="margin-top:.3rem;line-height:1.8"><b>${q}</b></p><p class="small muted" style="line-height:1.9;margin-top:.25rem">${a}</p></div>`;
