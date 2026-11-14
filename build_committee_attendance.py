@@ -35,22 +35,44 @@ def main() -> None:
         for sid, _turns, _words in rec.get("apps", []):
             spoke_in.setdefault(sid, set()).add(mk)
 
+    # Last-known roster, mirroring cmtRoster() in index.html exactly:
+    # stints in force at the committee's last session (the official DB
+    # retroactively closed every K25 stint, so "no end date" means
+    # nothing for K25); fallback to the latest-starting stints.
+    cmt_meta = {
+        str(c["id"]): c
+        for c in json.loads((ROOT / "data/committees.json").read_text(encoding="utf-8"))["committees"]
+    }
+
+    def last_known_roster(cid: str, roster: list[dict]) -> list[dict]:
+        as_of = (cmt_meta.get(cid) or {}).get("last_session") or max(
+            (r.get("to") or r.get("from") or "") for r in roster
+        )
+        if not as_of:
+            return []
+        covers = [
+            r for r in roster
+            if (r.get("from") or "") <= as_of and (not r.get("to") or r["to"] >= as_of)
+        ]
+        if not covers:
+            latest_from = max((r.get("from") or "") for r in roster)
+            covers = [r for r in roster if r.get("from") == latest_from]
+        rank = {"chair": 0, "member": 1, "substitute": 2}
+        seen, deduped = set(), []
+        for r in sorted(covers, key=lambda r: (rank.get(r["role"], 1), r["name"])):
+            if r["name"] not in seen:
+                seen.add(r["name"])
+                deduped.append(r)
+        return deduped
+
     out = {}
     for cid, roster in mem["by_committee"].items():
         if not roster:
             continue
         cname = roster[0]["committee"]
-        # Latest tenure per person; chairs first, then members, alpha within.
-        latest: dict[str, dict] = {}
-        for r in roster:
-            prev = latest.get(r["name"])
-            if prev is None or (r.get("to") or "") > (prev.get("to") or ""):
-                latest[r["name"]] = r
-        members = sorted(
-            latest.values(),
-            key=lambda r: (0 if r["role"] == "chair" else 1, r["name"]),
-        )
-        names = [r["name"] for r in members]
+        names = [r["name"] for r in last_known_roster(str(cid), roster)]
+        if not names:
+            continue
         sids = [
             (sid, meta[1])
             for sid, meta in sessions_meta.items()
@@ -65,6 +87,7 @@ def main() -> None:
             for mk in spoke_in[sid] & set(names):
                 spoke.setdefault(mk, []).append(i)
         out[str(cid)] = {
+            "as_of": (cmt_meta.get(str(cid)) or {}).get("last_session"),
             "members": names,
             "sessions": [{"id": sid, "date": d} for sid, d in sids],
             "spoke": spoke,
