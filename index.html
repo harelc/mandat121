@@ -3443,13 +3443,22 @@ function absentSummaryHTML(absent){
    faction. No full MK name list — it crowded the image; individual votes
    stay on the web page. Fixed, compact height. */
 /* Minimal QR encoder for the export footer: byte mode, EC level M,
-   version 4 only (33x33, 62-byte capacity — a vote deep link is 41),
-   mask chosen by lowest penalty of the four standard rules. No library,
-   no network call (an external QR API would leak the link and break
-   offline). Verified by decoding the generated code (OpenCV) back to
-   the exact vote URL; data codewords also cross-checked with segno. */
+   versions 4-8 (33x33 to 49x49; mask 2 fixed). No library, no network
+   call (an external QR API would leak the link and break offline).
+   Percent-encoded URLs are decoded first: "#mk=%D7%90%D7%91…" costs
+   6 chars per Hebrew letter and blew the old version-4-only 62-byte
+   cap for nearly every MK/faction name, so qrModules returned null
+   and the footer drew an empty white box. Raw UTF-8 costs 2 bytes per
+   letter; scanners hand the browser the same link. */
 function qrModules(text){
-  const dataBytes=[...new TextEncoder().encode(text)]; if(dataBytes.length>62) return null;
+  try{ text=decodeURIComponent(text) }catch(e){}
+  const dataBytes=[...new TextEncoder().encode(text)];
+  // EC level M block tables: ec = EC codewords per block, groups =
+  // [block count, data codewords per block] (group 1 first).
+  const SPECS={4:{ec:18,groups:[[2,32]],align:[6,26]},5:{ec:24,groups:[[2,43]],align:[6,30]},6:{ec:16,groups:[[4,27]],align:[6,34]},7:{ec:18,groups:[[4,31]],align:[6,22,38]},8:{ec:22,groups:[[2,38],[2,39]],align:[6,24,42]}};
+  let V=0, spec=null, totalData=0;
+  for(const [v,s] of Object.entries(SPECS)){ const td=s.groups.reduce((a,[c,p])=>a+c*p,0); if(dataBytes.length<=td-2){ V=+v; spec=s; totalData=td; break } }
+  if(!spec) return null;
   // GF(256), primitive 0x11d
   const EXP=new Array(512), LOG=new Array(256); let gx=1;
   for(let i=0;i<255;i++){ EXP[i]=gx; LOG[gx]=i; gx<<=1; if(gx&256) gx^=0x11d } for(let i=255;i<512;i++) EXP[i]=EXP[i-255];
@@ -3458,26 +3467,33 @@ function qrModules(text){
     for(let i=0;i<deg;i++){ for(let j=0;j<res.length;j++){ res[j]=gmul(res[j],root); if(j+1<res.length) res[j]^=res[j+1] } root=gmul(root,2) } return res }
   function rsEc(data,deg){ const div=rsDivisor(deg), res=new Array(deg).fill(0);
     for(const b of data){ const f=b^res.shift(); res.push(0); div.forEach((c,i)=>res[i]^=gmul(c,f)) } return res }
-  // Bit stream -> 64 data codewords (V4-M total data), 2 blocks x 32, 18 EC each
+  // Bit stream -> totalData data codewords, split into the version's blocks
   const bits=[]; const put=(v,n)=>{ for(let i=n-1;i>=0;i--) bits.push((v>>i)&1) };
-  put(4,4); put(dataBytes.length,8); dataBytes.forEach(b=>put(b,8)); put(0,Math.min(4,64*8-bits.length));
+  put(4,4); put(dataBytes.length,8); dataBytes.forEach(b=>put(b,8)); put(0,Math.min(4,totalData*8-bits.length));
   while(bits.length%8) bits.push(0);
   const cw=[]; for(let i=0;i<bits.length;i+=8) cw.push(bits.slice(i,i+8).reduce((a,b)=>a*2+b,0));
-  for(let p=0;cw.length<64;p++) cw.push(p%2?0x11:0xec);
-  const blocks=[cw.slice(0,32),cw.slice(32,64)].map(d=>({d,ec:rsEc(d,18)}));
-  const finalCw=[]; for(let i=0;i<32;i++) blocks.forEach(b=>finalCw.push(b.d[i])); for(let i=0;i<18;i++) blocks.forEach(b=>finalCw.push(b.ec[i]));
+  for(let p=0;cw.length<totalData;p++) cw.push(p%2?0x11:0xec);
+  const blocks=[]; { let off=0; for(const [cnt,per] of spec.groups) for(let k=0;k<cnt;k++){ const dd=cw.slice(off,off+per); off+=per; blocks.push({d:dd,ec:rsEc(dd,spec.ec)}) } }
+  const finalCw=[]; const maxD=Math.max(...blocks.map(b=>b.d.length));
+  for(let i=0;i<maxD;i++) blocks.forEach(b=>{ if(i<b.d.length) finalCw.push(b.d[i]) });
+  for(let i=0;i<spec.ec;i++) blocks.forEach(b=>finalCw.push(b.ec[i]));
   const finalBits=[]; finalCw.forEach(b=>put2(finalBits,b)); function put2(arr,b){ for(let i=7;i>=0;i--) arr.push((b>>i)&1) }
-  const N=33, mod=Array.from({length:N},()=>new Array(N).fill(null));
+  const N=17+4*V, mod=Array.from({length:N},()=>new Array(N).fill(null));
   const set=(x,y,v)=>{ if(x>=0&&x<N&&y>=0&&y<N) mod[y][x]=!!v };
   function finder(cx,cy){ for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++){ const d=Math.max(Math.abs(dx),Math.abs(dy)); set(cx+dx,cy+dy, d!==2&&d!==4) } }
   finder(3,3); finder(N-4,3); finder(3,N-4);
   for(let i=0;i<N;i++){ if(mod[6][i]===null) set(i,6,i%2===0); if(mod[i][6]===null) set(6,i,i%2===0) }
-  // Alignment pattern (V4 centres [6,26], only (26,26) is new)
-  for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){ const d=Math.max(Math.abs(dx),Math.abs(dy)); set(26+dx,26+dy,d!==1) }
+  // Alignment patterns at every centre combo except the three finder corners
+  const AC=spec.align;
+  for(const cy of AC) for(const cx of AC){ if((cx===AC[0]&&cy===AC[0])||(cx===AC[AC.length-1]&&cy===AC[0])||(cx===AC[0]&&cy===AC[AC.length-1])) continue;
+    for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){ const d=Math.max(Math.abs(dx),Math.abs(dy)); set(cx+dx,cy+dy,d!==1) } }
   set(8,N-8,true); // dark module
   // Reserve format areas
   const reserve=(x,y)=>{ if(mod[y]&&mod[y][x]===null) mod[y][x]=false };
   for(let i=0;i<9;i++){ reserve(i,8); reserve(8,i) } for(let i=0;i<8;i++){ reserve(N-1-i,8); reserve(8,N-1-i) }
+  // Version info (versions >= 7): BCH(18,6), generator 0x1f25, no mask
+  if(V>=7){ let rem=V; for(let i=0;i<6;i++) rem=(rem<<1)^(((rem>>11)&1)?0x1f25:0); const vinfo=((V<<12)|(rem&0xfff))&0x3ffff;
+    for(let i=0;i<18;i++){ const v=((vinfo>>i)&1)===1; set(N-11+(i%3),Math.floor(i/3),v); set(Math.floor(i/3),N-11+(i%3),v) } }
   // Data placement, mask 2 (column mod 3 == 0), standard zigzag
   const MASK=(x,y)=>x%3===0; let bitIdx=0, upward=true;
   for(let col=N-1;col>0;col-=2){ if(col===6) col--; for(let i=0;i<N;i++){ const row=upward?N-1-i:i; for(const x of [col,col-1]){ if(mod[row][x]===null){ let v=bitIdx<finalBits.length?!!finalBits[bitIdx++]:false; if(MASK(x,row)) v=!v; mod[row][x]=v } } } upward=!upward }
@@ -3585,7 +3601,7 @@ function exportVotePNG(id){
   T(W-PAD,H-64,`הופק ${new Date().toLocaleDateString('he-IL')} מאתר המנדט ה־121`,{s:14,c:C.dim}); // no «» here or below: guillemets are bidi-weak and flip sides in the rendered PNG
   T(W-PAD,H-36,'מילוי המושב = סיעה · טבעת = ההצבעה (בעד/נגד/נמנע)',{s:13,c:C.dim});
   const voteUrl=`https://mandat121.netlify.app/#vote=${b.id}`;
-  const qr=qrModules(voteUrl), qs=92, qx=PAD, qy=H-118, cell=qs/37; // 33 modules + 2-module quiet zone each side
+  const qr=qrModules(voteUrl), qs=92, qx=PAD, qy=H-118, cell=qs/((qr?qr.length:33)+4); // modules + 2-module quiet zone each side
   el.push(`<rect x="${qx}" y="${qy}" width="${qs}" height="${qs}" rx="8" fill="#ffffff" stroke="${C.line}"/>`);
   if(qr) qr.forEach((row,ry)=>row.forEach((v,rx)=>{ if(v) el.push(`<rect x="${(qx+(rx+2)*cell).toFixed(1)}" y="${(qy+(ry+2)*cell).toFixed(1)}" width="${cell.toFixed(1)}" height="${cell.toFixed(1)}" fill="${C.text}"/>`) }));
   T(qx+qs+16,H-78,'לדף ההצבעה באתר המנדט ה־121:',{s:15,w:700,anchor:'start'});
@@ -3622,7 +3638,7 @@ function pngDoc(kicker,pageUrl,filename,sourceLine){
       T(W-PAD,H-92,sourceLine,{s:14,c:C.mid});
       T(W-PAD,H-64,`הופק ${new Date().toLocaleDateString('he-IL')} מאתר המנדט ה־121`,{s:14,c:C.dim});
       T(W-PAD,H-36,'נתונים רשמיים של הכנסת · מעקב אזרחי',{s:13,c:C.dim});
-      const qr=qrModules(pageUrl), qs=92, qx=PAD, qy=H-118, cell=qs/37;
+      const qr=qrModules(pageUrl), qs=92, qx=PAD, qy=H-118, cell=qs/((qr?qr.length:33)+4);
       el.push(`<rect x="${qx}" y="${qy}" width="${qs}" height="${qs}" rx="8" fill="#ffffff" stroke="${C.line}"/>`);
       if(qr) qr.forEach((row,ry)=>row.forEach((v,rx)=>{ if(v) el.push(`<rect x="${(qx+(rx+2)*cell).toFixed(1)}" y="${(qy+(ry+2)*cell).toFixed(1)}" width="${cell.toFixed(1)}" height="${cell.toFixed(1)}" fill="${C.text}"/>`) }));
       T(qx+qs+16,H-78,'לדף המלא באתר המנדט ה־121:',{s:15,w:700,anchor:'start'});
@@ -4578,7 +4594,7 @@ function protoWordHit(w,term){
   let s=term;
   for(let i=0;i<2;i++){ if(s.length>3&&'והבלמכש'.includes(s[0])){ s=s.slice(1); bases.add(s) } else break }
   for(const b of bases){
-    if(w.length>=3&&b.startsWith(w)) return true; // query carries a suffix form (תקציבים) of the indexed word
+    if(b===term&&w.length>=3&&b.startsWith(w)) return true; // query carries a suffix form (תקציבים) of the indexed word — original term only: applying this to de-prefixed bases turned ויקיפדיה (base יקיפדיה) into hits for יקי
     // De-prefixed bases match bare only: re-adding a prefix to them
     // re-parses other roots (שכירות → כירות/ירות → ש+ירות = שירות).
     const prefixes=b===term?['','ה','ב','ל','מ','ו','כ','ש','וה','וב','ול','וש','בה','לה'] : [''];
@@ -4642,7 +4658,7 @@ function scheduleProtoSearch(){
     const [cmt,pln]=await Promise.all([searchCorpus('c',terms),searchCorpus('p',terms)]);
     PLENUM_HL_BY_SID={}; for(const e of pln) PLENUM_HL_BY_SID[e.sid]=e.hits.map(h=>h[0]); // openPlenum highlights these in the reader
     const cmtHTML=cmt.length?`<div class="small" style="font-weight:800;margin-top:.7rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ועדות (${cmt.length})</div><div class="rows" style="margin:.3rem -.9rem 0">${cmt.slice(0,15).map(({sid,score,hits})=>{const p=PROTO_SEARCH[sid]||{}; return `<div class="row" onclick="openSession('${sid}')"><span class="chip acc">${fmtDate(p.date)}</span><span class="flex">${esc(p.committee||'')}<br><span class="dim small">${hits.map(([w,c])=>`${esc(w)} ×${c}`).join(' · ')}</span></span><b>${score}</b><span class="chip acc">לפרוטוקול ←</span></div>`}).join('')}</div>`:'';
-    const plnHTML=pln.length?`<div class="small" style="font-weight:800;margin-top:.7rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> מליאה — דברי הכנסת (${pln.length})</div><div class="rows" style="margin:.3rem -.9rem 0">${pln.slice(0,15).map(({sid,score,hits})=>{const p=PLENUM_SEARCH[sid]||{}; return `<div class="row" onclick="openPlenum('${sid}')"><span class="chip acc">${fmtDate(p.date)}</span><span class="flex">ישיבת מליאה מס׳ ${p.number}<br><span class="dim small">${hits.map(([w,c])=>`${esc(w)} ×${c}`).join(' · ')}</span></span><b>${score}</b><span class="chip acc">לישיבה ולקריאה ←</span></div>`}).join('')}</div>`:'';
+    const plnHTML=pln.length?`<div class="small" style="font-weight:800;margin-top:.7rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> מליאה — דברי הכנסת (${pln.length})</div><div class="rows" style="margin:.3rem -.9rem 0">${pln.slice(0,15).map(({sid,score,hits})=>{const p=PLENUM_SEARCH[sid]||{}; return `<div class="row" onclick="openPlenum('${sid}')"><span class="chip acc">${fmtDate(p.date)}</span><span class="flex">ישיבת מליאה מס׳ ${p.number}<br><span class="dim small">${hits.map(([w,c])=>`${esc(w)} ×${c}`).join(' · ')}</span></span><b>${score}</b><span class="chip acc">לפרוטוקול ←</span></div>`}).join('')}</div>`:'';
     protoResultsHTML=(cmtHTML||plnHTML)?cmtHTML+plnHTML:'<p class="muted small" style="margin-top:.4rem">לא נמצא בפרוטוקולים שנסרקו. נסו מילה אחרת או תחילית (למשל: תקציב, גיוס, דיור).</p>';
     protoResultsFor=q; _protoBusyFor='';
     const box=document.querySelector('#protoResults'); if(box) box.innerHTML=protoResultsHTML;
