@@ -57,6 +57,14 @@ jobs:
             exit 0
           fi
           git commit -m "data: committee protocol search backfill metadata ($(date -u +%Y-%m-%d))"
+          # The builder rewrote the shard working tree (deliberately
+          # uncommitted — they're in R2 now); rebase refuses a dirty
+          # tree, so discard shard changes before rebasing. The
+          # committed manifest.json survives: checkout/clean only touch
+          # uncommitted/untracked files. (Run 43629532577 indexed 9,374
+          # protocols and uploaded fine, then died exactly here.)
+          git checkout -- data/search_c data/search_p
+          git clean -f data/search_c data/search_p
           for attempt in 1 2 3; do
             git fetch origin main
             if ! git rebase origin/main; then

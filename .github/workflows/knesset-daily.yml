@@ -137,18 +137,14 @@ jobs:
           python3 -u build_odata_extras.py       # P1 OData extras — probe-gated per section: unchanged sections are reused, so this is seconds on a no-news day
           python3 -u build_agenda.py             # this-week agenda: plenum order of the day + committee sittings (windowed, recess-honest)
 
-      # Protocol-search shards also live in the mandat121protocols R2
-      # bucket (versioned manifest; the client reads R2 first and falls
-      # back to the committed data/search_* files). Non-fatal: an R2
-      # outage must never block the data commit — the committed shards
-      # keep search correct, just a generation behind.
-      - name: Upload protocol-search shards to R2
-        if: ${{ inputs.target != 'k26-only' }}
-        env:
-          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
-          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
-          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        run: python3 -u upload_search_shards.py || echo "::warning::R2 shard upload failed — committed shards remain the fallback"
+      # NOTE: no R2 shard upload here. build_protocols_search.py above
+      # rebuilds data/search_c from the 268 pre-parsed protocols only
+      # (write_search_shards wipes the dir) — uploading that would
+      # regress the bucket's full-corpus index (9,374 protocols, built
+      # by committee-backfill.yml) back to 268. Shard uploads are owned
+      # by the committee-backfill workflow until the two builders are
+      # unified; rerun it (incremental, minutes) to refresh R2 with new
+      # sittings. The client falls back to committed shards if R2 lags.
 
       # K26 layers, in dependency order. Each builder no-ops until its
       # OData layer exists, so this whole step is gated only on "anything
