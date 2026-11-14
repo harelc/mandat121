@@ -3186,7 +3186,7 @@ function sharePage(text){
    WhatsApp, and — on vote pages — the PNG export. Icon buttons with a
    small label, no editorialising text. */
 const SHARE_ICON='<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" style="fill:currentColor;display:block"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>';
-function shareHTML(text,pngId,underStar){
+function shareHTML(text,pngCall,underStar){ // pngCall: an exporter invocation string, e.g. exportVotePNG('45487') / exportBillPNG(25,'123') / exportMkPNG('…') / exportFactionPNG('…')
   const t=encodeURIComponent(text), u=encodeURIComponent(location.href);
   const btn=(inner,label)=>`<span style="display:inline-flex;flex-direction:column;align-items:center;gap:.12rem">${inner}<span style="font-size:.62rem;color:var(--dim)">${label}</span></span>`;
   const ic='display:inline-flex;align-items:center;justify-content:center;width:2.15rem;height:2.15rem;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--text);cursor:pointer;font-size:.95rem;text-decoration:none';
@@ -3194,7 +3194,7 @@ function shareHTML(text,pngId,underStar){
   ${btn(`<button style="${ic}" title="שיתוף" aria-label="שיתוף" onclick="sharePage('${jsq(text)}')">${SHARE_ICON}</button>`,'שיתוף')}
   ${btn(`<a style="${ic}" title="שיתוף ב־𝕏" aria-label="שיתוף ב־𝕏" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${t}&url=${u}">𝕏</a>`,'𝕏')}
   ${btn(`<a style="${ic}" title="שיתוף בוואטסאפ" aria-label="שיתוף בוואטסאפ" target="_blank" rel="noopener" href="https://wa.me/?text=${t}%20${u}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="fill:currentColor;display:block"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2zm5.2 14.2c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.9-4.3-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.4 0 .6l-.4.6-.4.5c-.1.1-.3.3-.1.6.2.3.8 1.4 1.8 2.2 1.2 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l1-1.2c.2-.3.4-.2.7-.1l2.1 1c.3.2.5.3.6.4 0 .1 0 .7-.2 1.2z"/></svg></a>`,'וואטסאפ')}
-  ${pngId?btn(`<button style="${ic}" title="ייצוא PNG של דף ההצבעה" aria-label="ייצוא PNG של דף ההצבעה" onclick="exportVotePNG('${pngId}')"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.8;display:block"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg></button>`,'PNG'):''}
+  ${pngCall?btn(`<button style="${ic}" title="ייצוא PNG לשיתוף" aria-label="ייצוא PNG לשיתוף" onclick="${pngCall}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.8;display:block"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg></button>`,'PNG'):''}
   </div>`;
 }
 const CIVIC_SEEN_KEY='mandat121.civicSeen.v1';
@@ -3238,7 +3238,7 @@ function renderBillLite(){
     <div style="display:flex;gap:.6rem;align-items:flex-start"><div style="flex:1">
     <div class="card-top"><span class="chip acc">${esc(statusBucket(b))}</span><span class="chip">${esc(b.type||'')}</span>${b.committee?`<span class="chip cmt" title="${esc(b.committee)}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(b.committee)}</span>`:''}<span class="date">${esc(billActivityLabel(b))}</span></div>
     <h1 style="font-size:1.35rem;line-height:1.4">${esc(b.name)}</h1>
-    </div><div style="text-align:center">${starBtn('bill',b.id,b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.id)?'במעקב ★':'מעקב'}</div>${shareHTML('הצעת חוק בכנסת: '+(b.name||'')+' — סטטוס, ועדות והצבעות, במנדט ה־121',null,true)}</div></div>
+    </div><div style="text-align:center">${starBtn('bill',b.id,b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.id)?'במעקב ★':'מעקב'}</div>${shareHTML('הצעת חוק בכנסת: '+(b.name||'')+' — סטטוס, ועדות והצבעות, במנדט ה־121',`exportBillPNG(25,'${b.id}')`,true)}</div></div>
     <div class="small muted" style="margin-top:.5rem;line-height:1.9">
       סטטוס רשמי בכנסת: <b style="color:var(--text)">${esc(b.status||'—')}</b>${b.status_id===177?` — ״נעצרה״ הוא מונח־הגג של הכנסת להליך שהופסק: ${(b.votes||[]).some(v=>v.accepted===0)?'כאן ההצעה נדחתה בהצבעת מליאה':(b.votes||[]).length?'ההצעה עברה הצבעה במליאה, אך ההליך הופסק אחר כך':'ההליך הופסק בלי שההצעה הגיעה להצבעת מליאה'}`:''}<br>
       ${b.postponement_reason?`סיבה רשמית לעצירת ההליך: <b style="color:var(--text)">${esc(b.postponement_reason)}</b><br>`:''}
@@ -3276,7 +3276,7 @@ function renderBill26(){
     <div style="display:flex;gap:.6rem;align-items:flex-start"><div style="flex:1">
     <div class="card-top"><span class="chip acc">${esc(b.status||'')}</span>${b.type?`<span class="chip">${esc(b.type)}</span>`:''}${b.committee?`<span class="chip cmt">${esc(b.committee)}</span>`:''}<span class="date">${esc(billActivityLabel(b))}</span></div>
     <h1 style="font-size:1.35rem;line-height:1.4">${esc(b.name)}</h1>
-    </div><div style="text-align:center">${starBtn('bill',b.id,b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.id)?'במעקב ★':'מעקב'}</div>${shareHTML('הצעת חוק בכנסת: '+(b.name||'')+' — סטטוס, ועדות והצבעות, במנדט ה־121',null,true)}</div></div>
+    </div><div style="text-align:center">${starBtn('bill',b.id,b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.id)?'במעקב ★':'מעקב'}</div>${shareHTML('הצעת חוק בכנסת: '+(b.name||'')+' — סטטוס, ועדות והצבעות, במנדט ה־121',`exportBillPNG(26,'${b.id}')`,true)}</div></div>
     <div class="small muted" style="margin-top:.5rem;line-height:1.9">
       ${b.publication_date?`פורסם בספר החוקים: ${fmtDate(b.publication_date)}<br>`:''}
       ${b.private_number?`מספר פ׳: ${esc(b.private_number)}<br>`:''}
@@ -3580,6 +3580,100 @@ function exportVotePNG(id){
   img.onerror=()=>{ URL.revokeObjectURL(url); toast('ייצוא ה־PNG נכשל בדפדפן הזה') };
   img.src=url;
 }
+/* ============ Shared PNG card scaffolding (bills / MKs / factions) ============
+   Same visual identity as the vote export — warm paper, masthead, gold
+   rule, footer with source line + deep link + QR — so every shared image
+   from the site reads as one series. Content builders push SVG into
+   d.el via d.T/d.card and advance d.y; d.finish() rasterises. */
+const PNGC={bg:'#f4efe3',surface:'#fbf8f1',surface2:'#efe8d7',line:'#ddd2ba',text:'#26221a',mid:'#5f5847',dim:'#857c66',for:'#3a8a18',against:'#cf3f1d',abstain:'#c98a04',accent:'#476b9e',gold:'#b98f1f'};
+function pngDoc(kicker,pageUrl,filename,sourceLine){
+  const C=PNGC, W=1240, PAD=52, CW=W-PAD*2, el=[];
+  const xe=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const wrap=(s,n)=>{ const words=String(s||'').split(/\s+/).filter(Boolean), lines=[]; let cur=''; for(const w of words){ if((cur+' '+w).trim().length>n&&cur){lines.push(cur);cur=w} else cur=(cur+' '+w).trim() } if(cur)lines.push(cur); return lines.length?lines:[''] };
+  const T=(x,yy,str,o={})=>el.push(`<text x="${x}" y="${yy}" font-family="${o.serif?"'Frank Ruhl Libre','Rubik'":"'Heebo','Rubik',Arial"},sans-serif" font-size="${o.s||16}" font-weight="${o.w||400}" fill="${o.c||C.text}" text-anchor="${o.anchor||'end'}">${xe(str)}</text>`);
+  const card=(yy,h)=>el.push(`<rect x="${PAD}" y="${yy}" width="${CW}" height="${h}" rx="20" fill="${C.surface}" stroke="${C.line}"/>`);
+  T(W-PAD,58,'המנדט ה־121',{s:30,w:900,serif:1}); T(W-PAD,86,kicker,{s:16,c:C.mid});
+  el.push(`<line x1="${PAD}" y1="106" x2="${W-PAD}" y2="106" stroke="${C.gold}" stroke-width="3"/>`);
+  const d={C,W,PAD,CW,el,T,card,wrap,y:118,
+    chips(yy,items){ let cx=W-PAD-24; items.filter(Boolean).forEach(ch=>{ const w=ch.length*9.5+24; el.push(`<rect x="${cx-w}" y="${yy-22}" width="${w}" height="28" rx="14" fill="${C.surface2}" stroke="${C.line}"/><text x="${cx-w/2}" y="${yy-3}" font-family="'Heebo',Arial,sans-serif" font-size="14" font-weight="700" fill="${C.mid}" text-anchor="middle">${xe(ch)}</text>`); cx-=w+10 }) },
+    titleCard(chips,title,sub){ const tl=wrap(title,52).slice(0,3), sl=sub&&sub!==title?wrap(sub,86).slice(0,3):[]; const h=44+tl.length*46+sl.length*29+(chips.filter(Boolean).length?34:8); card(d.y,h); let ty=d.y+38; if(chips.filter(Boolean).length){ d.chips(ty,chips); ty+=16 } tl.forEach(l=>{ ty+=44; T(W-PAD-24,ty,l,{s:31,w:800}) }); sl.forEach(l=>{ ty+=28; T(W-PAD-24,ty,l,{s:16,c:C.mid}) }); d.y+=h+18 },
+    finish(){
+      const H=Math.round(d.y+138); el.unshift(`<rect width="${W}" height="${H}" fill="${C.bg}"/>`);
+      el.push(`<line x1="${PAD}" y1="${H-128}" x2="${W-PAD}" y2="${H-128}" stroke="${C.line}" stroke-width="1.5"/>`);
+      T(W-PAD,H-92,sourceLine,{s:14,c:C.mid});
+      T(W-PAD,H-64,`הופק ${new Date().toLocaleDateString('he-IL')} מאתר המנדט ה־121`,{s:14,c:C.dim});
+      T(W-PAD,H-36,'נתונים רשמיים של הכנסת · מעקב אזרחי',{s:13,c:C.dim});
+      const qr=qrModules(pageUrl), qs=92, qx=PAD, qy=H-118, cell=qs/37;
+      el.push(`<rect x="${qx}" y="${qy}" width="${qs}" height="${qs}" rx="8" fill="#ffffff" stroke="${C.line}"/>`);
+      if(qr) qr.forEach((row,ry)=>row.forEach((v,rx)=>{ if(v) el.push(`<rect x="${(qx+(rx+2)*cell).toFixed(1)}" y="${(qy+(ry+2)*cell).toFixed(1)}" width="${cell.toFixed(1)}" height="${cell.toFixed(1)}" fill="${C.text}"/>`) }));
+      T(qx+qs+16,H-78,'לדף המלא באתר המנדט ה־121:',{s:15,w:700,anchor:'start'});
+      el.push(`<text x="${qx+qs+16}" y="${H-48}" font-family="'Heebo',Arial,sans-serif" font-size="15" font-weight="700" fill="${C.accent}" text-anchor="start" direction="ltr" unicode-bidi="bidi-override">${xe(pageUrl.replace('https://',''))}</text>`);
+      T(qx+qs+16,H-22,qr?'סרקו את הקוד — או היכנסו לכתובת':'היכנסו לכתובת — או חפשו באתר',{s:13,c:C.dim,anchor:'start'});
+      const svg=`<svg xmlns="http://www.w3.org/2000/svg" dir="rtl" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${el.join('')}</svg>`;
+      const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'})); const img=new Image();
+      img.onload=()=>{ const scale=2, cv=document.createElement('canvas'); cv.width=W*scale; cv.height=H*scale; const ctx=cv.getContext('2d'); ctx.fillStyle=C.bg; ctx.fillRect(0,0,cv.width,cv.height); ctx.drawImage(img,0,0,cv.width,cv.height); URL.revokeObjectURL(url);
+        cv.toBlob(blob=>{ const aEl=document.createElement('a'); aEl.href=URL.createObjectURL(blob); aEl.download=filename; aEl.click(); setTimeout(()=>URL.revokeObjectURL(aEl.href),4000); toast('ה־PNG ירד ✓') },'image/png') };
+      img.onerror=()=>{ URL.revokeObjectURL(url); toast('ייצוא ה־PNG נכשל בדפדפן הזה') };
+      img.src=url;
+    }};
+  return d;
+}
+function exportBillPNG(kn,id){
+  const b=kn===26?K26B.find(x=>String(x.id)===String(id)):(ALLB_BY_ID[id]||ALLB_BY_ID[String(id)]); if(!b){ toast('ההצעה לא נמצאה'); return }
+  const votes=(kn===26?K26V.filter(v=>String(v.item_id)===String(b.id)):VOTES_ALL.filter(v=>v.item_id===b.id)).slice().sort((x,y)=>(x.date||'').localeCompare(y.date||''));
+  const d=pngDoc(`הצעת חוק · הכנסת ה־${kn}`,`https://mandat121.netlify.app/#${kn===26?'bill26':'bill'}=${b.id}`,`bill-${b.id}-k${kn}.png`,`מקור: נתוני החקיקה הרשמיים של הכנסת · הצעה מס׳ ${b.id}`);
+  d.titleCard([kn===26?(b.status||''):statusBucket(b),b.type||'',b.committee||'',billActivityLabel(b)],b.name,b.summary||'');
+  // Journey, as one line of stages
+  const rd={}; votes.forEach(v=>{ const k=v.kind==='pre1'?0:v.kind==='reading1'?1:v.kind==='reading2'?2:v.kind==='reading3'?3:(v.reading!=null?v.reading:null); if(k!=null&&(!rd[k]||v.date<rd[k])) rd[k]=v.date });
+  const stages=[['דיון מוקדם',rd[0]],['קריאה ראשונה',rd[1]],['קריאה שנייה',rd[2]],['קריאה שלישית',rd[3]],['ספר החוקים',b.publication_date||null]];
+  { const h=64; d.card(d.y,h); let ty=d.y+26; d.T(d.W-d.PAD-24,ty,'מסע הצעת החוק',{s:17,w:800}); ty+=30;
+    d.T(d.W-d.PAD-24,ty,stages.map(([l,dt])=>`${dt?'✓':'·'} ${l}${dt?' '+fmtDate(dt):' — טרם'}`).join('   ←   '),{s:15,c:d.C.mid}); d.y+=h+18 }
+  if(votes.length){ const rows=votes.slice(-8), h=52+rows.length*36; d.card(d.y,h); let ty=d.y+34; d.T(d.W-d.PAD-24,ty,`הצבעות מליאה (${votes.length})`,{s:19,w:800,serif:1});
+    rows.forEach(v=>{ ty+=36; const acc=v.for!=null?v.for>v.against:null; d.T(d.W-d.PAD-24,ty,`${fmtDate(v.date)} · ${v.kind_label||''} · ${v.title&&v.title!==b.name?d.wrap(v.title,44)[0]:v.desc||''}`,{s:15}); if(v.for!=null) d.T(d.PAD+24,ty,`${v.for}–${v.against} · ${acc?'עברה':'נדחתה'}`,{s:15,w:800,c:acc?d.C.for:d.C.against,anchor:'start'}) });
+    d.y+=h+18 }
+  const inits=(b.initiators||[]); if(inits.length){ const names=inits.map(i=>disp(i.name)+(i.initiator?' · יוזם/ת':'')).join(' · '); const lines=d.wrap(names,92).slice(0,4); const h=48+lines.length*26; d.card(d.y,h); let ty=d.y+32; d.T(d.W-d.PAD-24,ty,`יוזמים ומצטרפים (${inits.length})`,{s:17,w:800}); lines.forEach(l=>{ ty+=26; d.T(d.W-d.PAD-24,ty,l,{s:14,c:d.C.mid}) }); d.y+=h+18 }
+  if((b.topics||[]).length){ d.T(d.W-d.PAD,d.y+8,'נושאים: '+(b.topics||[]).join(' · '),{s:14,c:d.C.mid}); d.y+=30 }
+  d.finish();
+}
+function exportMkPNG(name){
+  name=normName(name);
+  const kn26=KN===26, e26=kn26?IDX26[name]:null, m25=kn26?null:mkIndex[name];
+  const votes=kn26?(e26?.votes||[]):(m25?.votes||[]);
+  const faction=kn26?(e26?.faction||(K26?.parties||[]).find(p=>(p.elected||[]).includes(name)||(p.candidates||[]).includes(name))?.name||''):realFaction(MKP[name]?.faction||m25?.faction||FACTION25[name]||factionOn(name,'9999-12-31')||'');
+  const d=pngDoc(`חבר/ת כנסת · הכנסת ה־${KN}`,`https://mandat121.netlify.app/#mk=${encodeURIComponent(name)}`,`mk-k${KN}.png`,`מקור: נתוני ההצבעות הרשמיים של הכנסת`);
+  d.titleCard([shortF(faction)||'ללא סיעה',`כנסת ${KN}`,kn26?'':(RANK25[name]&&shortF(faction)!=='סיעת יחיד'?`מקום ${RANK25[name]} ברשימת ${shortF(faction)}`:'')],disp(name),kn26?'':(mkTenureText(name)?'כהונה: '+mkTenureText(name):''));
+  if(!votes.length){ d.card(d.y,84); d.T(d.W-d.PAD-24,d.y+50,'אין הצבעות מליאה מתועדות בכנסת זו',{s:18,w:800}); d.y+=102; d.finish(); return }
+  const c={1:0,2:0,3:0}; votes.forEach(v=>c[v.result]++); const tot=votes.length;
+  let loyT=0,loy=0; const devs=[];
+  for(const v of votes){ const bill=v.bill; const own=(bill.mk_votes||[]).find(x=>x.mk_name===name); const maj=factionMajorityCached(bill,shortF((own&&own.faction)||factionOn(name,bill.vote_date)||faction).trim()); if(!maj) continue; loyT++; if(v.result===maj) loy++; else if(maj!==3) devs.push(v) }
+  const topics={}; votes.forEach(v=>(v.bill.topics||[]).forEach(t=>topics[t]=(topics[t]||0)+1)); const topTopics=Object.entries(topics).sort((a,b)=>b[1]-a[1]).slice(0,5);
+  { const h=150; d.card(d.y,h); const cy=d.y+75, cx=d.W-d.PAD-90, r=52, circ=2*Math.PI*r; let off=0;
+    [[c[1],d.C.for],[c[2],d.C.against],[c[3],d.C.abstain]].forEach(([v,col])=>{ const len=circ*(v/tot); d.el.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${col}" stroke-width="17" stroke-dasharray="${Math.max(len-2,0)} ${circ}" transform="rotate(-90 ${cx} ${cy})" stroke-dashoffset="${-off}"/>`); off+=len });
+    d.el.push(`<circle cx="${cx}" cy="${cy}" r="${r-13}" fill="${d.C.surface}"/>`); d.T(cx,cy+9,String(tot),{s:26,w:900,anchor:'middle'});
+    let ty=d.y+42; [[`בעד ${c[1]} (${Math.round(c[1]/tot*100)}%)`,d.C.for],[`נגד ${c[2]} (${Math.round(c[2]/tot*100)}%)`,d.C.against],[`נמנע ${c[3]} (${Math.round(c[3]/tot*100)}%)`,d.C.abstain]].forEach(([l,col])=>{ d.T(d.W-d.PAD-190,ty,l,{s:17,c:col}); ty+=32 });
+    if(loyT) d.T(d.W-d.PAD-190,ty+6,`נאמנות לסיעה: ${Math.round(loy/loyT*100)}% (${loy}/${loyT}) · חריגות: ${devs.length}`,{s:15,c:d.C.mid});
+    if(topTopics.length) d.T(d.PAD+24,d.y+h-18,'מצביע/ה הרבה על: '+topTopics.map(([t,n])=>`${t} · ${n}`).join('   '),{s:14,c:d.C.mid,anchor:'start'});
+    d.y+=h+18 }
+  const rows=votes.slice(0,8), h=52+rows.length*36; d.card(d.y,h); let ty=d.y+34; d.T(d.W-d.PAD-24,ty,'הצבעות אחרונות',{s:19,w:800,serif:1});
+  rows.forEach(v=>{ ty+=36; d.T(d.W-d.PAD-24,ty,`${fmtDate(v.bill.vote_date)} · ${d.wrap(v.bill.title||v.bill.name||'',58)[0]}`,{s:15}); d.T(d.PAD+24,ty,{1:'בעד',2:'נגד',3:'נמנע'}[v.result]||'',{s:15,w:800,c:[,d.C.for,d.C.against,d.C.abstain][v.result],anchor:'start'}) });
+  d.y+=h+18; d.finish();
+}
+function exportFactionPNG(name){
+  const kn26=KN===26;
+  if(kn26){ const p=(K26?.parties||[]).find(x=>x.name===name||shortF(x.name)===name); if(!p){ toast('הסיעה לא נמצאה'); return }
+    const d=pngDoc(`סיעה · הכנסת ה־26`,`https://mandat121.netlify.app/#faction=${encodeURIComponent(p.name)}`,`faction-k26.png`,`מקור: ועדת הבחירות המרכזית · הכנסת ה־26`);
+    d.titleCard([`${p.seats} מושבים`,'כנסת 26'],p.name,'');
+    { const h=54; d.card(d.y,h); d.el.push(`<rect x="${d.W-d.PAD-24-(d.CW-48)}" y="${d.y+20}" width="${(d.CW-48)}" height="14" rx="7" fill="${d.C.surface2}"/><rect x="${d.W-d.PAD-24-(d.CW-48)*p.seats/120}" y="${d.y+20}" width="${(d.CW-48)*p.seats/120}" height="14" rx="7" fill="${p.color||d.C.accent}"/>`); d.y+=h+18 }
+    const names=(p.elected||[]).map((n,i)=>`${(p.candidates||[]).indexOf(n)+1||i+1}. ${disp(n)}`).join(' · '); const lines=d.wrap(names,88).slice(0,10); const h=48+lines.length*27; d.card(d.y,h); let ty=d.y+32; d.T(d.W-d.PAD-24,ty,`חברי הכנסת (${(p.elected||[]).length})`,{s:17,w:800}); lines.forEach(l=>{ ty+=27; d.T(d.W-d.PAD-24,ty,l,{s:14.5,c:d.C.mid}) }); d.y+=h+18; d.finish(); return }
+  const f=currentFactions().find(x=>x.name===name||x.name===shortF(name)); if(!f){ toast('הסיעה לא נמצאה'); return }
+  const st=factionStatFor(f.name), coh=st?Math.round(st.majShare/st.bills*100):null;
+  const rebelsList=Object.entries(eraFactionRebelCounts(f.name)).sort((a,b)=>b[1]-a[1]).slice(0,6);
+  const d=pngDoc(`סיעה · הכנסת ה־25`,`https://mandat121.netlify.app/#faction=${encodeURIComponent(f.name)}`,`faction-k25.png`,`מקור: נתוני ההצבעות הרשמיים של הכנסת`);
+  d.titleCard([`${f.members.length} ח״כים בסוף הקדנציה`,'כנסת 25'],f.name,coh!=null?`לכידות סיעתית: ${coh}% מההצבעות ברוב הסיעה`:'');
+  if(rebelsList.length){ const h=52+rebelsList.length*34; d.card(d.y,h); let ty=d.y+34; d.T(d.W-d.PAD-24,ty,'החורגים הגדולים מהסיעה',{s:19,w:800,serif:1}); rebelsList.forEach(([n,cnt])=>{ ty+=34; d.T(d.W-d.PAD-24,ty,disp(n),{s:15}); d.T(d.PAD+24,ty,`×${cnt}`,{s:15,w:800,c:d.C.against,anchor:'start'}) }); d.y+=h+18 }
+  const names=f.members.map(n=>disp(n)).join(' · '); const lines=d.wrap(names,88).slice(0,10); { const h=48+lines.length*27; d.card(d.y,h); let ty=d.y+32; d.T(d.W-d.PAD-24,ty,`חברי הסיעה בסוף הקדנציה (${f.members.length})`,{s:17,w:800}); lines.forEach(l=>{ ty+=27; d.T(d.W-d.PAD-24,ty,l,{s:14.5,c:d.C.mid}) }); d.y+=h+18 }
+  d.finish();
+}
 function renderVote26(){
   const app=$('#app'), b=viewArg?voteModel26(viewArg):null;
   if(!b){ if(!K25_READY){ ensureK25Archive(); routePending('ההצבעה') } else app.innerHTML=backBtnHTML('votes','› חזרה להצבעות')+'<div class="card empty" style="margin-top:.6rem"><div class="big">🗳️</div>ההצבעה לא נמצאה בכנסת ה־26.</div>'; return }
@@ -3597,7 +3691,7 @@ function renderVote26(){
     <div style="display:flex;gap:.6rem;align-items:flex-start"><div style="flex:1">
     <div class="card-top">${b.kind_label?`<span class="chip acc">${esc(b.kind_label)}</span>`:''}${b.method_id&&b.method_id>=3?`<span class="chip">${esc(VOTE_METHOD[b.method_id])}</span>`:''}<span class="date">${fmtDate(b.vote_date)}</span></div>
     <h1 style="font-size:1.45rem;line-height:1.35">${esc(b.title)}</h1></div>
-    ${(()=>{const kb=b.bill_id?K26B.find(x=>String(x.id)===String(b.bill_id)):null; return `<div style="text-align:center">${kb?`${starBtn('bill',kb.id,kb.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(kb.id)?'החוק במעקב ★':'מעקב אחרי החוק'}</div>`:''}${shareHTML('הצבעה במליאת הכנסת: '+(b.title||'')+(b.has_tally?` — ${b.total_for} בעד, ${b.total_against} נגד`:'')+'. מי הצביע איך, במנדט ה־121',b.id,true)}</div>`})()}
+    ${(()=>{const kb=b.bill_id?K26B.find(x=>String(x.id)===String(b.bill_id)):null; return `<div style="text-align:center">${kb?`${starBtn('bill',kb.id,kb.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(kb.id)?'החוק במעקב ★':'מעקב אחרי החוק'}</div>`:''}${shareHTML('הצבעה במליאת הכנסת: '+(b.title||'')+(b.has_tally?` — ${b.total_for} בעד, ${b.total_against} נגד`:'')+'. מי הצביע איך, במנדט ה־121',`exportVotePNG('${b.id}')`,true)}</div>`})()}
     </div>
     ${b.sub&&b.sub!==b.title?`<div class="bill-name">${esc(b.sub)}</div>`:''}
     <div style="margin:1rem 0">${b.has_tally?`${outcomeHTML(b.total_for,b.total_against,b.total_abstain,'ההצעה התקבלה','ההצעה לא התקבלה')}${scoreHTML(b,true)}`:b.is_accepted!=null?`<div class="outcome ${b.is_accepted?'for':'against'}" role="status"><span class="o-main"><b>${b.is_accepted?'ההצעה התקבלה':'ההצעה לא התקבלה'}</b></span></div>`:''}</div>
@@ -3659,7 +3753,7 @@ function renderVote(){
         <h1 style="font-size:1.45rem;line-height:1.35">${esc(b.title)}</h1>
         ${b.sub&&b.sub!==b.title?`<div class="bill-name">${esc(b.sub)}</div>`:''}
         ${b.topics&&b.topics.length?`<div class="chips" style="margin-top:.5rem">${b.topics.map(t=>`<button class="chip" title="כל החוקים בנושא" onclick="filterTopic('${jsq(t)}')">${esc(t)}</button>`).join('')}</div>`:''}
-      </div><div style="text-align:center">${b.bill_id?`${starBtn('bill',b.bill_id,(b.lite&&b.lite.name)||b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.bill_id)?'החוק במעקב ★':'מעקב אחרי החוק'}</div>`:''}${shareHTML('הצבעה במליאת הכנסת: '+(b.title||'')+(b.has_tally?` — ${b.total_for} בעד, ${b.total_against} נגד`:'')+'. מי הצביע איך, במנדט ה־121',b.id,true)}</div>
+      </div><div style="text-align:center">${b.bill_id?`${starBtn('bill',b.bill_id,(b.lite&&b.lite.name)||b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.bill_id)?'החוק במעקב ★':'מעקב אחרי החוק'}</div>`:''}${shareHTML('הצבעה במליאת הכנסת: '+(b.title||'')+(b.has_tally?` — ${b.total_for} בעד, ${b.total_against} נגד`:'')+'. מי הצביע איך, במנדט ה־121',`exportVotePNG('${b.id}')`,true)}</div>
     </div>
     ${oversightQHTML('vote','האם מי שהצביעו כאן ייצגו אתכם?', 'סמנו למטה איך הייתם מצביעים — ותראו מיד מי מבין כל הח״כים הצביע כמוכם, מי הצביע נגד עמדתכם, ומי בכלל לא הופיע. פיקוח מתחיל בהשוואה הזאת.')}
     ${b.bill_id?`<div class="small dim" style="margin-top:.7rem">מסע הצעת החוק — כל שלביה, לא רק ההצבעה הזאת:</div>${stepperHTML(b.bill_id)}`:''}
@@ -4097,7 +4191,7 @@ function renderMkDetail(){
       <button class="chip" style="color:${e.party.color||fcol(e.party.name)};font-weight:700" onclick="openFaction('${jsq(e.party.name)}')">${esc(e.party.name)} · כנסת 26 ←</button>
       <div class="small dim">${e.rank?`מקום ${e.rank} ברשימת ${esc(e.party.name)} · `:''}${e.serving?'מכהן/ת בפועל':e.elected?'נבחר/ה לכנסת ה־26':'מועמד/ת ברשימה — לא נכנס/ה לכנסת ה־26'}</div>
       ${mkPresenceLineHTML(name)}
-      <span class="chip acc" style="margin-top:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> היסטוריית ההצבעות של כנסת 26</span></div>${starBtn('mk',name,name)}</div>
+      <span class="chip acc" style="margin-top:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> היסטוריית ההצבעות של כנסת 26</span></div><div style="text-align:center">${starBtn('mk',name,name)}${shareHTML('חבר/ת הכנסת '+(disp(name))+' — הצבעות, נאמנות לסיעה וחקיקה, במנדט ה־121',`exportMkPNG('${jsq(name)}')`,true)}</div></div>
     ${rec?`<div style="margin-top:1rem"><h3>בכנסת 25</h3><div class="small muted" style="line-height:1.9">${rec.votes.length} הצבעות מתועדות · סיעה אז: ${esc(shortF(rec.faction))} · <span style="color:var(--for)">${rec.votes.filter(v=>v.result===1).length} בעד</span> / <span style="color:var(--against)">${rec.votes.filter(v=>v.result===2).length} נגד</span> / <span style="color:var(--abstain)">${rec.votes.filter(v=>v.result===3).length} נמנע</span><br>איך הצביע/ה על ביטחון, כלכלה, זכויות — הכל שמור בכרטיס של כנסת 25.</div>
     <button class="btn primary" style="margin-top:.6rem" onclick="switchKnesset(25);openMk('${jsq(name)}')">לכל ההצבעות בכנסת 25 ←</button></div>`:K25_READY?'<p class="muted small" style="margin-top:1rem">לא כיהן/ה בכנסת 25.</p>':'<p class="muted small" style="margin-top:1rem">טוען את היסטוריית כנסת 25…</p>'}
     </div>
@@ -4125,7 +4219,7 @@ function renderMkDetail(){
       <div style="flex:1"><h1 style="font-size:1.5rem">${esc(disp(name))} ${followedMk(name)?'★':''}</h1>
       ${pf&&pf!=='ללא סיעה'?`<button class="chip" style="color:${fcol(pf)};font-weight:700" onclick="openFaction('${jsq(ps)}')">${esc(ps)} · כנסת 25 ←</button>`:'<span class="chip">ללא סיעה</span>'}
       <div class="small dim">כהונה: ${esc(mkTenureText(name)||'—')}</div>
-      </div>${starBtn('mk',name,name)}
+      </div><div style="text-align:center">${starBtn('mk',name,name)}${shareHTML('חבר/ת הכנסת '+(disp(name))+' — הצבעות, נאמנות לסיעה וחקיקה, במנדט ה־121',`exportMkPNG('${jsq(name)}')`,true)}</div>
     </div>
     <p class="muted small" style="margin-top:1rem;line-height:1.9">לא הצביע/ה באף הצבעת מליאה מתועדת בכנסת 25 — נכנס/ה לכנסת אחרי ההצבעה המתועדת האחרונה או לא השתתף/ה בהצבעות בתקופת כהונתו/ה. לכן אין גרף הצבעות, נאמנות לסיעה או היסטוריית הצבעות; שאר פרטי הכהונה — למטה.</p>
   </div>
@@ -4177,7 +4271,7 @@ function renderMkDetail(){
       <div class="small dim">${tot} הצבעות מתועדות בכנסת 25${rank25Txt?` · ${rank25Txt}`:''}</div>
       ${isFormerMk(name)?`<span class="chip" style="margin-top:.4rem">${formerBadgeText(name)} · כהונה: ${esc(mkTenureText(name)||'—')}</span>`:''}
       ${k26elected?`<span class="chip acc" style="margin-top:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> נבחר/ה לכנסת ה־26 · מקום ${k26elected.rank} ברשימת ${esc(k26elected.p)}</span>`:''}
-      </div>${starBtn('mk',name,name)}
+      </div><div style="text-align:center">${starBtn('mk',name,name)}${shareHTML('חבר/ת הכנסת '+(disp(name))+' — הצבעות, נאמנות לסיעה וחקיקה, במנדט ה־121',`exportMkPNG('${jsq(name)}')`,true)}</div>
     </div>
     <div class="donut-wrap" style="margin-top:1.1rem">
       <svg width="92" height="92" viewBox="0 0 42 42" role="img" aria-label="התפלגות הצבעות">
@@ -4581,7 +4675,7 @@ function renderFactionDetail(){
     if(!p){ app.innerHTML=backBtnHTML('factions','› סיעות')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="12" cy="17" r="2.6"/><path d="M9.3 8.6 10.6 14M14.7 8.6 13.4 14M9.6 7h4.8"/></svg></div>הסיעה לא נמצאה ברשימות כנסת 26.</div>'; return }
     app.innerHTML=`
     ${backBtnHTML('factions','› סיעות')}
-    <article class="card pad rise" style="margin-top:.6rem"><div class="card-top"><span class="chip acc">${p.seats} מושבים</span><span class="chip">כנסת 26</span><span style="margin-inline-start:auto">${starBtn('faction',p.name,p.name)}</span></div>
+    <article class="card pad rise" style="margin-top:.6rem"><div class="card-top"><span class="chip acc">${p.seats} מושבים</span><span class="chip">כנסת 26</span><span style="margin-inline-start:auto;text-align:center">${starBtn('faction',p.name,p.name)}${shareHTML('סיעת '+(p.name)+' בכנסת ה־26 — מושבים וחברי כנסת, במנדט ה־121',`exportFactionPNG('${jsq(p.name)}')`,true)}</span></div>
       <h1 style="font-size:1.55rem;color:${p.color}">${esc(p.name)}</h1>
       <div class="progress" style="margin:.7rem 0"><i style="width:${p.seats/120*100}%;background:${p.color}"></i></div>
       <p class="small muted">חברי הכנסת לפי סדר הרשימה הרשמי. מי שכיהנו בכנסת 25 מקושרים להיסטוריית ההצבעות שלהם.</p>
@@ -4655,7 +4749,7 @@ function renderFactionDetail(){
   ${backBtnHTML('factions','› סיעות')}
   <article class="card pad rise" style="margin-top:.6rem">
     <div class="card-top"><span class="chip acc">${f.members.length} ח״כים כיום</span>${st?`<span class="chip">${st.members.size} כיהנו לאורך הקדנציה</span>`:''}${agree?`<span class="chip"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20.3S4 15.4 2.6 10.6C1.7 7.4 3.9 4.5 6.9 4.5c2 0 3.9 1.2 5.1 3 1.2-1.8 3.1-3 5.1-3 3 0 5.2 2.9 4.3 6.1C20 15.4 12 20.3 12 20.3z"/></svg> ${agree.pct}% כמוך</span>`:''}</div>
-    <div style="display:flex;align-items:flex-start;gap:.8rem"><h1 style="font-size:1.55rem;color:${f.color};flex:1">${esc(f.name)}</h1>${starBtn('faction',f.name,f.name)}</div>
+    <div style="display:flex;align-items:flex-start;gap:.8rem"><h1 style="font-size:1.55rem;color:${f.color};flex:1">${esc(f.name)}</h1><div style="text-align:center">${starBtn('faction',f.name,f.name)}${shareHTML('סיעת '+(f.name)+' בכנסת ה־25 — לכידות, חורגים וחברי כנסת, במנדט ה־121',`exportFactionPNG('${jsq(f.name)}')`,true)}</div></div>
     ${coh!=null?`<div style="margin-top:.9rem"><div class="small muted">לכידות סיעתית ממוצעת על ${st.bills} הצבעות</div><div class="progress" style="margin:.35rem 0"><i style="width:${coh}%;background:${f.color}"></i></div><b>${coh}%</b></div>`:''}
     ${topTopics.length?`<div class="chips" style="margin-top:.9rem"><span class="small dim" style="align-self:center">נושאים מרכזיים בהצבעות:</span>${topTopics.map(([t,n])=>`<button class="chip" onclick="filterTopic('${jsq(t)}')">${esc(t)} · ${n}</button>`).join('')}</div>`:''}
   </article>
