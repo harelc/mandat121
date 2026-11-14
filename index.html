@@ -5088,6 +5088,9 @@ function renderMine(){
      status + updated date, so we say "עודכן" with the current stage. */
   if(fm.length&&!MK_HIGHLIGHTS) ensureMkHighlights().then(()=>{ if(view==='mine') renderMine() }).catch(()=>{});
   if(!EVENTS) ensureEvents().catch(()=>{});
+  const feed=[]; const feedSeen=new Set();
+  const pushFeed=(date,icon,title,sub,go)=>{ if(!date) return; const k=icon+'|'+title+'|'+date; if(feedSeen.has(k)) return; feedSeen.add(k); feed.push({date,icon,title,sub,go}) };
+  const fbIds=new Set(fb.map(b=>String(b.id)));
   // Server-proven transitions first: exact from→to status changes on
   // followed bills (the snapshot feed below cannot claim these).
   if(EVENTS) for(const e of EVENTS){
@@ -5095,9 +5098,6 @@ function renderMine(){
     else if(e.type==='new_vote'&&e.item_id&&fbIds.has(String(e.item_id))) pushFeed(e.date,'🗳️',`הצבעה חדשה על חוק במעקב: ${(ALLB_BY_ID[e.item_id]&&displayText(ALLB_BY_ID[e.item_id]))||e.name||''}`,`${e.for??''}–${e.against??''}`,`openVote('${e.vote_id}')`);
     else if(e.type==='new_session'&&(S.followCommittees||[]).map(String).includes(String(e.committee_id))) pushFeed(e.date,'🏛️',`ישיבה חדשה בוועדה במעקב: ${e.committee||cmtName(e.committee_id)}`,`ישיבת ועדה · כנסת ${e.kn}`,`openCommittee('${e.committee_id}')`);
   }
-  const feed=[]; const feedSeen=new Set();
-  const pushFeed=(date,icon,title,sub,go)=>{ if(!date) return; const k=icon+'|'+title+'|'+date; if(feedSeen.has(k)) return; feedSeen.add(k); feed.push({date,icon,title,sub,go}) };
-  const fbIds=new Set(fb.map(b=>String(b.id)));
   for(const b of fb){
     pushFeed(billActivityDate(b),'📜',`פעילות בחוק במעקב: ${displayText(b)}`,`${billActivityLabel(b)} · השלב כעת: ${statusBucket(b)}`,`openBillPage('${b.id}')`);
   }
