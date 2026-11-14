@@ -1516,8 +1516,8 @@ function ensureAgenda(){ const kn=KN; if(AG_CACHE[kn]){ AGENDA=AG_CACHE[kn]; agR
 function ensureProtoIdx(){ if(Object.keys(PROTO_IDX).length) return Promise.resolve(PROTO_IDX); return _lazyOnce('protoIdx',async()=>{ const j=await _fetchJson('data/protocols_index.json'); if(j){ PROTO_IDX=j; if(view==='session') renderSessionDetail() } return PROTO_IDX }) }
 function ensureCmem(){ return _lazyOnce('cmem',async()=>{ const j=await _fetchJson('data/k25_committee_members.json'); if(j){ CMEM=j; CMEM.by_mk=_normKeys(CMEM.by_mk); for(const arr of Object.values(CMEM.by_committee||{})) arr.forEach(m=>m.name=normName(m.name)); if(view==='mk') renderMkDetail(); else if(view==='committee') renderCommitteeDetail(); else if(view==='committees') renderCommittees() } return CMEM }) }
 function ensureAnalytics(){ if(ANALYTICS) return Promise.resolve(ANALYTICS); return _lazyOnce('analytics',async()=>{ const j=await _fetchJson('data/k25_analytics.json'); if(j){ ANALYTICS=j; if(view==='analysis') renderAnalysis(); else if(view==='mk') renderMkDetail() } return ANALYTICS }) }
-function ensureProtoSearch(){ return _lazyOnce('protoSearch',async()=>{ const j=await _fetchJson('data/protocol_search.json'); if(j){ PROTO_SEARCH=j; if(view==='committees') renderCommittees() } return PROTO_SEARCH }) }
-function ensurePlenumSearch(){ return _lazyOnce('plenumSearch',async()=>{ const j=await _fetchJson('data/plenum_search.json'); if(j){ PLENUM_SEARCH=j; if(view==='plenum') renderPlenum(); else if(view==='vote') renderVote(); else if(view==='plenumSession') renderPlenumSession() } return PLENUM_SEARCH }) }
+function ensureProtoSearch(){ return _lazyOnce('protoSearch',async()=>{ const j=await _fetchJson('data/protocol_search.json'); if(j){ PROTO_SEARCH=j; if(view==='protocols') renderProtocols() } return PROTO_SEARCH }) }
+function ensurePlenumSearch(){ return _lazyOnce('plenumSearch',async()=>{ const j=await _fetchJson('data/plenum_search.json'); if(j){ PLENUM_SEARCH=j; if(view==='plenum') renderPlenum(); else if(view==='protocols') renderProtocols(); else if(view==='vote') renderVote(); else if(view==='plenumSession') renderPlenumSession() } return PLENUM_SEARCH }) }
 function ensureWiki(){ return _lazyOnce('wiki',async()=>{ const j=await _fetchJson('data/mk_wiki_abstracts.json'); if(j){ WIKI=_normKeys(j.by_name); WIKI_META=j._meta||{}; if(view==='mk') renderMkDetail() } return WIKI }) }
 function ensureExtras(){ if(EXTRAS) return Promise.resolve(EXTRAS); return _lazyOnce('extras',async()=>{ const j=await _fetchJson('data/k25_extras.json'); if(j){ j.queries_by_mk=_normKeys(j.queries_by_mk); j.agendas_by_mk=_normKeys(j.agendas_by_mk); EXTRAS=j; if(view==='mk') renderMkDetail(); else if(view==='billAll') renderBillLite(); else if(view==='committee') renderCommitteeDetail(); else if(view==='session') renderSessionDetail(); else if(view==='committees') renderCommittees() } return EXTRAS }) }
 function ensureBillDocs(){ if(BILL_DOCS) return Promise.resolve(BILL_DOCS); return _lazyOnce('billDocs',async()=>{ const j=await _fetchJson(`data/k${KN}_bill_docs.json`); if(j){ BILL_DOCS=j; if(view==='billAll') renderBillLite(); else if(view==='vote') renderVote() } return BILL_DOCS }) }
@@ -2073,7 +2073,7 @@ function followCount(){return S.followBills.length+S.followMks.length+(S.followC
 function buildTabs(){const active=view==='vote'?'votes':(view==='billAll'||view==='bill26')?'bills':view==='mk'?'mks':view==='faction'?'factions':(view==='committee'||view==='session')?'committees':view==='plenumSession'?'plenum':view; $('#tabs').innerHTML=TABS.map(([v,ic,l])=>`<button class="tab ${active===v?'active':''}" onclick="go('${v}')"><span class="ic">${icon(ic)}</span>${l}${v==='mine'&&(myCount()||followCount())?`<span class="dot">${myCount()+followCount()}</span>`:''}</button>`).join('')}
 function updateTabsBadge(){buildTabs()}
 function go(v,arg=null){ navTo('tab='+v,()=>{view=v;viewArg=arg;buildTabs();render();window.scrollTo({top:0})}) }
-function render(){({now:renderNow,bills:renderBills,votes:renderVotes,plenum:renderPlenum,mks:renderMks,factions:renderFactions,committees:renderCommittees,analysis:renderAnalysis,mine:renderMine,about:renderAbout}[view]||renderNow)(); paintStarCounts()}
+function render(){({now:renderNow,bills:renderBills,votes:renderVotes,plenum:renderPlenum,mks:renderMks,factions:renderFactions,committees:renderCommittees,protocols:renderProtocols,analysis:renderAnalysis,mine:renderMine,about:renderAbout}[view]||renderNow)(); paintStarCounts()}
 /* Hash router: every navigation writes the hash, and `hashchange` renders.
    That is what makes the browser Back/Forward buttons work — previously the
    hash was written but never listened to, so Back changed the URL while the
@@ -2145,7 +2145,7 @@ function applyRoute(){
   else if(h.get('plenum')){ setKN(25); view='plenumSession'; viewArg=h.get('plenum'); buildTabs(); renderPlenumSession() }
   else if(h.get('bill26')){ setKN(26); view='bill26'; viewArg=h.get('bill26'); buildTabs(); renderBill26() }
   else if(h.get('vote')){ const kn=voteKn(h.get('vote')); if(kn) setKN(kn); view='vote'; viewArg=h.get('vote'); buildTabs(); if(!kn&&!K25_READY) routePending('ההצבעה'); else renderVote() }
-  else { view=['now','bills','votes','plenum','mks','factions','committees','analysis','mine','about'].includes(h.get('tab'))?h.get('tab'):'now'; viewArg=null; buildTabs(); render() }
+  else { view=['now','bills','votes','plenum','mks','factions','committees','protocols','analysis','mine','about'].includes(h.get('tab'))?h.get('tab'):'now'; viewArg=null; buildTabs(); render() }
   window.scrollTo({top:0});
 }
 window.addEventListener('hashchange',applyRoute);
@@ -2195,7 +2195,7 @@ let PLENUM_HL=[], PLENUM_HL_Q='', PLENUM_HL_BY_SID={};
 function openPlenum(sid){
   const id=String(sid); let hl=[], q='';
   if(view==='plenum'&&plenumHitsFor&&plenumHitsFor===plenumFilter.q.trim()&&plenumHits&&plenumHits[id]){ hl=plenumHits[id].hits.map(h=>h[0]); q=plenumHitsFor }
-  else if(view==='committees'&&protoResultsFor&&protoResultsFor===protoQuery.trim()&&PLENUM_HL_BY_SID[id]){ hl=PLENUM_HL_BY_SID[id]; q=protoResultsFor }
+  else if(view==='protocols'&&protoResultsFor&&protoResultsFor===protoQuery.trim()&&PLENUM_HL_BY_SID[id]){ hl=PLENUM_HL_BY_SID[id]; q=protoResultsFor }
   PLENUM_HL=hl; PLENUM_HL_Q=q;
   if(KN!==25) switchKnesset(25); // דברי הכנסת corpus is K25-only
   navTo('plenum='+sid,()=>{viewArg=String(sid); view='plenumSession'; buildTabs(); renderPlenumSession(); window.scrollTo({top:0})})
@@ -2294,7 +2294,7 @@ function searchGroups(qRaw){
   }
   { // Protocols: full-text hits are async (sharded index), so the dropdown
     // offers ONE jump row instead of inline results — it hands the query to
-    // the cross-corpus protocol search in the committees tab (K25 only),
+    // the cross-corpus protocol search page (view 'protocols', K25 only),
     // which renders grouped committee + plenum hits there.
     if(protoTerms(qRaw).length){
       const item={html:`<span class="flex">חיפוש בפרוטוקולים: «${esc(qRaw)}»<span class="sub">פרוטוקולי ועדות ודברי הכנסת (מליאה) · כנסת 25 · כל מילה במאגר</span></span>`,go:()=>openProtocolSearch(qRaw)};
@@ -2315,11 +2315,11 @@ function renderSearchDrop(){
   drop.hidden=false;
 }
 function searchPick(i){ const it=SEARCH_FLAT[i]; if(!it) return; hideSearchDrop(); $('#globalSearch')?.blur(); it.go() }
-/* Hand a query to the cross-corpus protocol search (committees tab, K25):
-   full-text over committee protocols + דברי הכנסת, a corpus the global
-   dropdown does NOT already scan — unlike bill text, which billMatches
-   covers and the dropdown's bill group already reflects. */
-function openProtocolSearch(qRaw){ if(KN!==25) switchKnesset(25); cmtSeg='committees'; protoQuery=qRaw; go('committees'); setTimeout(()=>document.querySelector('input[data-keep="protoQ"]')?.scrollIntoView({block:'center',behavior:'smooth'}),60) }
+/* Hand a query to the cross-corpus protocol search page (view 'protocols',
+   K25): full-text over committee protocols + דברי הכנסת, a corpus the
+   global dropdown does NOT already scan — unlike bill text, which
+   billMatches covers and the dropdown's bill group already reflects. */
+function openProtocolSearch(qRaw){ if(KN!==25) switchKnesset(25); protoQuery=qRaw; go('protocols') }
 function searchFallback(){ const q=$('#globalSearch').value.trim(); hideSearchDrop();
   // No object of any kind matched: the one corpus not yet searched is the
   // protocols, so Enter goes there (when the query has a searchable term;
@@ -4604,9 +4604,29 @@ function protoWordHit(w,term){
 }
 /* --- sharded inverted-index search (async; shards cached per session) --- */
 const _shardCache={};
+/* Shards live primarily in the mandat121protocols R2 bucket (versioned
+   by manifest.json — see upload_search_shards.py) so the indexes don't
+   bloat git; the committed data/search_* files are the fallback if the
+   bucket is unreachable or has no such shard. Manifest is fetched once
+   per session; a bad version string is never trusted into a URL. */
+const R2_SHARD_BASE='https://pub-a65c4e6efb634d8da9873e4f51835a60.r2.dev';
+let _shardManifestP=null;
+function shardManifest(){
+  if(!_shardManifestP) _shardManifestP=fetch(R2_SHARD_BASE+'/manifest.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null);
+  return _shardManifestP;
+}
 function fetchShard(corpus,bigram){ // bigram: the word's first 2 chars
   const key=corpus+':'+bigram;
-  if(!_shardCache[key]) _shardCache[key]=_fetchJson(`data/search_${corpus}/${bigram.charCodeAt(0)}_${bigram.charCodeAt(1)}.json`).then(j=>j||{});
+  if(!_shardCache[key]) _shardCache[key]=(async()=>{
+    const fn=`${bigram.charCodeAt(0)}_${bigram.charCodeAt(1)}.json`;
+    const m=await shardManifest();
+    const ver=m?.corpora?.[corpus]?.version;
+    if(ver&&/^[A-Za-z0-9._-]+$/.test(ver)){
+      const j=await _fetchJson(`${R2_SHARD_BASE}/shards/${ver}/search_${corpus}/${fn}`);
+      if(j) return j;
+    }
+    return (await _fetchJson(`data/search_${corpus}/${fn}`))||{};
+  })();
   return _shardCache[key];
 }
 function protoCandidates(term){ // every string an indexed word matching `term` can start with
@@ -4674,6 +4694,20 @@ function protoSearchHTML(){
   <input type="search" data-keep="protoQ" placeholder="מילה או תחילית — למשל: תקציב, גיוס, שכירות…" value="${esc(protoQuery)}" style="width:100%;margin-top:.55rem" oninput="protoQuery=this.value;keepSearchFocus(this,()=>render())">
   <div id="protoResults">${q?results:''}</div></div>`;
 }
+/* Cross-corpus protocol search is its own page (view 'protocols', route
+   #tab=protocols) — not a main-bar tab (the bar is full) and no longer a
+   card buried in the committees view, which made plenum hits look like
+   committee content. Reached via the global search bar and via link
+   banners in the ועדות / דברי הכנסת tabs. K25 corpora only. */
+function renderProtocols(){
+  if(KN===26){ $('#app').innerHTML=`<div class="sec-title">חיפוש בפרוטוקולים <small>כנסת 26</small></div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg></div>הפרוטוקולים של כנסת 26 עוד לא פורסמו.<br><span class="small">החיפוש המלא — פרוטוקולי ועדות ודברי הכנסת — זמין לכנסת 25.</span><br>${k25CtaHTML('📜 לחיפוש בפרוטוקולי כנסת 25 ←')}</div>`; return }
+  ensureProtoSearch(); ensurePlenumSearch();
+  $('#app').innerHTML=`
+  <div class="sec-title">חיפוש בפרוטוקולים <small>ועדות + מליאה · כנסת 25 · חיפוש מלא בכל מילה שנאמרה</small></div>
+  ${protoSearchHTML()}
+  <p class="small dim">התוצאות מדורגות לפי מספר האזכורים. לחיצה על שורת ועדה או מליאה פותחת את הישיבה עם הפרוטוקול פתוח והמילים מודגשות. הכיסוי כיום: ${Object.keys(PROTO_SEARCH).length||268} פרוטוקולי ועדות (החלון האחרון שפורסם) וכל ${Object.keys(PLENUM_SEARCH).length||418} ישיבות המליאה של כנסת 25.</p>`;
+}
+const protoSearchBannerHTML=()=>`<div class="card pad" style="margin-bottom:.85rem;display:flex;gap:.7rem;align-items:center;flex-wrap:wrap"><span class="flex"><b>מחפשים מילה שנאמרה?</b><br><span class="dim small">חיפוש מלא בפרוטוקולי הוועדות ובדברי הכנסת (מליאה) של כנסת 25 — כל מילה, לא רק שמות.</span></span><button class="btn primary" onclick="openProtocolSearch(protoQuery||'')">לחיפוש בפרוטוקולים ←</button></div>`;
 
 /* ============ FACTIONS ============ */
 function currentFactions(){
@@ -4865,8 +4899,8 @@ function plenumBrowserHTML(){
 }
 function renderPlenum(){
   if(KN===26){ $('#app').innerHTML=`<div class="sec-title">דברי הכנסת <small>מליאה · כנסת 26</small></div><div class="card empty"><div class="big">${icon('plenum')}</div>דברי הכנסת של כנסת 26 עוד לא פורסמו.<br><span class="small">כשתתכנס הכנסת ויתפרסמו ישיבות המליאה הראשונות, יופיעו כאן כל הישיבות עם חיפוש מלא בפרוטוקולים — כמו בכנסת 25.</span><br>${k25CtaHTML('📜 לדברי הכנסת של כנסת 25 ←')}</div>`; return }
-  ensurePlenumSearch(); // one search only in this tab (plenumBrowserHTML); the cross-corpus חיפוש בפרוטוקולים lives in the committees tab
-  $('#app').innerHTML=`<div class="sec-title">דברי הכנסת <small>מליאה · כל ישיבות כנסת 25 · ${Object.keys(PLENUM_SEARCH).length||418} ישיבות</small></div>${plenumBrowserHTML()}`;
+  ensurePlenumSearch(); // one search only in this tab (plenumBrowserHTML); the cross-corpus חיפוש בפרוטוקולים is its own page (view 'protocols')
+  $('#app').innerHTML=`<div class="sec-title">דברי הכנסת <small>מליאה · כל ישיבות כנסת 25 · ${Object.keys(PLENUM_SEARCH).length||418} ישיבות</small></div>${protoSearchBannerHTML()}${plenumBrowserHTML()}`;
 }
 function renderPlenumSession(){
   ensurePlenumSearch();
@@ -4936,10 +4970,6 @@ function renderCommittees(){
     $('#app').innerHTML=`<div class="sec-title">ועדות <small>כנסת 26</small></div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>ועדות כנסת 26 עוד לא הוקמו.<br><span class="small">כשהכנסת תתכנס ויוקמו הוועדות, יופיעו כאן הישיבות וסדרי היום שלהן — כמו ועדות כנסת 25.</span><br>${k25CtaHTML('📚 לכנסת 25 המלאה ←')}</div>`; return }
   ensureCmem();
   if(cmtSeg==='lobbyists'){ ensureExtras(); $('#app').innerHTML=`<div class="sec-title">שדלנים <small>המרשם הרשמי של הכנסת · מי מייצג את מי מול הכנסת</small></div>${cmtSegHTML()}${lobbyBrowserHTML()}`; return }
-  // The committees view renders protoSearchHTML() below, so load its
-  // indexes here — otherwise PROTO_SEARCH/PLENUM_SEARCH stay {} and
-  // typing silently produces no results at all.
-  ensureProtoSearch(); ensurePlenumSearch();
   if(!CMT){ $('#app').innerHTML=`<div class="sec-title">ועדות</div><div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>נתוני הוועדות לא נטענו.</div>`; return }
   const recentCount={}; CMT.recent_sessions.forEach(s=>recentCount[s.committee_id]=(recentCount[s.committee_id]||0)+1);
   const byTier={perm:[],sub:[],special:[],joint:[]};
@@ -4993,7 +5023,7 @@ function renderCommittees(){
     <input type="search" data-keep="committeeQ" placeholder="חיפוש ועדה בכל השכבות…" value="${esc(committeeFilter.q)}" style="flex:1;min-width:180px" oninput="committeeFilter.q=this.value;renderCommitteesKeep(this)">
     ${committeeFilter.type||committeeFilter.q?`<button class="btn ghost" onclick="committeeFilter.type='';committeeFilter.q='';renderCommittees()">ניקוי סינון ✕</button>`:''}
   </div>
-  ${protoSearchHTML()}
+  ${protoSearchBannerHTML()}
   ${total?permHTML+subHTML+specialHTML+jointHTML:'<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg></div>לא נמצאו ועדות בסינון הזה.</div>'}
   ${committeeFeedHTML(6)}`;
 }
