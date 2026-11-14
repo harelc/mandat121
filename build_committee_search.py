@@ -166,6 +166,10 @@ def main():
             except Exception as e:  # noqa: BLE001
                 failed += 1
                 failed_ids.append((sid, str(e)[:80]))
+                if failed <= 5:  # surface the first failures live — a
+                    # 90-min job that only explains itself at the end is
+                    # undebuggable (first CI run failed ~100% silently)
+                    print(f"FAIL sid={sid}: {type(e).__name__}: {str(e)[:160]}", flush=True)
             done += 1
             if done % CHECKPOINT == 0:
                 checkpoint(cache, dirty)
