@@ -7,6 +7,11 @@ name: r2-search-upload
 
 on:
   workflow_dispatch:
+    inputs:
+      diagnose:
+        description: "Only list the account's buckets (diagnose 404s)"
+        type: boolean
+        default: false
 
 permissions:
   contents: read
@@ -25,4 +30,4 @@ jobs:
           R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
           R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
           R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
-        run: python3 -u upload_search_shards.py
+        run: python3 -u upload_search_shards.py ${{ inputs.diagnose && '--diagnose' || '' }}

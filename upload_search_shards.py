@@ -44,7 +44,7 @@ def _sign(key, msg):
 
 
 def s3_request(method, key, body=b"", content_type=None, cache_control=None,
-               query=""):
+               query="", bucket_scoped=True):
     # .strip() everything: a secret pasted with a trailing newline
     # otherwise lands in the URL/host and urllib rejects it (probe run
     # 43625340335 failed exactly that way on all 1,743 PUTs).
@@ -58,8 +58,9 @@ def s3_request(method, key, body=b"", content_type=None, cache_control=None,
     # answers path-style requests (endpoint/bucket/key) with 404 even
     # when the bucket exists and the token is Admin (probe run
     # 43625707493 — LIST and PUT both 404ed after the permission fix).
-    host = f"{BUCKET}." + endpoint.split("://", 1)[1]
-    uri = f"/{key}"
+    acct_host = endpoint.split("://", 1)[1]
+    host = f"{BUCKET}." + acct_host if bucket_scoped else acct_host
+    uri = f"/{key}" if bucket_scoped else "/"
     payload_hash = hashlib.sha256(body).hexdigest()
     headers = {"host": host, "x-amz-content-sha256": payload_hash,
                "x-amz-date": amzdate}
@@ -139,11 +140,36 @@ def local_corpus(d):
     return files, version
 
 
+def diagnose():
+    """List the buckets this token can see on the endpoint's account
+    (names only). Settles bucket-name / wrong-account mismatches behind
+    S3 404s without printing any secret."""
+    import xml.etree.ElementTree as ET
+    try:
+        _, body = s3_request("GET", "", bucket_scoped=False)
+        root = ET.fromstring(body)
+        names = [el.text for el in root.iter() if el.tag.endswith("}Name") or el.tag.endswith("Name")]
+        print(f"account buckets visible to token: {names}")
+        print(f"uploader is configured for bucket: {BUCKET!r}")
+        if BUCKET not in names:
+            print("MISMATCH: configured bucket is not in this account (or "
+                  "the token cannot see it). Fix R2_BUCKET / R2_ENDPOINT, "
+                  "or rename the target.")
+            return 1
+        print("bucket name + account match ✓")
+        return 0
+    except Exception as e:  # noqa: BLE001
+        print(f"ListBuckets failed: {e}")
+        return 1
+
+
 def main():
     for v in ("R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_ENDPOINT"):
         if not os.environ.get(v):
             print(f"missing env {v} — set it from the R2 token (never commit it)")
             return 1
+    if "--diagnose" in sys.argv:
+        return diagnose()
     try:
         req = urllib.request.Request(PUBLIC_BASE + "/manifest.json",
                                      headers={"Cache-Control": "no-cache"})
