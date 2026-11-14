@@ -82,11 +82,25 @@ def s3_request(method, key, body=b"", content_type=None, cache_control=None,
     headers["Authorization"] = (
         f"AWS4-HMAC-SHA256 Credential={access}/{scope}, "
         f"SignedHeaders={signed}, Signature={sig}")
-    req = urllib.request.Request(f"https://{host}" + uri + (f"?{query}" if query else ""),
-                                 data=body or None,
-                                 method=method, headers=headers)
-    with urllib.request.urlopen(req, timeout=120) as r:
-        return r.status, r.read()
+    url = f"https://{host}" + uri + (f"?{query}" if query else "")
+    # Retry transient failures (5xx / network) — all operations here are
+    # idempotent. One R2 500 on a single shard out of 1,743 failed a
+    # whole probe run (43626028921) without this.
+    import time as _time
+    import urllib.error as _uerr
+    for attempt in range(4):
+        req = urllib.request.Request(url, data=body or None,
+                                     method=method, headers=headers)
+        try:
+            with urllib.request.urlopen(req, timeout=120) as r:
+                return r.status, r.read()
+        except _uerr.HTTPError as e:
+            if e.code < 500 or attempt == 3:
+                raise
+        except Exception:
+            if attempt == 3:
+                raise
+        _time.sleep(2 * (attempt + 1))
 
 
 # --- 2 GB storage guard -------------------------------------------------
