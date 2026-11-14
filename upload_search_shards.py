@@ -95,6 +95,34 @@ def s3_request(method, key, body=b"", content_type=None, cache_control=None,
 CAP_BYTES = int(os.environ.get("R2_CAP_BYTES", 2_000_000_000))
 
 
+
+def list_objects():
+    """Whole-bucket {key: size} via S3 LIST (needs Admin-level token;
+    raises on 403 — caller falls back to the manifest ledger)."""
+    import xml.etree.ElementTree as ET
+    import urllib.parse as _up
+    out, token = {}, ""
+    while True:
+        q = "list-type=2" + (f"&continuation-token={_up.quote(token)}" if token else "")
+        _, body = s3_request("GET", "", query=q)
+        root = ET.fromstring(body)
+        nxt = ""
+        for el in root.iter():
+            if el.tag.endswith("Contents"):
+                key = size = None
+                for ch in el:
+                    if ch.tag.endswith("Key"):
+                        key = ch.text
+                    elif ch.tag.endswith("Size"):
+                        size = int(ch.text)
+                if key is not None:
+                    out[key] = size or 0
+            elif el.tag.endswith("NextContinuationToken"):
+                nxt = el.text or ""
+        if not nxt:
+            return out
+        token = nxt
+
 def local_corpus(d):
     files = {}
     for f in sorted(d.glob("*.json")):
@@ -139,31 +167,39 @@ def main():
             jobs.append((f"shards/{version}/search_{corpus}/{n}", d / n,
                          "application/json",
                          "public, max-age=86400, immutable"))
-    # 2 GB guard (pre-flight). Accounting is manifest-based, NOT S3 LIST:
-    # an object-scoped R2 token gets 403 on ListObjects (probe run
-    # 43625429053), and it doesn't need it — this script is the bucket's
-    # only writer, so the previous manifest IS the ledger. Shard entries
-    # are [sha256, size]; legacy {file: sha256} manifests count size 0
-    # (first guarded run re-uploads under the new format anyway).
+    # 2 GB guard (pre-flight). Preferred accounting: S3 LIST of the
+    # whole bucket (sees EVERYTHING, including any stray objects the
+    # ledger doesn't know). If LIST is forbidden (object-scoped token),
+    # fall back to the manifest ledger — this script is the bucket's
+    # only writer, so the previous manifest is a complete record then.
+    # Shard entries are [sha256, size]; legacy {file: sha256} entries
+    # count size 0.
     def entry_size(meta):
         return meta[1] if isinstance(meta, list) and len(meta) > 1 else 0
-    existing = {}  # key -> size, reconstructed from the old manifest
+    ledger = {}
     for cname, oc in (old.get("corpora") or {}).items():
         over = oc.get("version")
         if not over:
             continue
         for fn, meta in (oc.get("shards") or {}).items():
-            existing[f"shards/{over}/search_{cname}/{fn}"] = entry_size(meta)
+            ledger[f"shards/{over}/search_{cname}/{fn}"] = entry_size(meta)
+    try:
+        existing = list_objects()
+        acct = "S3 LIST"
+    except Exception as e:
+        existing = ledger
+        acct = f"manifest ledger (LIST unavailable: {str(e)[:40]})"
     cur_total = sum(existing.values())
     new_bytes = sum(p.stat().st_size for _, p, _, _ in jobs)
     job_keys = {k for k, _, _, _ in jobs}
-    overwritten = sum(s for k, s in existing.items() if k in job_keys)
+    overwritten = sum(sz for k, sz in existing.items() if k in job_keys)
     versions = {c["version"] for c in manifest["corpora"].values()}
-    stale = {k: s for k, s in existing.items()
-             if not any(k.startswith(f"shards/{v}/") for v in versions)}
+    stale = {k: sz for k, sz in existing.items()
+             if k.startswith("shards/")
+             and not any(k.startswith(f"shards/{v}/") for v in versions)}
     peak = cur_total - overwritten + new_bytes
     steady = peak - sum(stale.values())
-    print(f"R2 guard: bucket now {cur_total/1e9:.3f} GB, peak projection "
+    print(f"R2 guard [{acct}]: bucket now {cur_total/1e9:.3f} GB, peak projection "
           f"{peak/1e9:.3f} GB, steady state {steady/1e9:.3f} GB, "
           f"cap {CAP_BYTES/1e9:.1f} GB")
     if peak > CAP_BYTES or steady > CAP_BYTES:
