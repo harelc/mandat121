@@ -17,7 +17,7 @@ unchanged corpus uploads nothing and keeps its version.
 Credentials come from the environment ONLY (GitHub Actions secrets in
 CI; never committed — CWE-798): R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
 R2_ENDPOINT (https://<account>.r2.cloudflarestorage.com).
-Optional: R2_BUCKET (default mandat121-search), R2_PUBLIC_BASE
+Optional: R2_BUCKET (default mandat121protocols), R2_PUBLIC_BASE
 (default the site's r2.dev URL). Stdlib only, AWS SigV4 signing inline.
 """
 import hashlib
@@ -32,7 +32,7 @@ from datetime import datetime, timezone
 from pathlib import Path
 
 ROOT = Path(__file__).resolve().parent
-BUCKET = os.environ.get("R2_BUCKET", "mandat121-search")
+BUCKET = os.environ.get("R2_BUCKET", "mandat121protocols")
 PUBLIC_BASE = os.environ.get(
     "R2_PUBLIC_BASE",
     "https://pub-a65c4e6efb634d8da9873e4f51835a60.r2.dev").rstrip("/")
