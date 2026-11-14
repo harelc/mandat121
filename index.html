@@ -2648,6 +2648,22 @@ function drawPresenceGrid(hover){
   }
 }
 const k25CtaHTML=(label,sub)=>`<button class="k25-cta" onclick="switchKnesset(25)">${label}<small>${sub||'כל החוקים, ההצבעות, הוועדות והפרוטוקולים — מלא ומוכן עכשיו'}</small></button>`;
+/* Shared Now/hero for BOTH Knessets — same structure, same order, same
+   civic framing; only the era's data fills the slots. K26 differences
+   (presence history, "what's coming" cards) live BELOW this block, not
+   in a differently-shaped hero. */
+function homeHeroHTML({kn,badge,h1,lead,kpis,newVotes}){
+  return `<section class="card hero rise"><span class="badge ${kn===26?'k26':''}">${badge}</span>
+    <h1 style="margin-top:.4rem">${h1}</h1>
+    <p>${lead}</p>
+    <div class="card pad" style="margin-top:.8rem;background:var(--surface)"><h3>איך מפקחים? שלוש שאלות לכל חוק</h3><p class="small muted" style="line-height:1.9;margin-top:.3rem"><b style="color:var(--text)">1. מי יזם ומי שינה?</b> — עקבו אחרי מסע החוק והוועדה שדנה בו. <b style="color:var(--text)">2. מי הופיע ומי נעדר?</b> — בוועדות ובמליאה. <b style="color:var(--text)">3. מי הצביע איך?</b> — ואיך הייתם מצביעים אתם. כל דף באתר עונה על אחת מהן.</p></div>
+    ${prevSeen?`<div class="card pad" style="margin-top:.8rem"><h3>הפיקוח שלכם מאז הביקור הקודם <small class="dim">${fmtDate(prevSeen)}</small></h3><p class="small muted" style="margin-top:.3rem;line-height:1.9">${newVotes?`<b style="color:var(--text)">${newVotes} הצבעות מליאה חדשות</b> התקיימו מאז. פתחו אותן, סמנו איך הייתם מצביעים, ובדקו מי הצביע כמוכם.`:'לא התקיימו הצבעות מליאה חדשות מאז הביקור הקודם — הכנסת לא מצביעה כל יום. בינתיים אפשר לעבור על הוועדות.'}</p><div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem"><button class="btn" onclick="go('votes')">להצבעות ←</button><button class="btn ghost" onclick="go('mine')">לפיקוח שלי ←</button></div></div>`:''}
+    ${kpis}
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn primary" style="margin-top:.9rem" onclick="openIntro()">▶ חדשים כאן? הסבר מצויר בפחות מדקה</button>
+    ${followCount()?`<button class="btn" style="margin-top:.9rem" onclick="go('mine')">★ המעקב שלי (${followCount()})</button>`:''}</div>
+  </section>`;
+}
+const CIVIC_LEAD=kn=>`בישראל אין בית שני ואין וטו נשיאותי: הפיקוח של הכנסת על <b>הממשלה</b> הוא כמעט הבלם המוסדי היחיד בין בחירות לבחירות — והוא עובד רק אם מישהו מסתכל. ביום הבחירות חולקו 120 מנדטים. <b>המנדט ה־121 נשאר אצלכם</b> — והוא עובד כל הקדנציה: מעקב אזרחי חי אחרי כל חוק, כל הצבעה וכל ח״כ בכנסת ה־${kn}, כדי שהכנסת תישאר רשות עצמאית, לא חותמת גומי. סמנו איך הייתם מצביעים, וגלו מי מבין כל הח״כים מצביע כמוכם.`;
 function renderNow26(){
   ensureLivePresence(); // live in-the-building overlay; re-renders when it lands
   ensurePresence26(); // arrival-order history under the hemicycle; re-renders when it lands
@@ -2665,13 +2681,8 @@ function renderNow26(){
   const legendMap={}; seats.forEach(s=>{ const f=shortF(s.faction); (legendMap[f]??={n:0,color:s.color}); legendMap[f].n++ });
   const legend=Object.entries(legendMap).sort((a,b)=>b[1].n-a[1].n||partyRank(a[0],26)-partyRank(b[0],26));
   $('#app').innerHTML=`
-  <section class="card hero compact rise"><span class="badge k26">כנסת 26 · בבנייה</span>
-    <h1 style="margin-top:.4rem">הכנסת ה־26 מתמלאת, נתון אחרי נתון.</h1>
-    <p>120 המנדטים חולקו — והמנדט ה־121 כבר עובד: פיקוח אזרחי על הכנסת החדשה מהיום הראשון, כדי שתישאר רשות עצמאית מול הממשלה.</p>
-    ${homeKpisHTML({members:seats.length,factions:serving?legend.length:parties.length,bills:K26B.length,votes:K26V.length,detailed:K26V.filter(v=>v.for!=null).length,lastVote:K26V.length?fmtDate([...K26V].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date):''})}
-    <button class="k25-cta" onclick="openIntro()">▶ חדשים כאן? הסבר מצויר בפחות מדקה<small>מה זה המנדט ה־121, איך עוקבים, ואיך מגלים מי מצביע כמוכם — בפחות מדקה</small></button>
-  </section>
-  <section class="card pad rise" style="margin-top:.85rem"><h3>למה לעקוב דווקא מעכשיו?</h3><p class="small muted" style="line-height:1.9;margin-top:.3rem">בישראל אין בית שני ואין וטו נשיאותי: הפיקוח של הכנסת על <b style="color:var(--text)">הממשלה</b> הוא כמעט הבלם המוסדי היחיד בין בחירות לבחירות — והוא עובד רק אם מישהו מסתכל. כנסת חדשה היא הרגע שבו הרגלים נקבעים: אילו ועדות עובדות, מי מגיע למשכן, מי מדבר ומי שותק. כאן כבר אפשר לראות את נוכחות הח״כים במשכן יום אחרי יום; וברגע שיתפרסמו החוקים, הישיבות וההצבעות הראשונים — הם יופיעו כאן, עם אותן שלוש שאלות פיקוח: <b style="color:var(--text)">מי יזם ומי שינה? מי הופיע ומי נעדר? מי הצביע איך?</b></p></section>
+  ${homeHeroHTML({kn:26,badge:'כנסת 26 · בבנייה',h1:'הכנסת ה־26 מתמלאת, נתון אחרי נתון.',lead:CIVIC_LEAD(26),kpis:homeKpisHTML({members:seats.length,factions:serving?legend.length:parties.length,bills:K26B.length,votes:K26V.length,detailed:K26V.filter(v=>v.for!=null).length,lastVote:K26V.length?fmtDate([...K26V].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date):''}),newVotes:prevSeen?K26V.filter(v=>(v.date||'')>prevSeen).length:0})}
+  <section class="card pad rise" style="margin-top:.85rem"><h3>למה לעקוב דווקא מעכשיו?</h3><p class="small muted" style="line-height:1.9;margin-top:.3rem">כנסת חדשה היא הרגע שבו הרגלים נקבעים: אילו ועדות עובדות, מי מגיע למשכן, מי מדבר ומי שותק. כאן כבר אפשר לראות את נוכחות הח״כים במשכן יום אחרי יום; וברגע שיתפרסמו החוקים, הישיבות וההצבעות הראשונים — הם יופיעו כאן, עם אותן שלוש שאלות פיקוח שלמעלה.</p></section>
   <div id="plenumTvBox"></div>
   ${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?agendaHTML():''}
   <div class="sec-title">${serving?'מליאת הכנסת ה־26':'המליאה הנכנסת'} <small>${serving?'מי מכהן/ת בפועל — כולל כניסות ויציאות לפי החוק הנורווגי':'רחפו או לחצו על מושב — חלקם כיהנו גם בכנסת 25'}</small></div>
@@ -2914,16 +2925,7 @@ function renderNow(){
     .sort((a,b)=>partyRank(a.faction,25)-partyRank(b.faction,25)||listRank25(a.name)-listRank25(b.name)||disp(a.name).localeCompare(disp(b.name),'he'));
   const fac25={}; seats25.forEach(s=>{const f=shortF(s.faction); (fac25[f]??={n:0,color:s.color}); fac25[f].n++});
   app.innerHTML=`
-  <section class="card hero rise">
-    <h1>מי הצביע איך,<br>על מה — ולמה זה משנה לך.</h1>
-    <p>בישראל אין בית שני ואין וטו נשיאותי: הפיקוח של הכנסת על <b>הממשלה</b> הוא כמעט הבלם המוסדי היחיד בין בחירות לבחירות — והוא עובד רק אם מישהו מסתכל. ביום הבחירות חולקו 120 מנדטים. <b>המנדט ה־121 נשאר אצלכם</b> — והוא עובד כל הקדנציה: מעקב אזרחי חי אחרי כל חוק, כל הצבעה וכל ח״כ, כדי שהכנסת תישאר רשות עצמאית, לא חותמת גומי. סמנו איך הייתם מצביעים, וגלו מי מבין כל הח״כים מצביע כמוכם.</p>
-    <div class="card pad" style="margin-top:.8rem;background:var(--surface)"><h3>איך מפקחים? שלוש שאלות לכל חוק</h3><p class="small muted" style="line-height:1.9;margin-top:.3rem"><b style="color:var(--text)">1. מי יזם ומי שינה?</b> — עקבו אחרי מסע החוק והוועדה שדנה בו. <b style="color:var(--text)">2. מי הופיע ומי נעדר?</b> — בוועדות ובמליאה. <b style="color:var(--text)">3. מי הצביע איך?</b> — ואיך הייתם מצביעים אתם. כל דף באתר עונה על אחת מהן.</p></div>
-    ${prevSeen?`<div class="card pad" style="margin-top:.8rem"><h3>הפיקוח שלכם מאז הביקור הקודם <small class="dim">${fmtDate(prevSeen)}</small></h3><p class="small muted" style="margin-top:.3rem;line-height:1.9">${newSince.length?`<b style="color:var(--text)">${newSince.length} הצבעות מליאה חדשות</b> התקיימו מאז. פתחו אותן, סמנו איך הייתם מצביעים, ובדקו מי הצביע כמוכם.`:'לא התקיימו הצבעות מליאה חדשות מאז הביקור הקודם — הכנסת לא מצביעה כל יום. בינתיים אפשר לעבור על הוועדות.'}</p><div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem"><button class="btn" onclick="go('votes')">להצבעות ←</button><button class="btn ghost" onclick="go('mine')">לפיקוח שלי ←</button></div></div>`:''}
-    ${homeKpisHTML({members:seats25.length,factions:Object.keys(fac25).length,bills:ALLB.length,votes:VOTES_ALL.length,detailed:Object.keys(VOTE_RES.votes||{}).length,lastVote:fmtDate(latest)})}
-    ${prevSeen&&newSince.length?`<div class="chip acc" style="margin-top:.9rem">${newSince.length} הצבעות חדשות מאז הביקור הקודם (${fmtDate(prevSeen)})</div>`:''}
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn primary" style="margin-top:.9rem" onclick="openIntro()">▶ חדשים כאן? הסבר מצויר בפחות מדקה</button>
-    ${followCount()?`<button class="btn" style="margin-top:.9rem" onclick="go('mine')">★ המעקב שלי (${followCount()})</button>`:''}</div>
-  </section>
+  ${homeHeroHTML({kn:25,badge:'כנסת 25 · ארכיון מלא',h1:'מי הצביע איך,<br>על מה — ולמה זה משנה לך.',lead:CIVIC_LEAD(25),kpis:homeKpisHTML({members:seats25.length,factions:Object.keys(fac25).length,bills:ALLB.length,votes:VOTES_ALL.length,detailed:Object.keys(VOTE_RES.votes||{}).length,lastVote:fmtDate(latest)}),newVotes:newSince.length})}
 
   <div id="plenumTvBox"></div>
 
