@@ -3177,9 +3177,21 @@ function sharePage(text){
   if(navigator.share){ navigator.share({title:document.title,text,url}).catch(()=>{}) }
   else if(navigator.clipboard){ navigator.clipboard.writeText(text+' '+url).then(()=>alert('הקישור והטקסט הועתקו — אפשר להדביק ולשתף.')) }
 }
-function shareHTML(text){
+/* One share bar everywhere (bill/vote, both Knessets): Android-style
+   share icon (Material "share" glyph: three nodes, two links), X,
+   WhatsApp, and — on vote pages — the PNG export. Icon buttons with a
+   small label, no editorialising text. */
+const SHARE_ICON='<svg viewBox="0 0 24 24" width="19" height="19" aria-hidden="true" style="fill:currentColor;display:block"><path d="M18 16.08c-.76 0-1.44.3-1.96.77L8.91 12.7c.05-.23.09-.46.09-.7s-.04-.47-.09-.7l7.05-4.11c.54.5 1.25.81 2.04.81 1.66 0 3-1.34 3-3s-1.34-3-3-3-3 1.34-3 3c0 .24.04.47.09.7L8.04 9.81C7.5 9.31 6.79 9 6 9c-1.66 0-3 1.34-3 3s1.34 3 3 3c.79 0 1.5-.31 2.04-.81l7.12 4.16c-.05.21-.08.43-.08.65 0 1.61 1.31 2.92 2.92 2.92s2.92-1.31 2.92-2.92-1.31-2.92-2.92-2.92z"/></svg>';
+function shareHTML(text,pngId){
   const t=encodeURIComponent(text), u=encodeURIComponent(location.href);
-  return `<div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.7rem;align-items:center"><span class="small dim">שיתוף הוא פעולת פיקוח:</span><button class="btn ghost small" onclick="sharePage('${jsq(text)}')">⤴ שתפו</button><a class="btn ghost small" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${t}&url=${u}">שתפו ב־𝕏</a><a class="btn ghost small" target="_blank" rel="noopener" href="https://wa.me/?text=${t}%20${u}">בוואטסאפ</a></div>`;
+  const btn=(inner,label)=>`<span style="display:inline-flex;flex-direction:column;align-items:center;gap:.12rem">${inner}<span style="font-size:.62rem;color:var(--dim)">${label}</span></span>`;
+  const ic='display:inline-flex;align-items:center;justify-content:center;width:2.15rem;height:2.15rem;border-radius:50%;border:1px solid var(--line);background:var(--surface);color:var(--text);cursor:pointer;font-size:.95rem;text-decoration:none';
+  return `<div style="display:flex;gap:.55rem;flex-wrap:wrap;margin-top:.7rem;align-items:flex-start" role="group" aria-label="שיתוף">
+  ${btn(`<button style="${ic}" title="שיתוף" aria-label="שיתוף" onclick="sharePage('${jsq(text)}')">${SHARE_ICON}</button>`,'שיתוף')}
+  ${btn(`<a style="${ic}" title="שיתוף ב־𝕏" aria-label="שיתוף ב־𝕏" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${t}&url=${u}">𝕏</a>`,'𝕏')}
+  ${btn(`<a style="${ic}" title="שיתוף בוואטסאפ" aria-label="שיתוף בוואטסאפ" target="_blank" rel="noopener" href="https://wa.me/?text=${t}%20${u}"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="fill:currentColor;display:block"><path d="M12 2a10 10 0 0 0-8.6 15.1L2 22l5.1-1.3A10 10 0 1 0 12 2zm5.2 14.2c-.2.6-1.3 1.2-1.8 1.2-.5.1-1 .2-3.4-.7-2.9-1.2-4.7-4.1-4.9-4.3-.1-.2-1.1-1.5-1.1-2.9s.7-2 1-2.3c.2-.3.5-.3.7-.3h.5c.2 0 .4 0 .6.5l.9 2.1c.1.2.1.4 0 .6l-.4.6-.4.5c-.1.1-.3.3-.1.6.2.3.8 1.4 1.8 2.2 1.2 1.1 2.3 1.5 2.6 1.6.3.1.5.1.7-.1l1-1.2c.2-.3.4-.2.7-.1l2.1 1c.3.2.5.3.6.4 0 .1 0 .7-.2 1.2z"/></svg></a>`,'וואטסאפ')}
+  ${pngId?btn(`<button style="${ic}" title="ייצוא PNG של דף ההצבעה" aria-label="ייצוא PNG של דף ההצבעה" onclick="exportVotePNG('${pngId}')"><svg viewBox="0 0 24 24" width="18" height="18" aria-hidden="true" style="fill:none;stroke:currentColor;stroke-width:1.8;display:block"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-3.1-3.1a2 2 0 0 0-2.8 0L6 21"/></svg></button>`,'PNG'):''}
+  </div>`;
 }
 const CIVIC_SEEN_KEY='mandat121.civicSeen.v1';
 const civicSeen=()=>{ try{ return JSON.parse(localStorage.getItem(CIVIC_SEEN_KEY)||'{}') }catch(e){ return {} } };
@@ -3223,6 +3235,7 @@ function renderBillLite(){
     <div class="card-top"><span class="chip acc">${esc(statusBucket(b))}</span><span class="chip">${esc(b.type||'')}</span>${b.committee?`<span class="chip cmt" title="${esc(b.committee)}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ${esc(b.committee)}</span>`:''}<span class="date">${esc(billActivityLabel(b))}</span></div>
     <h1 style="font-size:1.35rem;line-height:1.4">${esc(b.name)}</h1>
     </div><div style="text-align:center">${starBtn('bill',b.id,b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.id)?'במעקב ★':'מעקב'}</div></div></div>
+    ${shareHTML('הצעת חוק בכנסת: '+(b.name||'')+' — סטטוס, ועדות והצבעות, במנדט ה־121')}
     <div class="small muted" style="margin-top:.5rem;line-height:1.9">
       סטטוס רשמי בכנסת: <b style="color:var(--text)">${esc(b.status||'—')}</b>${b.status_id===177?` — ״נעצרה״ הוא מונח־הגג של הכנסת להליך שהופסק: ${(b.votes||[]).some(v=>v.accepted===0)?'כאן ההצעה נדחתה בהצבעת מליאה':(b.votes||[]).length?'ההצעה עברה הצבעה במליאה, אך ההליך הופסק אחר כך':'ההליך הופסק בלי שההצעה הגיעה להצבעת מליאה'}`:''}<br>
       ${b.postponement_reason?`סיבה רשמית לעצירת ההליך: <b style="color:var(--text)">${esc(b.postponement_reason)}</b><br>`:''}
@@ -3237,7 +3250,6 @@ function renderBillLite(){
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem">
       <a class="btn" href="https://main.knesset.gov.il/Activity/Legislation/Laws/Pages/LawBill.aspx?t=lawsuggestionssearch&lawitemid=${b.id}" target="_blank" rel="noopener">דף ההצעה בכנסת ↗</a>
       ${b.doc_url?`<a class="btn" href="${esc(b.doc_url)}" target="_blank" rel="noopener"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> נוסח ההצעה ↗</a>`:''}
-      <button class="btn ghost" onclick="sharePage('${jsq('הצעת חוק בכנסת: '+(b.name||'')+' — סטטוס, ועדות והצבעות, במנדט ה־121')}')" title="שיתוף דף המעקב אחרי החוק הזה — כדי שעוד אזרחים יעקבו אחריו">⤴ שיתוף המעקב</button>
     </div>
   </article>
   ${oversightQHTML('bill','מי שינה את החוק הזה בדרך — ומי ניסה לעצור אותו?', 'עקבו אחרי מסע החוק למעלה: באיזו ועדה נידון, מי היוזמים, ומה קרה בכל הצבעת מליאה מתחת. הוועדה היא המקום שבו הממשלה והכנסת באמת מנהלות משא ומתן — שם הפיקוח עובד או נכשל.')}
@@ -3262,6 +3274,7 @@ function renderBill26(){
     <div class="card-top"><span class="chip acc">${esc(b.status||'')}</span>${b.type?`<span class="chip">${esc(b.type)}</span>`:''}${b.committee?`<span class="chip cmt">${esc(b.committee)}</span>`:''}<span class="date">${esc(billActivityLabel(b))}</span></div>
     <h1 style="font-size:1.35rem;line-height:1.4">${esc(b.name)}</h1>
     </div><div style="text-align:center">${starBtn('bill',b.id,b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.id)?'במעקב ★':'מעקב'}</div></div></div>
+    ${shareHTML('הצעת חוק בכנסת: '+(b.name||'')+' — סטטוס, ועדות והצבעות, במנדט ה־121')}
     <div class="small muted" style="margin-top:.5rem;line-height:1.9">
       ${b.publication_date?`פורסם בספר החוקים: ${fmtDate(b.publication_date)}<br>`:''}
       ${b.private_number?`מספר פ׳: ${esc(b.private_number)}<br>`:''}
@@ -3590,9 +3603,9 @@ function renderVote26(){
       <div class="myvote" style="max-width:520px"><span class="lbl" style="font-size:.95rem;color:var(--text);font-weight:800">אני הייתי מצביע/ה בהצבעה הזאת:</span>${[1,2,3].map(v=>`<button class="mv ${S.myVotes[String(b.id)]===v?'sel':''}" data-v="${v}" style="padding:.75rem .2rem" onclick="castMine('${b.id}',${v},this)">${v===1?'✓ בעד':v===2?'✕ נגד':'– נמנע'}</button>`).join('')}</div>
       <div data-matchhost>${matchStrip(b)}</div>
     </div>
+    ${shareHTML('הצבעה במליאת הכנסת: '+(b.title||'')+(b.has_tally?` — ${b.total_for} בעד, ${b.total_against} נגד`:'')+'. מי הצביע איך, במנדט ה־121',b.id)}
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem">
       <a class="btn" href="https://knesset.gov.il/vote/heb/Vote_Res_Map.asp?vote_id_t=${b.id}" target="_blank" rel="noopener">דף ההצבעה הרשמי ↗</a>
-      <button class="btn" onclick="exportVotePNG('${b.id}')">🖼️ ייצוא PNG של דף ההצבעה</button>
     </div>
   </article>
   ${b.mk_votes.length?`
@@ -3647,7 +3660,7 @@ function renderVote(){
         ${b.topics&&b.topics.length?`<div class="chips" style="margin-top:.5rem">${b.topics.map(t=>`<button class="chip" title="כל החוקים בנושא" onclick="filterTopic('${jsq(t)}')">${esc(t)}</button>`).join('')}</div>`:''}
       </div>${b.bill_id?`<div style="text-align:center">${starBtn('bill',b.bill_id,(b.lite&&b.lite.name)||b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.bill_id)?'החוק במעקב ★':'מעקב אחרי החוק'}</div></div>`:''}
     </div>
-    ${shareHTML('הצבעה במליאת הכנסת: '+(b.title||'')+(b.has_tally?` — ${b.total_for} בעד, ${b.total_against} נגד`:'')+'. מי הצביע איך, במנדט ה־121')}
+    ${shareHTML('הצבעה במליאת הכנסת: '+(b.title||'')+(b.has_tally?` — ${b.total_for} בעד, ${b.total_against} נגד`:'')+'. מי הצביע איך, במנדט ה־121',b.id)}
     ${oversightQHTML('vote','האם מי שהצביעו כאן ייצגו אתכם?', 'סמנו למטה איך הייתם מצביעים — ותראו מיד מי מבין כל הח״כים הצביע כמוכם, מי הצביע נגד עמדתכם, ומי בכלל לא הופיע. פיקוח מתחיל בהשוואה הזאת.')}
     ${b.bill_id?`<div class="small dim" style="margin-top:.7rem">מסע הצעת החוק — כל שלביה, לא רק ההצבעה הזאת:</div>${stepperHTML(b.bill_id)}`:''}
     <div style="margin:1rem 0">${b.has_tally?`${outcomeHTML(b.total_for,b.total_against,b.total_abstain,...nouns)}${scoreHTML(b,true)}`:b.is_accepted!=null?`<div class="outcome ${b.is_accepted?'for':'against'}" role="status"><span class="o-ic">${b.is_accepted?'✓':'✕'}</span><span class="o-main"><b>${esc(b.is_accepted?nouns[0]:nouns[1])}</b><span>הצבעה ${esc(VOTE_METHOD[b.method_id]||'לא אלקטרונית')} — אין ספירה מספרית</span></span></div>`:''}</div>
@@ -3659,7 +3672,6 @@ function renderVote(){
       ${b.lite?`<button class="btn primary" onclick="openBillAll('${b.lite.id}')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> לדף הצעת החוק — מסע החוק, סטטוס ויוזמים ←</button>`:''}
       ${b.bill_id?`<a class="btn" href="https://main.knesset.gov.il/Activity/Legislation/Laws/Pages/LawBill.aspx?t=lawsuggestionssearch&lawitemid=${b.bill_id}" target="_blank" rel="noopener">דף ההצעה בכנסת ↗</a>`:''}
       <a class="btn" href="https://knesset.gov.il/vote/heb/Vote_Res_Map.asp?vote_id_t=${b.id}" target="_blank" rel="noopener">דף ההצבעה הרשמי ↗</a>
-      <button class="btn" onclick="exportVotePNG('${b.id}')">🖼️ ייצוא PNG של דף ההצבעה</button>
       ${plnSess?`<button class="btn" onclick="openPlenum('${plnSess.sid}')">📜 דברי הכנסת של הישיבה (מס׳ ${plnSess.number}) ←</button>`:''}
     </div>
   </article>
