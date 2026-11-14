@@ -695,7 +695,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
 
 <footer>
   <p class="foot-links"><a href="#intro" onclick="openIntro();return false">▶ הסבר מצויר בפחות מדקה</a> · <a href="#tab=about">אודות</a> · <a href="https://github.com/harelc/mandat121" target="_blank" rel="noopener">הקוד ב־GitHub ↗</a></p>
-  <p>המנדט ה־121 — מעקב אזרחי אחרי הכנסת. כל המידע מגיע מפרסומים רשמיים של הכנסת (חוקים, הצבעות המליאה, ועדות ודיונים של כנסת 26, המתמלאת ככל שהכנסת מפרסמת; כנסת 25 שמורה כאן במלואה). המעקב וההצבעות שלי נשמרים רק בדפדפן הזה.</p>
+  <p>המנדט ה־121 — 120 נבחרו, ה־121 מפקח. מעקב אזרחי אחרי הכנסת. כל המידע מגיע מפרסומים רשמיים של הכנסת (חוקים, הצבעות המליאה, ועדות ודיונים של כנסת 26, המתמלאת ככל שהכנסת מפרסמת; כנסת 25 שמורה כאן במלואה). המעקב וההצבעות שלי נשמרים רק בדפדפן הזה.</p>
   <p class="foot-meta">&copy; הראל קין | <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener">CC BY-NC-SA 4.0</a></p>
   <div id="visit-line" hidden style="margin-top:.5rem"></div>
   <div class="foot-bmc"><span id="bmc-wrap" class="bmc-wrap"><a class="bmc-btn" href="https://www.buymeacoffee.com/harelc" target="_blank" rel="noopener"><img src="https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg" alt="">אהבתם? רוצים לתמוך בפיתוח? קנו לי קפה</a><button type="button" class="bmc-x" onclick="document.getElementById('bmc-wrap').remove()" title="סגור" aria-label="סגירת כפתור התמיכה">&times;</button></span></div>
@@ -781,7 +781,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
 
       <section class="iscene" data-scene>
         <span class="kick">הקול שלכם · 6 מתוך 9</span>
-        <h2>סמנו איך הייתם מצביעים — וגלו מי מייצג אתכם</h2>
+        <h2>סמנו איך הייתם מצביעים — וגלו מי מבין כל הח״כים מצביע כמוכם</h2>
         <div class="diagram"><div style="display:flex;flex-direction:column;align-items:center;width:100%">
           <div class="imyvote" aria-hidden="true"><span class="sel-for pop" style="--d:.2s">✓ בעד</span><span class="pop" style="--d:.45s">✕ נגד</span><span class="pop" style="--d:.7s">– נמנע</span></div>
           <div class="imatch" aria-hidden="true">
@@ -789,7 +789,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
             <div class="r"><span style="min-width:5.2rem;text-align:start">סיעה לדוגמה</span><span class="tr"><i style="--w:64%;transition-delay:.5s"></i></span><b>64% כמוני</b></div>
           </div>
         </div></div>
-        <p class="cap">״אני הייתי מצביע/ה״ על כמה חוקים — והאתר מדרג אילו ח״כים וסיעות הצביעו הכי קרוב אליכם. הדוגמה סכמטית.</p>
+        <p class="cap">״אני הייתי מצביע/ה״ על כמה חוקים — והאתר מדרג מי מבין כל הח״כים והסיעות הצביע הכי קרוב אליכם. הדוגמה סכמטית.</p>
       </section>
 
       <section class="iscene" data-scene>
@@ -872,7 +872,8 @@ try{ const raw=JSON.parse(localStorage.getItem(LS)||localStorage.getItem('openkn
 let S=STORE['26'];
 let prevSeen=S.lastSeen;
 function save(){S.lastSeen=new Date().toISOString().slice(0,10);localStorage.setItem(LS,JSON.stringify(STORE))}
-function switchKnesset(n){ KN=n; S=STORE[String(n)]; prevSeen=S.lastSeen; AGENDA=AG_CACHE[n]||null; agendaAnchor=null; agendaLastBody=''; save(); renderKSwitch(); buildTabs(); if(n===25) ensureK25Archive(); render(); window.scrollTo({top:0}); toast(n===26?'כנסת 26 — מתמלאת ככל שנתונים מתפרסמים':'כנסת 25 — כיסוי מלא') }
+function setKN(n){ if(KN===n) return; KN=n; S=STORE[String(n)]; prevSeen=S.lastSeen; AGENDA=AG_CACHE[n]||null; agendaAnchor=null; agendaLastBody=''; save(); renderKSwitch(); buildTabs(); if(n===25) ensureK25Archive() }
+function switchKnesset(n){ setKN(n); render(); window.scrollTo({top:0}); toast(n===26?'כנסת 26 — מתמלאת ככל שנתונים מתפרסמים':'כנסת 25 — כיסוי מלא') }
 function renderKSwitch(){ const a=$('#ksw25'),b=$('#ksw26'); if(a)a.classList.toggle('on',KN===25); if(b)b.classList.toggle('on',KN===26) }
 const followedBill=id=>S.followBills.includes(String(id));
 const followedMk=n=>S.followMks.includes(n);
@@ -2010,7 +2011,7 @@ function applyRoute(){
   if(!appLoaded) return;
   const h=new URLSearchParams(location.hash.slice(1));
   if(!h.get('voterec')) navTrack(location.hash.slice(1)); // legacy redirect-only hash: never a back target (it would bounce forward again)
-  if(h.get('bill')||h.get('vote')||h.get('voterec')||h.get('committee')) ensureK25Archive(); // K25 deep links (incl. committees) resolve only once the archive lands; ensureK25Archive re-applies this route then
+  if(h.get('bill')||h.get('vote')||h.get('voterec')||h.get('committee')||h.get('mk')||h.get('faction')||h.get('session')||h.get('plenum')) ensureK25Archive(); // K25 deep links resolve only once the archive lands; ensureK25Archive re-applies this route then
   if(h.get('voterec')){ // legacy route: the id was a bill id whose chosen vote was shown; land on that vote if it still resolves, else its bill page
     const b=ALLB_BY_ID[h.get('voterec')];
     const bv=b&&(b.votes||[]).length?[...b.votes].sort((x,y)=>y.reading-x.reading||(y.date||'').localeCompare(x.date||''))[0]:null;
@@ -2020,24 +2021,26 @@ function applyRoute(){
   else if(h.get('bill')){ const id=h.get('bill'); viewArg=id;
     // bill= is always the bill page (bill ids and vote ids never overlap,
     // so a vote id here can only be a stray link — send it to its vote).
-    if(ALLB_BY_ID[id]){ view='billAll'; buildTabs(); renderBillLite() }
-    else if(VOTE_BY_ID[id]){ view='vote'; viewArg=id; buildTabs(); renderVote() }
+    const kn=billKn(id); if(kn) setKN(kn);
+    if(K26B.some(b=>String(b.id)===String(id))){ view='bill26'; buildTabs(); renderBill26() }
+    else if(ALLB_BY_ID[id]){ view='billAll'; buildTabs(); renderBillLite() }
+    else if(voteKn(id)){ view='vote'; viewArg=id; buildTabs(); renderVote() }
     else { view='bills'; buildTabs(); render() } }
-  else if(h.get('mk')){ view='mk'; viewArg=h.get('mk'); buildTabs(); renderMkDetail() }
-  else if(h.get('faction')){ view='faction'; viewArg=h.get('faction'); buildTabs(); renderFactionDetail() }
-  else if(h.get('committee')){ view='committee'; viewArg=h.get('committee'); buildTabs(); renderCommitteeDetail() }
-  else if(h.get('session')){ view='session'; viewArg=h.get('session'); buildTabs(); renderSessionDetail() }
-  else if(h.get('plenum')){ view='plenumSession'; viewArg=h.get('plenum'); buildTabs(); renderPlenumSession() }
-  else if(h.get('bill26')){ view='bill26'; viewArg=h.get('bill26'); buildTabs(); renderBill26() }
-  else if(h.get('vote')){ view='vote'; viewArg=h.get('vote'); buildTabs(); renderVote() }
+  else if(h.get('mk')){ const kn=mkKn(h.get('mk')); if(kn) setKN(kn); view='mk'; viewArg=h.get('mk'); buildTabs(); renderMkDetail() }
+  else if(h.get('faction')){ const kn=factionKn(h.get('faction')); if(kn) setKN(kn); view='faction'; viewArg=h.get('faction'); buildTabs(); renderFactionDetail() }
+  else if(h.get('committee')){ const kn=committeeKn(h.get('committee')); if(kn) setKN(kn); view='committee'; viewArg=h.get('committee'); buildTabs(); renderCommitteeDetail() }
+  else if(h.get('session')){ const kn=sessionKn(h.get('session')); if(kn) setKN(kn); view='session'; viewArg=h.get('session'); buildTabs(); renderSessionDetail() }
+  else if(h.get('plenum')){ setKN(25); view='plenumSession'; viewArg=h.get('plenum'); buildTabs(); renderPlenumSession() }
+  else if(h.get('bill26')){ setKN(26); view='bill26'; viewArg=h.get('bill26'); buildTabs(); renderBill26() }
+  else if(h.get('vote')){ const kn=voteKn(h.get('vote')); if(kn) setKN(kn); view='vote'; viewArg=h.get('vote'); buildTabs(); renderVote() }
   else { view=['now','bills','votes','plenum','mks','factions','committees','analysis','mine','about'].includes(h.get('tab'))?h.get('tab'):'now'; viewArg=null; buildTabs(); render() }
   window.scrollTo({top:0});
 }
 window.addEventListener('hashchange',applyRoute);
 /* One vote page for every plenum vote, addressed by vote id. */
-function openVote(id){ navTo('vote='+id,()=>{viewArg=String(id); view='vote'; buildTabs(); renderVote(); window.scrollTo({top:0})}) }
+function openVote(id){ const kn=voteKn(id); if(kn&&kn!==KN) switchKnesset(kn); navTo('vote='+id,()=>{viewArg=String(id); view='vote'; buildTabs(); renderVote(); window.scrollTo({top:0})}) }
 function openMk(name){ mkRebelShowAll=false; mkBillsShowAll=false; mkPastCmtShowAll=false; mkPipeSel={name:null,i:-1}; navTo('mk='+encodeURIComponent(name),()=>{viewArg=name; view='mk'; buildTabs(); renderMkDetail(); window.scrollTo({top:0})}) }
-function openFaction(name){ navTo('faction='+encodeURIComponent(name),()=>{viewArg=name; view='faction'; buildTabs(); renderFactionDetail(); window.scrollTo({top:0})}) }
+function openFaction(name){ const kn=factionKn(name); if(kn&&kn!==KN) switchKnesset(kn); navTo('faction='+encodeURIComponent(name),()=>{viewArg=name; view='faction'; buildTabs(); renderFactionDetail(); window.scrollTo({top:0})}) }
 /* Faction names are per-Knesset (a K25 faction and a K26 party may share a
    name, a spelling — רע"ם vs רע״ם — or neither). Anything computed from one
    Knesset's votes opens that Knesset's faction page, switching instance
@@ -2049,6 +2052,18 @@ function openFactionIn(kn,name){ if(KN!==kn) switchKnesset(kn); openFaction(name
    instance read "not found" (bill) or silently fell back to the list. */
 function openVoteIn(kn,id){ if(KN!==kn) switchKnesset(kn); openVote(id) }
 function openBillIn(kn,id){ if(KN!==kn) switchKnesset(kn); if(kn===26) openBill26(id); else openBillPage(id) }
+/* Era resolvers for deep links (#bill=, #vote=, #mk=, #faction=, #session=):
+   an id/name alone says which Knesset's dataset owns it. applyRoute uses
+   these to setKN() silently before rendering — a full link must land on
+   the correct Knesset's page, never on the other era's "not found". When
+   both eras own it (a person/faction in both), the current era wins; when
+   neither does (archive still loading), null keeps the current era and
+   ensureK25Archive re-applies the route once the owner is knowable. */
+function voteKn(id){ const s=String(id); return VOTE_BY_ID[s]?25:K26V_BY_ID[s]?26:null }
+function billKn(id){ const s=String(id); return ALLB_BY_ID[s]?25:K26B.some(b=>String(b.id)===s)?26:voteKn(s) }
+function mkKn(name){ const has26=!!k26Entry(name), has25=!!(mkIndex[name]||MKP[name]); return has25&&has26?KN:has26?26:has25?25:null }
+function factionKn(name){ const in26=(K26?.parties||[]).some(p=>p.name===name), in25=currentFactions().some(f=>f.name===name||f.full===name); return in25&&in26?KN:in26?26:in25?25:null }
+function sessionKn(id){ const s=String(id); const in25=CMT?.recent_sessions?.some(x=>String(x.id)===s), in26=K26CMT?.recent_sessions?.some(x=>String(x.id)===s); return in25&&in26?KN:in26?26:in25?25:null }
 /* Committee ids are the official committee ids (K25: 4185–4287, K26:
    4288–…), so an id alone says which Knesset's dataset owns it. Every
    committee entry point — search, deep link, in-app chip — resolves the
@@ -2069,6 +2084,7 @@ function openPlenum(sid){
   if(view==='plenum'&&plenumHitsFor&&plenumHitsFor===plenumFilter.q.trim()&&plenumHits&&plenumHits[id]){ hl=plenumHits[id].hits.map(h=>h[0]); q=plenumHitsFor }
   else if(view==='committees'&&protoResultsFor&&protoResultsFor===protoQuery.trim()&&PLENUM_HL_BY_SID[id]){ hl=PLENUM_HL_BY_SID[id]; q=protoResultsFor }
   PLENUM_HL=hl; PLENUM_HL_Q=q;
+  if(KN!==25) switchKnesset(25); // דברי הכנסת corpus is K25-only
   navTo('plenum='+sid,()=>{viewArg=String(sid); view='plenumSession'; buildTabs(); renderPlenumSession(); window.scrollTo({top:0})})
 }
 
@@ -2211,7 +2227,7 @@ function committeeFeedHTML(limit=8){
   ${s.items.length?s.items.slice(0,3).map(it=>`<div class="small" style="padding:.28rem 0;border-top:1px solid var(--line)">${it.in_dataset?`<a href="#" onclick="event.preventDefault();event.stopPropagation();openBillPage('${it.item_id}')">${esc(it.name)}</a>`:esc(it.name)}${it.status?`<br><span class="dim">${esc(it.status)}</span>`:''}</div>`).join(''):'<div class="small muted">סדר היום טרם פורסם</div>'}
   ${s.docs.length?`<div style="margin-top:.45rem" onclick="event.stopPropagation()">${s.docs.slice(0,3).map(d=>`<a class="chip" href="${esc(d.path)}" target="_blank" rel="noopener"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> ${esc(d.group)}</a>`).join(' ')}</div>`:''}</div>`).join('')}</div>`;
 }
-function openSession(id){ navTo('session='+id,()=>{viewArg=String(id); view='session'; buildTabs(); renderSessionDetail(); window.scrollTo({top:0})}) }
+function openSession(id){ const kn=sessionKn(id); if(kn&&kn!==KN) switchKnesset(kn); navTo('session='+id,()=>{viewArg=String(id); view='session'; buildTabs(); renderSessionDetail(); window.scrollTo({top:0})}) }
 // In-app committee-session page. Why not link out? The official
 // AllCommitteesAgenda.aspx deep link drops its ItemID and lands on a generic
 // agenda page (and main.knesset.gov.il bot-walls non-browser agents), so the
@@ -2643,7 +2659,7 @@ function renderNow26(){
     <h1 style="margin-top:.4rem">הכנסת ה־26 מתמלאת, נתון אחרי נתון.</h1>
     <p>120 המנדטים חולקו — ומעכשיו כל ישיבה, חוק והצבעה של הכנסת הזאת יופיעו כאן בדיוק כמו בכנסת 25.</p>
     ${homeKpisHTML({members:seats.length,factions:serving?legend.length:parties.length,bills:K26B.length,votes:K26V.length,detailed:K26V.filter(v=>v.for!=null).length,lastVote:K26V.length?fmtDate([...K26V].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date):''})}
-    <button class="k25-cta" onclick="openIntro()">▶ חדשים כאן? הסבר מצויר בפחות מדקה<small>מה זה המנדט ה־121, איך עוקבים, ואיך מגלים מי מייצג אתכם — בפחות מדקה</small></button>
+    <button class="k25-cta" onclick="openIntro()">▶ חדשים כאן? הסבר מצויר בפחות מדקה<small>מה זה המנדט ה־121, איך עוקבים, ואיך מגלים מי מצביע כמוכם — בפחות מדקה</small></button>
   </section>
   <div id="plenumTvBox"></div>
   ${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?agendaHTML():''}
@@ -2889,7 +2905,9 @@ function renderNow(){
   app.innerHTML=`
   <section class="card hero rise">
     <h1>מי הצביע איך,<br>על מה — ולמה זה משנה לך.</h1>
-    <p>ביום הבחירות חולקו 120 מנדטים. <b>המנדט ה־121 נשאר אצלכם</b> — והוא עובד כל הקדנציה: מעקב אזרחי חי אחרי כל חוק, כל הצבעה וכל ח״כ. עוקבים, מסמנים איך הייתם מצביעים, ורואים מי באמת מייצג אתכם.</p>
+    <p>בישראל אין בית שני ואין וטו נשיאותי: הפיקוח של הכנסת על <b>הממשלה</b> הוא כמעט הבלם המוסדי היחיד בין בחירות לבחירות — והוא עובד רק אם מישהו מסתכל. ביום הבחירות חולקו 120 מנדטים. <b>המנדט ה־121 נשאר אצלכם</b> — והוא עובד כל הקדנציה: מעקב אזרחי חי אחרי כל חוק, כל הצבעה וכל ח״כ, כדי שהכנסת תישאר רשות עצמאית, לא חותמת גומי. סמנו איך הייתם מצביעים, וגלו מי מבין כל הח״כים מצביע כמוכם.</p>
+    <div class="card pad" style="margin-top:.8rem;background:var(--surface)"><h3>איך מפקחים? שלוש שאלות לכל חוק</h3><p class="small muted" style="line-height:1.9;margin-top:.3rem"><b style="color:var(--text)">1. מי יזם ומי שינה?</b> — עקבו אחרי מסע החוק והוועדה שדנה בו. <b style="color:var(--text)">2. מי הופיע ומי נעדר?</b> — בוועדות ובמליאה. <b style="color:var(--text)">3. מי הצביע איך?</b> — ואיך הייתם מצביעים אתם. כל דף באתר עונה על אחת מהן.</p></div>
+    ${prevSeen?`<div class="card pad" style="margin-top:.8rem"><h3>הפיקוח שלכם מאז הביקור הקודם <small class="dim">${fmtDate(prevSeen)}</small></h3><p class="small muted" style="margin-top:.3rem;line-height:1.9">${newSince.length?`<b style="color:var(--text)">${newSince.length} הצבעות מליאה חדשות</b> התקיימו מאז. פתחו אותן, סמנו איך הייתם מצביעים, ובדקו מי הצביע כמוכם.`:'לא התקיימו הצבעות מליאה חדשות מאז הביקור הקודם — הכנסת לא מצביעה כל יום. בינתיים אפשר לעבור על הוועדות.'}</p><div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem"><button class="btn" onclick="go('votes')">להצבעות ←</button><button class="btn ghost" onclick="go('mine')">לפיקוח שלי ←</button></div></div>`:''}
     ${homeKpisHTML({members:seats25.length,factions:Object.keys(fac25).length,bills:ALLB.length,votes:VOTES_ALL.length,detailed:Object.keys(VOTE_RES.votes||{}).length,lastVote:fmtDate(latest)})}
     ${prevSeen&&newSince.length?`<div class="chip acc" style="margin-top:.9rem">${newSince.length} הצבעות חדשות מאז הביקור הקודם (${fmtDate(prevSeen)})</div>`:''}
     <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn primary" style="margin-top:.9rem" onclick="openIntro()">▶ חדשים כאן? הסבר מצויר בפחות מדקה</button>
@@ -3022,11 +3040,37 @@ function keepSearchFocus(inp,renderFn){
   if(n){ n.focus(); try{ n.setSelectionRange(pos,pos) }catch(e){} }
 }
 function renderBillsKeep(inp){ keepSearchFocus(inp,renderBills) }
-function openBillAll(id){ navTo('bill='+id,()=>{viewArg=String(id); view='billAll'; buildTabs(); renderBillLite(); window.scrollTo({top:0})}) }
+function openBillAll(id){ if(KN!==25) switchKnesset(25); navTo('bill='+id,()=>{viewArg=String(id); view='billAll'; buildTabs(); renderBillLite(); window.scrollTo({top:0})}) }
 /* Bill context (committee agenda, faction's bills, a bill list) -> the
    bill page, never a single vote's page. */
 function openBillPage(billId){
   if(ALLB_BY_ID[billId]) openBillAll(billId);
+}
+/* Civic-action helpers: share the evidence, and teach the oversight
+   question each page answers. Share text is built only from data shown
+   on the page itself — no invented tallies. */
+function sharePage(text){
+  const url=location.href;
+  if(navigator.share){ navigator.share({title:document.title,text,url}).catch(()=>{}) }
+  else if(navigator.clipboard){ navigator.clipboard.writeText(text+' '+url).then(()=>alert('הקישור והטקסט הועתקו — אפשר להדביק ולשתף.')) }
+}
+function shareHTML(text){
+  const t=encodeURIComponent(text), u=encodeURIComponent(location.href);
+  return `<div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.7rem;align-items:center"><span class="small dim">שיתוף הוא פעולת פיקוח:</span><button class="btn ghost small" onclick="sharePage('${jsq(text)}')">⤴ שתפו</button><a class="btn ghost small" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${t}&url=${u}">𝕏 ב־X</a><a class="btn ghost small" target="_blank" rel="noopener" href="https://wa.me/?text=${t}%20${u}">בוואטסאפ</a></div>`;
+}
+function oversightQHTML(q,a){
+  return `<div class="card pad" style="margin-top:.85rem"><h3>שאלת פיקוח</h3><p style="margin-top:.3rem;line-height:1.8"><b>${q}</b></p><p class="small muted" style="line-height:1.9;margin-top:.25rem">${a}</p></div>`;
+}
+let CMT_ATT=null;
+function ensureCmtAtt(){ if(CMT_ATT) return Promise.resolve(CMT_ATT); return _lazyOnce('cmtatt',async()=>{ CMT_ATT=await _fetchJson('data/committee_attendance.json'); if(view==='committee') renderCommitteeDetail(); return CMT_ATT }) }
+function cmtAttHTML(c){
+  const d=CMT_ATT?.by_committee?.[String(c.id)]; if(!d||!d.sessions?.length) return '';
+  const rows=d.sessions.map((s,i)=>`<div style="display:contents"><span class="small dim" style="white-space:nowrap">${fmtDate(s.date)}</span>${d.members.map(m=>{const on=(d.spoke[m]||[]).includes(i); return `<span title="${esc(disp(m))} · ${fmtDate(s.date)} — ${on?'דיבר/ה בישיבה (לפי הפרוטוקול)':'לא דיבר/ה בישיבה זו'}" onclick="openMk('${jsq(m)}')" style="cursor:pointer;height:14px;border-radius:3px;background:${on?'var(--for)':'var(--line)'};opacity:${on?'.85':'.45'}"></span>`}).join('')}</div>`).join('');
+  const counts=d.members.map(m=>({m,n:(d.spoke[m]||[]).length})).sort((a,b)=>b.n-a.n);
+  return `<section class="card pad rise" style="margin-top:.85rem"><h3>מי דיבר בוועדה — ${d.sessions.length} הישיבות האחרונות עם פרוטוקול <small class="dim">כל חבר/ה הוא עמודה, כל שורה היא ישיבה · ירוק = דיבר/ה</small></h3>
+  <div style="display:grid;grid-template-columns:86px repeat(${d.members.length},1fr);gap:3px;align-items:center;margin-top:.7rem;overflow-x:auto">${rows}</div>
+  <p class="small dim" style="margin-top:.6rem;line-height:1.9"><b style="color:var(--text)">זו לא רשימת נוכחות רשמית</b> — הכנסת אינה מפרסמת מי נכח בכל ישיבת ועדה. הסימון הוא מי <b>דיבר</b> לפי פרוטוקולי הוועדה שפורסמו; חבר/ה שנכח/ה בשקט לא יסומן/תסומן. ובכל זאת, זה המדד הציבורי היחיד להשתתפות בפועל: מי שמעולם לא מדבר בוועדה שלו/ה — שווה לשאול למה. לחיצה על תא פותחת את דף הח״כ/ית.</p>
+  <div class="chips" style="margin-top:.5rem">${counts.slice(0,6).map(x=>`<button class="chip" onclick="openMk('${jsq(x.m)}')">${esc(disp(x.m))} · דיבר/ה ב־${x.n} מ־${d.sessions.length}</button>`).join('')}</div></section>`;
 }
 function renderBillLite(){
   ensureExtras(); ensureBillDocs(); ensureBillHistory();
@@ -3058,6 +3102,8 @@ function renderBillLite(){
       ${b.doc_url?`<a class="btn" href="${esc(b.doc_url)}" target="_blank" rel="noopener"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> נוסח ההצעה ↗</a>`:''}
     </div>
   </article>
+  ${shareHTML('הצעת חוק בכנסת: '+(b.name||'')+' — סטטוס, ועדות והצבעות, במנדט ה־121')}
+  ${oversightQHTML('מי שינה את החוק הזה בדרך — ומי ניסה לעצור אותו?', 'עקבו אחרי מסע החוק למעלה: באיזו ועדה נידון, מי היוזמים, ומה קרה בכל הצבעת מליאה מתחת. הוועדה היא המקום שבו הממשלה והכנסת באמת מנהלות משא ומתן — שם הפיקוח עובד או נכשל.')}
   ${billHistoryHTML(b)}
   ${billDocsHTML(b)}
   ${billCmtHTML({bill_id:b.id})}
@@ -3067,7 +3113,7 @@ function renderBillLite(){
   </div>`;
   window.scrollTo(0,0);
 }
-function openBill26(id){ navTo('bill26='+id,()=>{viewArg=String(id); view='bill26'; buildTabs(); renderBill26(); window.scrollTo({top:0})}) }
+function openBill26(id){ if(KN!==26) switchKnesset(26); navTo('bill26='+id,()=>{viewArg=String(id); view='bill26'; buildTabs(); renderBill26(); window.scrollTo({top:0})}) }
 function renderBill26(){
   const app=$('#app'), b=K26B.find(x=>String(x.id)===String(viewArg));
   if(!b){ app.innerHTML=backBtnHTML('bills','› חזרה לחוקים')+'<div class="card empty" style="margin-top:.6rem"><div class="big">📄</div>ההצעה לא נמצאה בכנסת ה־26.</div>'; return }
@@ -3464,6 +3510,8 @@ function renderVote(){
         ${b.topics&&b.topics.length?`<div class="chips" style="margin-top:.5rem">${b.topics.map(t=>`<button class="chip" title="כל החוקים בנושא" onclick="filterTopic('${jsq(t)}')">${esc(t)}</button>`).join('')}</div>`:''}
       </div>${b.bill_id?`<div style="text-align:center">${starBtn('bill',b.bill_id,(b.lite&&b.lite.name)||b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.bill_id)?'החוק במעקב ★':'מעקב אחרי החוק'}</div></div>`:''}
     </div>
+    ${shareHTML('הצבעה במליאת הכנסת: '+(b.title||'')+(b.has_tally?` — ${b.total_for} בעד, ${b.total_against} נגד`:'')+'. מי הצביע איך, במנדט ה־121')}
+    ${oversightQHTML('האם מי שהצביעו כאן ייצגו אתכם?', 'סמנו למטה איך הייתם מצביעים — ותראו מיד מי מבין כל הח״כים הצביע כמוכם, מי הצביע נגד עמדתכם, ומי בכלל לא הופיע. פיקוח מתחיל בהשוואה הזאת.')}
     ${b.bill_id?`<div class="small dim" style="margin-top:.7rem">מסע הצעת החוק — כל שלביה, לא רק ההצבעה הזאת:</div>${stepperHTML(b.bill_id)}`:''}
     <div style="margin:1rem 0">${b.has_tally?`${outcomeHTML(b.total_for,b.total_against,b.total_abstain,...nouns)}${scoreHTML(b,true)}`:b.is_accepted!=null?`<div class="outcome ${b.is_accepted?'for':'against'}" role="status"><span class="o-ic">${b.is_accepted?'✓':'✕'}</span><span class="o-main"><b>${esc(b.is_accepted?nouns[0]:nouns[1])}</b><span>הצבעה ${esc(VOTE_METHOD[b.method_id]||'לא אלקטרונית')} — אין ספירה מספרית</span></span></div>`:''}</div>
     <div data-matchhost-host>
@@ -4673,7 +4721,7 @@ function renderCommitteeDetail(){
   if(kn&&kn!==KN){ switchKnesset(kn); view='committee'; buildTabs(); renderCommitteeDetail(); return }
   if(!kn&&!K25_READY){ ensureK25Archive(); $('#app').innerHTML=backBtnHTML('committees','› ועדות')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>טוען את מאגר הוועדות…</div>'; return }
   if(KN===26){ renderCommitteeDetail26(); return }
-  ensureCmem(); ensureExtras();
+  ensureCmem(); ensureExtras(); ensureCmtAtt();
   const app=$('#app'), c=CMT_BY_ID[viewArg];
   if(!c){ app.innerHTML=backBtnHTML('committees','› ועדות')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>הוועדה לא נמצאה במאגר כנסת 25.</div>'; return }
   const recent=(CMT?.recent_sessions||[]).filter(s=>String(s.committee_id)===String(c.id)).sort((a,b)=>(b.start||'').localeCompare(a.start||''));
@@ -4692,6 +4740,8 @@ function renderCommitteeDetail(){
     <div class="kpis"><div class="kpi"><b>${(c.sessions_total||0).toLocaleString('he-IL')}</b><span>ישיבות בקדנציה</span></div><div class="kpi"><b>${bills.length.toLocaleString('he-IL')}</b><span>חוקים מהמאגר נידונו כאן</span></div><div class="kpi"><b>${c.last_session?fmtDate(c.last_session):'—'}</b><span>ישיבה אחרונה</span></div></div>
   </article>
   ${committeeJointHTML(c)}
+  ${oversightQHTML('האם הוועדה הזאת באמת מפקחת על הממשלה?', 'ועדות הן כלי הפיקוח החזק ביותר של הכנסת: שם משרדי הממשלה נדרשים להופיע, להסביר ולהציג נתונים. בדקו מתחת: מי מחברי הוועדה בכלל מדבר בישיבות, אילו חוקים נידונו כאן — ומה קרה להם אחר כך.')}
+  ${cmtAttHTML(c)}
   ${committeeMembersHTML(c)}
   <div class="grid c2" style="margin-top:.85rem;align-items:start">
     ${committeeSessionsHTML(c,recent)}
@@ -4717,7 +4767,14 @@ function renderAbout(){
 
   <section class="card hero rise">
     <h1>120 מנדטים חולקו ביום הבחירות.<br>ה־121 נשאר אצל האזרחים.</h1>
-    <p class="about-lead" style="margin-top:.7rem"><b>המנדט ה־121</b> הוא מעקב אזרחי חי אחרי הכנסת: כל חוק, כל הצבעת מליאה, כל ח״כ, סיעה, ועדה ודיון — במקום אחד, בשפה קריאה, ועם הכלים לסמן איך הייתם מצביעים בעצמכם ולראות מי באמת מייצג אתכם. כרגע במאגר כנסת 25: <b>${n(ALLB.length)} חוקים</b>, <b>${n(VOTES_ALL.length)} הצבעות מליאה</b> ו־<b>${n(Object.keys(VOTE_RES.votes||{}).length)} הצבעות עם תוצאות לפי ח״כ</b>; כנסת 26 מתמלאת ככל שהכנסת מפרסמת נתונים.</p>
+    <p class="about-lead" style="margin-top:.7rem"><b>המנדט ה־121</b> הוא מעקב אזרחי חי אחרי הכנסת: כל חוק, כל הצבעת מליאה, כל ח״כ, סיעה, ועדה ודיון — במקום אחד, בשפה קריאה, ועם הכלים לסמן איך הייתם מצביעים בעצמכם ולראות מי מבין כל הח״כים מצביע כמוכם באמת. כרגע במאגר כנסת 25: <b>${n(ALLB.length)} חוקים</b>, <b>${n(VOTES_ALL.length)} הצבעות מליאה</b> ו־<b>${n(Object.keys(VOTE_RES.votes||{}).length)} הצבעות עם תוצאות לפי ח״כ</b>; כנסת 26 מתמלאת ככל שהכנסת מפרסמת נתונים.</p>
+  </section>
+
+  <section class="card pad about-card rise" style="margin-top:.85rem">
+    <h3>למה בכלל לעקוב — ולמה דווקא אחרי הכנסת</h3>
+    <p>בישראל אין בית מחוקקים שני, אין נשיא עם וטו ואין ממשל פדרלי. בין בחירות לבחירות, הפיקוח של הכנסת על <b>הממשלה</b> הוא כמעט הבלם המוסדי היחיד על הרשות המבצעת — והכנסת אמורה להיות רשות עצמאית ושווה, לא שלוחה של הממשלה.</p>
+    <p>אבל הפיקוח הזה נחלש מבפנים: <b>הממשלה שולטת</b> בדרך כלל גם ברוב הכנסת, דרך המשמעת הקואליציונית. כשוועדה לא שואלת, כשח״כ לא מגיע, כשהצבעה עוברת בלי שאף אזרח ראה אותה — אין מי שיעצור את זה מבחוץ.</p>
+    <p>כאן נכנס המנדט ה־121. פיקוח פורמלי עובד רק כשמישהו צופה בו: כשאזרחים יודעים מי דיבר בוועדה, מי נעדר מהצבעה ומי שינה חוק בדרך — העלות של חותמת־גומי עולה. <b>אתר לא יחזיר לכנסת את עצמאותה. אבל כנסת שאף אחד לא צופה בה לא תהיה עצמאית לעולם.</b> שתי דקות כאן בשבוע הן פעולת פיקוח אזרחית של ממש: בחרו חוק, ח״כ או ועדה, שימו עליהם כוכב — וחזרו לראות מה השתנה.</p>
   </section>
 
   <div class="grid c2" style="align-items:start;margin-top:.85rem">
@@ -4778,7 +4835,7 @@ function siteTopStarsHTML(){
   if(!top.length) return '';
   const rows=top.map(([k,n],idx)=>{ const i=k.indexOf(':'); const kind=k.slice(0,i), key=k.slice(i+1);
     let lbl=key, go='';
-    if(kind==='bill'){ lbl=(ALLB_BY_ID[key]&&displayText(ALLB_BY_ID[key]))||'הצעת חוק'; go=`openBillPage('${key}')` }
+    if(kind==='bill'){ const kb=ALLB_BY_ID[key]||K26B.find(b=>String(b.id)===key); lbl=kb?displayText(kb):'הצעת חוק'; go=`openBillIn(${billKn(key)||KN},'${key}')` }
     else if(kind==='mk'){ lbl=disp(key); go=`openMk('${jsq(key)}')` }
     else if(kind==='committee'){ const c=committeeById(key); lbl=c?c.name:'ועדה'; go=`openCommittee('${key}')` }
     else if(kind==='faction'){ go=`openFaction('${jsq(key)}')` }
@@ -4871,7 +4928,7 @@ function renderMine(){
   const feedTop=feed.slice(0,18);
   const feedNew=prevSeen?feed.filter(e=>(e.date||'')>prevSeen).length:0;
   $('#app').innerHTML=`
-  <section class="cc-hero rise"><div style="display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap"><h2>⭐ מרכז המעקב שלי</h2><span class="small muted">המנדט ה־121 שלך — הצבעות, מעקב ומי מייצג אותך · נשמר מקומית בדפדפן זה בלבד</span></div>
+  <section class="cc-hero rise"><div style="display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap"><h2>⭐ מרכז המעקב שלי</h2><span class="small muted">המנדט ה־121 שלך — הצבעות, מעקב ומי מצביע כמוך מבין כל הח״כים · נשמר מקומית בדפדפן זה בלבד</span></div>
   <div class="cc-tiles">
     <div class="cc-tile"><b>${mineBills.length.toLocaleString('he-IL')}</b><span>הצבעות שסימנתי “אני הייתי מצביע/ה”</span></div>
     <div class="cc-tile gold"><b>${followCount().toLocaleString('he-IL')}</b><span>במעקב שלי ★ — ${fb.length} חוקים (${fb25.length} מכנסת 25 · ${fb26.length} מכנסת 26) · ${fm.length} ח״כים · ${fc.length} ועדות · ${ff.length} סיעות${(S.followTopics||[]).length?` · ${S.followTopics.length} נושאים`:''}</span></div>
@@ -4925,7 +4982,7 @@ const INTRO_TEXT=[
  ['עוקבים אחרי כל חוק, מההנחה ועד ההכרעה','מי יזם, באיזה שלב, מה קרה בוועדה ומתי עלתה להצבעה.'],
  ['הוועדות — שם החוקים באמת מתבשלים','לכל ועדה: יו״ר, חברים, ישיבות והחוקים שנידונו בה; לכל ישיבה: סדר יום, מסמכים, שידור ופרוטוקול.'],
  ['מי הצביע איך — ח״כ אחרי ח״כ','התוצאה, מפת המושבים, וההצבעה של כל ח״כ בכל הצבעת מליאה.'],
- ['סמנו איך הייתם מצביעים — וגלו מי מייצג אתכם','״אני הייתי מצביע/ה״, והאתר מדרג ח״כים וסיעות לפי התאמה אליכם.'],
+ ['סמנו איך הייתם מצביעים — וגלו מי מבין כל הח״כים מצביע כמוכם','״אני הייתי מצביע/ה״, והאתר מדרג ח״כים וסיעות לפי התאמה אליכם.'],
  ['חיפוש אחד — לכל האתר, וגם בתוך הפרוטוקולים','חוקים, הצבעות, ח״כים, ועדות — וכל מילה בפרוטוקולי הוועדות ובדברי הכנסת, עם קפיצה לקטע.'],
  ['מי מצביע עם מי — ומי חורג מהסיעה','מטריצת דמיון הצבעה, אשכולות ומגשרים; ⚡ מסמן מי הצביע אחרת מרוב סיעתו, וכל חריגה נספרת בכרטיס הח״כ.'],
  ['המנדט ה־121 שלכם, מוכן לעבודה','חינם לגמרי ובלי פרסומות. מעקב אישי בלי חשבון ובלי הרשמה — נשמר רק בדפדפן שלכם.'],
