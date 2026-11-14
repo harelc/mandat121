@@ -527,6 +527,18 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
 .foot-links{margin-bottom:.55rem;font-size:.86rem;font-weight:700}
 .foot-links a{color:var(--accent);text-decoration:none}
 .foot-links a:hover{text-decoration:underline}
+/* civic oversight intro — ONE uniform component on bill/vote/committee
+   pages: a dismissible banner, and on first entry to each page type a
+   modal with the same content. Dismissal is per type, localStorage. */
+.civic-q{margin-top:.85rem;border-inline-start:4px solid var(--accent);display:flex;gap:.7rem;align-items:flex-start}
+.civic-q .cq-ic{flex:none;width:2rem;height:2rem;border-radius:50%;background:var(--surface);border:1px solid var(--line);display:grid;place-items:center;font-size:1rem}
+.civic-q h3{margin:0;font-size:.95rem}
+.civic-q p{line-height:1.85;margin-top:.25rem}
+.civic-q .cq-x{margin-inline-start:auto;flex:none}
+.civic-modal{position:fixed;inset:0;background:rgba(20,16,8,.55);display:grid;place-items:center;z-index:120;padding:1rem}
+.civic-modal .cm-box{background:var(--bg,#fffdf7);border:1px solid var(--line);border-radius:18px;box-shadow:var(--shadow);max-width:30rem;width:100%;padding:1.3rem 1.4rem}
+.civic-modal h2{font-size:1.25rem;line-height:1.4;margin:.4rem 0}
+.civic-modal p{line-height:1.9;color:var(--mid)}
 /* about / impressum */
 .about-lead{font-size:1.02rem;line-height:1.75;color:var(--mid);max-width:68ch}
 .about-lead b{color:var(--text)}
@@ -3071,8 +3083,22 @@ function shareHTML(text){
   const t=encodeURIComponent(text), u=encodeURIComponent(location.href);
   return `<div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.7rem;align-items:center"><span class="small dim">שיתוף הוא פעולת פיקוח:</span><button class="btn ghost small" onclick="sharePage('${jsq(text)}')">⤴ שתפו</button><a class="btn ghost small" target="_blank" rel="noopener" href="https://twitter.com/intent/tweet?text=${t}&url=${u}">שתפו ב־𝕏</a><a class="btn ghost small" target="_blank" rel="noopener" href="https://wa.me/?text=${t}%20${u}">בוואטסאפ</a></div>`;
 }
-function oversightQHTML(q,a){
-  return `<div class="card pad" style="margin-top:.85rem"><h3>שאלת פיקוח</h3><p style="margin-top:.3rem;line-height:1.8"><b>${q}</b></p><p class="small muted" style="line-height:1.9;margin-top:.25rem">${a}</p></div>`;
+const CIVIC_SEEN_KEY='mandat121.civicSeen.v1';
+const civicSeen=()=>{ try{ return JSON.parse(localStorage.getItem(CIVIC_SEEN_KEY)||'{}') }catch(e){ return {} } };
+function civicDismiss(type){ try{ const s=civicSeen(); s[type]=1; localStorage.setItem(CIVIC_SEEN_KEY,JSON.stringify(s)) }catch(e){} document.querySelectorAll(`[data-civic="${type}"]`).forEach(el=>el.remove()); civicModalClose(); }
+function civicModalClose(){ document.getElementById('civicModal')?.remove(); }
+function civicIntro(type,q,a){ // first entry to this page type: modal once; after that the banner carries it until dismissed there too
+  if(civicSeen()[type]) return;
+  if(document.getElementById('civicModal')) return;
+  const el=document.createElement('div'); el.id='civicModal'; el.className='civic-modal';
+  el.innerHTML=`<div class="cm-box" role="dialog" aria-modal="true" aria-label="מבוא לפיקוח אזרחי"><span class="chip acc">מבוא לפיקוח אזרחי · ${{bill:'דף חוק',vote:'דף הצבעה',committee:'דף ועדה'}[type]||''}</span><h2>${q}</h2><p>${a}</p><div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem"><button class="btn primary" onclick="civicDismiss('${type}')">הבנתי — לדף ←</button><button class="btn ghost" onclick="civicModalClose()">רק לסגור (יוצג שוב בדף הבא)</button></div></div>`;
+  el.addEventListener('click',e=>{ if(e.target===el) civicModalClose() });
+  document.body.appendChild(el);
+}
+function oversightQHTML(type,q,a){
+  setTimeout(()=>civicIntro(type,q,a),350); // after the page paints; once per type
+  if(civicSeen()[type]) return '';
+  return `<section class="card pad civic-q" data-civic="${type}"><span class="cq-ic" aria-hidden="true">⚖️</span><div><h3>שאלת פיקוח</h3><p><b>${q}</b></p><p class="small muted">${a}</p></div><button class="btn ghost small cq-x" onclick="civicDismiss('${type}')" title="לא להציג שוב בדפים מסוג זה" aria-label="סגירת שאלת הפיקוח">✕</button></section>`;
 }
 let CMT_ATT=null;
 function ensureCmtAtt(){ if(CMT_ATT) return Promise.resolve(CMT_ATT); return _lazyOnce('cmtatt',async()=>{ CMT_ATT=await _fetchJson('data/committee_attendance.json'); if(view==='committee') renderCommitteeDetail(); return CMT_ATT }) }
@@ -3116,7 +3142,7 @@ function renderBillLite(){
       <button class="btn ghost" onclick="sharePage('${jsq('הצעת חוק בכנסת: '+(b.name||'')+' — סטטוס, ועדות והצבעות, במנדט ה־121')}')" title="שיתוף דף המעקב אחרי החוק הזה — כדי שעוד אזרחים יעקבו אחריו">⤴ שיתוף המעקב</button>
     </div>
   </article>
-  ${oversightQHTML('מי שינה את החוק הזה בדרך — ומי ניסה לעצור אותו?', 'עקבו אחרי מסע החוק למעלה: באיזו ועדה נידון, מי היוזמים, ומה קרה בכל הצבעת מליאה מתחת. הוועדה היא המקום שבו הממשלה והכנסת באמת מנהלות משא ומתן — שם הפיקוח עובד או נכשל.')}
+  ${oversightQHTML('bill','מי שינה את החוק הזה בדרך — ומי ניסה לעצור אותו?', 'עקבו אחרי מסע החוק למעלה: באיזו ועדה נידון, מי היוזמים, ומה קרה בכל הצבעת מליאה מתחת. הוועדה היא המקום שבו הממשלה והכנסת באמת מנהלות משא ומתן — שם הפיקוח עובד או נכשל.')}
   ${billHistoryHTML(b)}
   ${billDocsHTML(b)}
   ${billCmtHTML({bill_id:b.id})}
@@ -3524,7 +3550,7 @@ function renderVote(){
       </div>${b.bill_id?`<div style="text-align:center">${starBtn('bill',b.bill_id,(b.lite&&b.lite.name)||b.name)}<div class="small dim star-cap" style="margin-top:.2rem">${followedBill(b.bill_id)?'החוק במעקב ★':'מעקב אחרי החוק'}</div></div>`:''}
     </div>
     ${shareHTML('הצבעה במליאת הכנסת: '+(b.title||'')+(b.has_tally?` — ${b.total_for} בעד, ${b.total_against} נגד`:'')+'. מי הצביע איך, במנדט ה־121')}
-    ${oversightQHTML('האם מי שהצביעו כאן ייצגו אתכם?', 'סמנו למטה איך הייתם מצביעים — ותראו מיד מי מבין כל הח״כים הצביע כמוכם, מי הצביע נגד עמדתכם, ומי בכלל לא הופיע. פיקוח מתחיל בהשוואה הזאת.')}
+    ${oversightQHTML('vote','האם מי שהצביעו כאן ייצגו אתכם?', 'סמנו למטה איך הייתם מצביעים — ותראו מיד מי מבין כל הח״כים הצביע כמוכם, מי הצביע נגד עמדתכם, ומי בכלל לא הופיע. פיקוח מתחיל בהשוואה הזאת.')}
     ${b.bill_id?`<div class="small dim" style="margin-top:.7rem">מסע הצעת החוק — כל שלביה, לא רק ההצבעה הזאת:</div>${stepperHTML(b.bill_id)}`:''}
     <div style="margin:1rem 0">${b.has_tally?`${outcomeHTML(b.total_for,b.total_against,b.total_abstain,...nouns)}${scoreHTML(b,true)}`:b.is_accepted!=null?`<div class="outcome ${b.is_accepted?'for':'against'}" role="status"><span class="o-ic">${b.is_accepted?'✓':'✕'}</span><span class="o-main"><b>${esc(b.is_accepted?nouns[0]:nouns[1])}</b><span>הצבעה ${esc(VOTE_METHOD[b.method_id]||'לא אלקטרונית')} — אין ספירה מספרית</span></span></div>`:''}</div>
     <div data-matchhost-host>
@@ -4753,7 +4779,7 @@ function renderCommitteeDetail(){
     <div class="kpis"><div class="kpi"><b>${(c.sessions_total||0).toLocaleString('he-IL')}</b><span>ישיבות בקדנציה</span></div><div class="kpi"><b>${bills.length.toLocaleString('he-IL')}</b><span>חוקים מהמאגר נידונו כאן</span></div><div class="kpi"><b>${c.last_session?fmtDate(c.last_session):'—'}</b><span>ישיבה אחרונה</span></div></div>
   </article>
   ${committeeJointHTML(c)}
-  ${oversightQHTML('האם הוועדה הזאת באמת מפקחת על הממשלה?', 'ועדות הן כלי הפיקוח החזק ביותר של הכנסת: שם משרדי הממשלה נדרשים להופיע, להסביר ולהציג נתונים. בדקו מתחת: מי מחברי הוועדה בכלל מדבר בישיבות, אילו חוקים נידונו כאן — ומה קרה להם אחר כך.')}
+  ${oversightQHTML('committee','האם הוועדה הזאת באמת מפקחת על הממשלה?', 'ועדות הן כלי הפיקוח החזק ביותר של הכנסת: שם משרדי הממשלה נדרשים להופיע, להסביר ולהציג נתונים. בדקו מתחת: מי מחברי הוועדה בכלל מדבר בישיבות, אילו חוקים נידונו כאן — ומה קרה להם אחר כך.')}
   ${cmtAttHTML(c)}
   ${committeeMembersHTML(c)}
   <div class="grid c2" style="margin-top:.85rem;align-items:start">
