@@ -2204,8 +2204,8 @@ function openPlenum(sid){
 /* ============ global grouped autocomplete ============
    One index over the objects already in memory — MKs, factions/lists,
    bills, committees, topics — each row deep-links to that object's page.
-   Enter opens the best (highlighted) match; with no object match it falls
-   back to the old behaviour: free-text bill search. */
+   Enter opens the best (highlighted) match; with no object match it goes
+   to the protocol search — the one corpus this index does not scan. */
 let SEARCH_FLAT=[], SEARCH_ACTIVE=-1, SEARCH_TOPIC_COUNTS=null;
 const normQ=s=>normName(s).replace(/[׳\u05F3]/g,"'").replace(/[״\u05F4]/g,'"'); // ש״ס == ש"ס
 function matchRank(text,q){ const t=normQ(text); return t.startsWith(q)?0:t.includes(q)?1:-1 }
@@ -2292,6 +2292,15 @@ function searchGroups(qRaw){
       .map(({t,n})=>({html:`<span class="flex">${esc(t)}<span class="sub">${n.toLocaleString('he-IL')} הצעות בנושא · כנסת 25</span></span>`,go:()=>{ if(KN!==25) switchKnesset(25); eraFilter.topic=t; eraFilter.limit=30; go('votes') }}));
     push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.5v-9h9L21 12l-8.5 8.5z"/><circle cx="8" cy="8" r="1.6"/></svg> נושאים',all,items,null);
   }
+  { // Protocols: full-text hits are async (sharded index), so the dropdown
+    // offers ONE jump row instead of inline results — it hands the query to
+    // the cross-corpus protocol search in the committees tab (K25 only),
+    // which renders grouped committee + plenum hits there.
+    if(protoTerms(qRaw).length){
+      const item={html:`<span class="flex">חיפוש בפרוטוקולים: «${esc(qRaw)}»<span class="sub">פרוטוקולי ועדות ודברי הכנסת (מליאה) · כנסת 25 · כל מילה במאגר</span></span>`,go:()=>openProtocolSearch(qRaw)};
+      groups.push(['<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> פרוטוקולים',[item]]);
+    }
+  }
   return groups;
 }
 function hideSearchDrop(){ const d=$('#searchDrop'); if(d){ d.hidden=true; d.innerHTML='' } SEARCH_FLAT=[]; SEARCH_ACTIVE=-1 }
@@ -2300,13 +2309,23 @@ function renderSearchDrop(){
   if(!inp.value.trim()){ hideSearchDrop(); return }
   const groups=searchGroups(inp.value.trim());
   SEARCH_FLAT=groups.flatMap(([,items])=>items); SEARCH_ACTIVE=SEARCH_FLAT.length?0:-1;
-  if(!groups.length){ drop.innerHTML='<div class="sd-empty">לא נמצאו ח״כים, סיעות, חוקים, הצבעות, ועדות או נושאים בשם הזה — Enter יחפש בטקסט החוקים.</div>'; drop.hidden=false; return }
+  if(!groups.length){ drop.innerHTML=`<div class="sd-empty">לא נמצאו ח״כים, סיעות, חוקים, הצבעות, ועדות או נושאים בשם הזה${protoTerms(inp.value.trim()).length?' — Enter יחפש בפרוטוקולים (ועדות ומליאה).':'.'}</div>`; drop.hidden=false; return }
   let i=-1;
   drop.innerHTML=groups.map(([label,items])=>`<div class="sd-group">${label}</div>${items.map(it=>{ i++; return `<div class="sd-row ${i===SEARCH_ACTIVE?'on':''}" role="option" onclick="searchPick(${i})">${it.html}<span class="dim small">←</span></div>` }).join('')}`).join('');
   drop.hidden=false;
 }
 function searchPick(i){ const it=SEARCH_FLAT[i]; if(!it) return; hideSearchDrop(); $('#globalSearch')?.blur(); it.go() }
-function searchFallback(){ const q=$('#globalSearch').value.trim(); allFilter.q=q; allFilter.limit=30; hideSearchDrop(); go('bills') }
+/* Hand a query to the cross-corpus protocol search (committees tab, K25):
+   full-text over committee protocols + דברי הכנסת, a corpus the global
+   dropdown does NOT already scan — unlike bill text, which billMatches
+   covers and the dropdown's bill group already reflects. */
+function openProtocolSearch(qRaw){ if(KN!==25) switchKnesset(25); cmtSeg='committees'; protoQuery=qRaw; go('committees'); setTimeout(()=>document.querySelector('input[data-keep="protoQ"]')?.scrollIntoView({block:'center',behavior:'smooth'}),60) }
+function searchFallback(){ const q=$('#globalSearch').value.trim(); hideSearchDrop();
+  // No object of any kind matched: the one corpus not yet searched is the
+  // protocols, so Enter goes there (when the query has a searchable term;
+  // a lone character can't run the protocol index — keep the bill filter).
+  if(protoTerms(q).length){ openProtocolSearch(q); return }
+  allFilter.q=q; allFilter.limit=30; go('bills') }
 function setupGlobalSearch(){
   const gs=$('#globalSearch'); if(!gs) return;
   gs.addEventListener('input',()=>{ ensureK25Archive(); renderSearchDrop() }); // bills/votes live in the K25 archive — pull it on first search, not on boot

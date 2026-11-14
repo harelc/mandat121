@@ -67,7 +67,33 @@ const ROLE = { "יור": "chair", "יו\"ר": "chair", "דובר": "speaker", "�
 const parasOf = (body) => body.split("\n").map((p) => p.replace(/\s+/g, " ").trim()).filter(Boolean).join("\n\n");
 const MARK = /<<\s*(יו"ר|יור|דובר|אורח|קריאה|נושא|סיום|דובר_המשך|הפסקה|מנהל)\s*>>\s*([\s\S]*?)<<\s*(?:יו"ר|יור|דובר|אורח|קריאה|נושא|סיום|דובר_המשך|הפסקה|מנהל)\s*>>/g;
 
+const MARK1 = /<<\s*(יו"ר|יור|דובר|אורח|קריאה|נושא|סיום|דובר_המשך|הפסקה|מנהל)\s*>>/g;
+/* Stenographers sometimes drop a LONE marker mid-speech (seen in sitting
+   2227967: "<< דובר_המשך >>אבל עד שנשנה את החוק…" with no name and no
+   closing twin). The paired MARK regex then treats that lone marker as a
+   header opening and the next turn's opening as its close — every speaker
+   after it shifts by one turn (body becomes "speaker", next name becomes
+   "text"). Drop lone markers (keeping the text after them as body) before
+   pairing: a real header pair encloses a short text ending in ":" or ")"
+   (topics/recess/end markers: any short text). */
+function stripLoneMarkers(text) {
+  const occ = [...text.matchAll(MARK1)];
+  if (occ.length < 2) return text;
+  const lone = new Set();
+  for (let i = 0; i < occ.length; i++) {
+    if (i + 1 >= occ.length) { lone.add(i); continue; }
+    const between = text.slice(occ[i].index + occ[i][0].length, occ[i + 1].index).replace(/\s+/g, " ").trim();
+    const paired = between.length > 0 && between.length <= 600 && (between.endsWith(":") || between.endsWith(")") || ["נושא", "הפסקה", "סיום"].includes(occ[i][1]));
+    if (paired) i++; else lone.add(i);
+  }
+  if (!lone.size) return text;
+  let out = "", last = 0;
+  occ.forEach((m, i) => { if (lone.has(i)) { out += text.slice(last, m.index); last = m.index + m[0].length; } });
+  return out + text.slice(last);
+}
+
 export function parseTranscript(text) {
+  text = stripLoneMarkers(text);
   const turns = [], speakers = {};
   const matches = [...text.matchAll(MARK)];
   for (let i = 0; i < matches.length; i++) {

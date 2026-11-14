@@ -56,8 +56,47 @@ def docx_text(url):
 def parse(session, url):
     return parse_text(session, docx_text(url))
 
+MARK1 = re.compile(r"<<\s*(יו\"ר|יור|דובר|אורח|קריאה|נושא|סיום|דובר_המשך|הפסקה|מנהל)\s*>>")
+
+def strip_lone_markers(text):
+    """Drop LONE stenographer markers (keeping the text after them).
+
+    Seen in plenum sitting 2227967: a single << דובר_המשך >> mid-speech
+    with no name and no closing twin. The paired MARK regex then treats
+    it as a header opening and the next turn's opening as its close, so
+    every speaker after it shifts by one turn. A real header pair
+    encloses a short text ending in ":" or ")" (topics/recess/end: any
+    short text). Mirror of stripLoneMarkers in the Netlify parsers."""
+    occ = list(MARK1.finditer(text))
+    if len(occ) < 2:
+        return text
+    lone = set()
+    i = 0
+    while i < len(occ):
+        if i + 1 >= len(occ):
+            lone.add(i)
+            break
+        between = " ".join(text[occ[i].end():occ[i + 1].start()].split()).strip()
+        paired = 0 < len(between) <= 600 and (between.endswith(":") or between.endswith(")")
+                                              or occ[i].group(1) in ("נושא", "הפסקה", "סיום"))
+        if paired:
+            i += 2
+        else:
+            lone.add(i)
+            i += 1
+    if not lone:
+        return text
+    out, last = [], 0
+    for i, m in enumerate(occ):
+        if i in lone:
+            out.append(text[last:m.start()])
+            last = m.end()
+    out.append(text[last:])
+    return "".join(out)
+
 def parse_text(session, text):
     turns, speakers = [], {}
+    text = strip_lone_markers(text)
     matches = list(MARK.finditer(text))
     for i, m in enumerate(matches):
         role = ROLE[m.group(1)]

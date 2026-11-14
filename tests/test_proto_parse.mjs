@@ -11,6 +11,7 @@ const TEXT = [
   "<< דובר >> דנה כהן (סיעת הדוגמה): << דובר >>",
   "פסקה ראשונה של הנאום.",
   "פסקה שנייה של אותו נאום.",
+  "<< דובר_המשך >> משפט המשך בודד באמצע הנאום.",
   "<< דובר_המשך >> דנה כהן: << דובר_המשך >>",
   "פסקת המשך של אותה דוברת.",
   "<< קריאה >> אבי לוי: << קריאה >>",
@@ -29,7 +30,7 @@ for (const f of ["committee-protocol", "plenum"]) {
   assert.equal(speech.length, 3, `${f}: speech + interjection + chair`); passed++;
   assert.equal(
     speech[0].text,
-    "פסקה ראשונה של הנאום.\n\nפסקה שנייה של אותו נאום.\n\nפסקת המשך של אותה דוברת.",
+    "פסקה ראשונה של הנאום.\n\nפסקה שנייה של אותו נאום.\n\nמשפט המשך בודד באמצע הנאום.\n\nפסקת המשך של אותה דוברת.",
     `${f}: paragraphs preserved, continuation merged`,
   ); passed++;
   assert.ok(turns.every((t) => !t.text.includes("<<")), `${f}: no marker leaks`); passed++;

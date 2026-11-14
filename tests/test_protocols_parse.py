@@ -29,6 +29,7 @@ TEXT = (
     "קריאת ביניים קצרה.\n"
     "<< דובר >> דנה כהן (סיעת הדוגמה): << דובר >>\n"
     "תשובה אחרי הקריאה.\n"
+    "<< דובר_המשך >> אבל עד שנשנה את החוק, תיגמר שנת הלימודים.\n"
     "<< הפסקה >> (הישיבה נפסקה בשעה 09:40 ונתחדשה בשעה 10:01.) << הפסקה >>\n"
     '<< מנהל >> (היו"ר משה גפני, 10:02) << מנהל >>\n'
     "דברי היושב-ראש כמנהל הדיון.\n"
@@ -55,6 +56,18 @@ class ParseTextTests(unittest.TestCase):
         for t in self.doc["turns"]:
             self.assertNotIn("<<", t["text"])
             self.assertNotIn("דובר_המשך", t["text"])
+
+    def test_lone_marker_does_not_shift_speakers(self):
+        # Regression (sitting 2227967): a lone << דובר_המשך >> mid-speech
+        # used to pair with the next turn's opening marker, shifting every
+        # later speaker by one turn. Its sentence stays in דנה's reply and
+        # the following chair turn keeps its own speaker.
+        self.assertEqual(self.turns[2]["speaker"], "דנה כהן")
+        self.assertEqual(
+            self.turns[2]["text"],
+            "תשובה אחרי הקריאה.\n\nאבל עד שנשנה את החוק, תיגמר שנת הלימודים.",
+        )
+        self.assertTrue(all(t["speaker"] == "משה גפני" for t in self.turns[3:]))
 
     def test_continuation_words_count_to_the_speaker_once(self):
         spk = self.doc["speakers"]["דנה כהן"]
