@@ -497,6 +497,7 @@ a.bill-ref:hover{background:#dbe7f5}
 .row:first-child{border-top:0}
 .row:hover{background:var(--surface2)}
 .row .flex{flex:1;min-width:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.row .flex.wrap{overflow:visible;text-overflow:clip;white-space:normal;overflow-wrap:anywhere}
 .vchip{font-size:.72rem;font-weight:800;padding:.18rem .55rem;border-radius:999px;white-space:nowrap}
 .vchip.f{background:var(--for-dim);color:var(--for)} .vchip.a{background:var(--against-dim);color:var(--against)} .vchip.n{background:var(--abstain-dim);color:var(--abstain)}
 select,input[type=search]{background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:.55rem .8rem;font-size:.9rem}
@@ -861,6 +862,13 @@ try{ const raw=JSON.parse(localStorage.getItem(LS)||localStorage.getItem('openkn
 // arrays identical from here on (toggleFollow mirrors every MK toggle).
 { const u=[...new Set([...(STORE['25'].followMks||[]),...(STORE['26'].followMks||[])])];
   STORE['25'].followMks=[...u]; STORE['26'].followMks=[...u]; }
+// Bill follows are shared across Knessets too: bill ids are globally unique
+// (a K25 bill id never recurs in K26), and a K25 bill's page is reachable
+// while KN=26 (deep link #bill=…, global search) — its star used to land in
+// STORE['26'].followBills, where renderBillLite (KN=25) and the Mine page's
+// K25 list (STORE['25']) never looked, so the star silently vanished.
+{ const u=[...new Set([...(STORE['25'].followBills||[]),...(STORE['26'].followBills||[])].map(String))];
+  STORE['25'].followBills=[...u]; STORE['26'].followBills=[...u]; }
 let S=STORE['26'];
 let prevSeen=S.lastSeen;
 function save(){S.lastSeen=new Date().toISOString().slice(0,10);localStorage.setItem(LS,JSON.stringify(STORE))}
@@ -1761,7 +1769,7 @@ function starBtn(kind,key,label=''){
   return `<button class="star ${on?'on':''}" title="${on?'במעקב שלך — לחצו להסרה':'מעקב אחרי זה'}" aria-label="מעקב ${esc(label)}" aria-pressed="${on}" onclick="event.stopPropagation();toggleFollow('${kind}','${jsq(key)}',this)"><span class="star-ic">${on?'★':'☆'}</span><span class="star-n" data-starc="${esc(kind)}:${esc(key)}" ${n?'':'style="display:none"'}>${n?n.toLocaleString('he-IL'):''}</span></button>`;
 }
 function toggleFollow(kind,key,el){
-  if(kind==='bill')toggleIn(S.followBills,String(key)); else if(kind==='mk'){ toggleIn(S.followMks,key); STORE['25'].followMks=[...S.followMks]; STORE['26'].followMks=[...S.followMks]; save(); } else if(kind==='committee')toggleIn(S.followCommittees,String(key)); else if(kind==='faction')toggleIn(S.followFactions||(S.followFactions=[]),key); else toggleIn(S.followTopics,key);
+  if(kind==='bill'){ toggleIn(S.followBills,String(key)); STORE['25'].followBills=[...S.followBills]; STORE['26'].followBills=[...S.followBills]; save(); } else if(kind==='mk'){ toggleIn(S.followMks,key); STORE['25'].followMks=[...S.followMks]; STORE['26'].followMks=[...S.followMks]; save(); } else if(kind==='committee')toggleIn(S.followCommittees,String(key)); else if(kind==='faction')toggleIn(S.followFactions||(S.followFactions=[]),key); else toggleIn(S.followTopics,key);
   const on=el.classList.toggle('on'); el.setAttribute('aria-pressed',on); const ic=el.querySelector('.star-ic'); if(ic) ic.textContent=on?'★':'☆'; else el.textContent=on?'★':'☆';
   syncStar(kind,kind==='bill'||kind==='committee'?String(key):key,on);
   const cap=el.parentElement&&el.parentElement.querySelector('.star-cap'); if(cap) cap.textContent=on?'במעקב ★':'מעקב';
@@ -2034,6 +2042,12 @@ function openFaction(name){ navTo('faction='+encodeURIComponent(name),()=>{viewA
    Knesset's votes opens that Knesset's faction page, switching instance
    first, exactly like the switchKnesset(25);openMk(…) pattern for people. */
 function openFactionIn(kn,name){ if(KN!==kn) switchKnesset(kn); openFaction(name) }
+/* Bills/votes are per-Knesset datasets (ALLB/VOTES_ALL = K25, K26B/K26V =
+   K26) with era-specific pages, so a search hit must switch instance first
+   — exactly like openFactionIn / openCommittee. Landing in the wrong
+   instance read "not found" (bill) or silently fell back to the list. */
+function openVoteIn(kn,id){ if(KN!==kn) switchKnesset(kn); openVote(id) }
+function openBillIn(kn,id){ if(KN!==kn) switchKnesset(kn); if(kn===26) openBill26(id); else openBillPage(id) }
 /* Committee ids are the official committee ids (K25: 4185–4287, K26:
    4288–…), so an id alone says which Knesset's dataset owns it. Every
    committee entry point — search, deep link, in-app chip — resolves the
@@ -2103,25 +2117,29 @@ function searchGroups(qRaw){
         return {html:`${avatar(n,party26[n]||f,28)}<span class="flex">${esc(disp(n))}<span class="sub">${sub}</span></span>`, go:()=>{ if(KN!==target) switchKnesset(target); openMk(n) }} });
     push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> ח״כים',all,items,total=>searchMoreItem(total,items.length,'הח״כים',()=>{ mkFilter.q=qRaw; mkFilter.status='all'; go('mks') }));
   }
-  { // Factions / lists of the active Knesset
-    const all=(KN===26?(K26?.parties||[]).filter(p=>p.seats>0).map(p=>({r:bestRank([p.name],q),label:p.name,sub:`${p.seats} מושבים · כנסת 26`,go:()=>openFaction(p.name)}))
-      :currentFactions().map(f=>({r:bestRank([f.name,f.full,shortF(f.full||f.name)],q),label:f.name,sub:`${f.members.length} ח״כים כיום · כנסת 25`,go:()=>openFaction(f.name)})))
+  { // Factions / lists of BOTH Knessets — openFactionIn switches to the
+    // owning Knesset, so a K25 faction found while browsing K26 (and vice
+    // versa) still lands on its own faction page.
+    const all=[...(K26?.parties||[]).filter(p=>p.seats>0).map(p=>({r:bestRank([p.name],q),label:p.name,sub:`${p.seats} מושבים · כנסת 26`,go:()=>openFactionIn(26,p.name)})),
+      ...currentFactions().map(f=>({r:bestRank([f.name,f.full,shortF(f.full||f.name)],q),label:f.name,sub:`${f.members.length} ח״כים כיום · כנסת 25`,go:()=>openFactionIn(25,f.name)}))]
       .filter(x=>x.r>=0).sort((a,b)=>a.r-b.r||a.label.localeCompare(b.label,'he'));
     const items=all.slice(0,SEARCH_GROUP_LIMIT).map(({label,sub,go})=>({html:`<span class="flex">${esc(label)}<span class="sub">${esc(sub)}</span></span>`,go}));
     push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="12" cy="17" r="2.6"/><path d="M9.3 8.6 10.6 14M14.7 8.6 13.4 14M9.6 7h4.8"/></svg> סיעות ורשימות',all,items,total=>searchMoreItem(total,items.length,'הסיעות',()=>go('factions')));
   }
-  { // Bills — full-field match (see billMatches), not name-only
-    const all=ALLB.map(b=>{ const r=bestRank([b.name,b.summary,b.synopsis],q); return {b,r:r>=0?r:(billMatches(b,qRaw)?2:-1)} }).filter(x=>x.r>=0)
+  { // Bills — full-field match (see billMatches), not name-only; both
+    // Knessets, each hit opening in its own Knesset (openBillIn).
+    const all=[...ALLB.map(b=>({b,kn:25})),...K26B.map(b=>({b,kn:26}))].map(x=>{ const r=bestRank([x.b.name,x.b.summary,x.b.synopsis],q); return {...x,r:r>=0?r:(billMatches(x.b,qRaw)?2:-1)} }).filter(x=>x.r>=0)
       .sort((a,b)=>a.r-b.r||(b.b.updated||'').localeCompare(a.b.updated||''));
     const items=all.slice(0,SEARCH_GROUP_LIMIT)
-      .map(({b})=>({html:`<span class="flex">${esc(b.name)}<span class="sub">${esc(statusBucket(b))}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}</span></span>`,go:()=>openBillPage(b.id)}));
+      .map(({b,kn})=>({html:`<span class="flex">${esc(b.name)}<span class="sub">${esc(kn===25?statusBucket(b):(b.status||''))}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''} · כנסת ${kn}</span></span>`,go:()=>openBillIn(kn,b.id)}));
     push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> חוקים',all,items,total=>searchMoreItem(total,items.length,'החוקים',()=>{ allFilter.q=qRaw; allFilter.limit=30; go('bills') }));
   }
-  { // Plenum votes (era index) — titles/descriptions the bill index misses
-    const all=VOTES_ALL.map(v=>({v,r:bestRank([v.title,v.desc,v.kind_label],q)})).filter(x=>x.r>=0)
+  { // Plenum votes — titles/descriptions the bill index misses; both
+    // Knessets, each hit opening in its own Knesset (openVoteIn).
+    const all=[...VOTES_ALL.map(v=>({v,kn:25})),...K26V.map(v=>({v,kn:26}))].map(x=>({...x,r:bestRank([x.v.title,x.v.desc,x.v.kind_label],q)})).filter(x=>x.r>=0)
       .sort((a,b)=>a.r-b.r||(b.v.date||'').localeCompare(a.v.date||'')||(b.v.id||0)-(a.v.id||0));
     const items=all.slice(0,SEARCH_GROUP_LIMIT)
-      .map(({v})=>({html:`<span class="flex">${esc(v.title||v.desc||'')}<span class="sub">${esc(v.kind_label||'')} · ${fmtDate(v.date)}${v.for!=null?` · ${v.for}–${v.against} · ${v.for>v.against?'עברה':v.against>v.for?'נדחתה':'תיקו'}`:''}</span></span>`,go:()=>openVote(v.id)}));
+      .map(({v,kn})=>({html:`<span class="flex">${esc(v.title||v.desc||'')}<span class="sub">${esc(v.kind_label||'')} · ${fmtDate(v.date)}${v.for!=null?` · ${v.for}–${v.against} · ${v.for>v.against?'עברה':v.against>v.for?'נדחתה':'תיקו'}`:''} · כנסת ${kn}</span></span>`,go:()=>openVoteIn(kn,v.id)}));
     push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> הצבעות',all,items,total=>searchMoreItem(total,items.length,'ההצבעות',()=>{ eraFilter.q=qRaw; eraFilter.kind=''; eraFilter.topic=''; eraFilter.limit=30; go('votes') }));
   }
   { // Committees — both Knessets: ids are era-unique, and openCommittee
@@ -2141,7 +2159,7 @@ function searchGroups(qRaw){
     const all=Object.entries(SEARCH_TOPIC_COUNTS).map(([t,n])=>({t,n,r:matchRank(t,q)})).filter(x=>x.r>=0)
       .sort((a,b)=>a.r-b.r||b.n-a.n);
     const items=all.slice(0,SEARCH_GROUP_LIMIT)
-      .map(({t,n})=>({html:`<span class="flex">${esc(t)}<span class="sub">${n.toLocaleString('he-IL')} הצעות בנושא</span></span>`,go:()=>{ eraFilter.topic=t; eraFilter.limit=30; go('votes') }}));
+      .map(({t,n})=>({html:`<span class="flex">${esc(t)}<span class="sub">${n.toLocaleString('he-IL')} הצעות בנושא · כנסת 25</span></span>`,go:()=>{ if(KN!==25) switchKnesset(25); eraFilter.topic=t; eraFilter.limit=30; go('votes') }}));
     push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M3.5 12.5v-9h9L21 12l-8.5 8.5z"/><circle cx="8" cy="8" r="1.6"/></svg> נושאים',all,items,null);
   }
   return groups;
@@ -3191,6 +3209,173 @@ function absentSummaryHTML(absent){
    is on a bill, the bill layers on context (journey stepper, topics,
    text, and a ☆ to follow the bill) — it never becomes the vote's
    identity, and "my vote" keys by vote id, always. */
+/* ============ PNG export of a vote page ============
+   A standalone redraw (SVG -> canvas -> PNG), not a screenshot: same warm
+   paper / faction-fill + vote-ring language as the page, but deliberately
+   WITHOUT the golden followed-MK rings (follow-state is personal, it does
+   not belong in a shareable image), and without photos (initial seats keep
+   a 120-seat map legible at export size). Keeps: title/context, outcome +
+   tally, hemicycle, per-faction breakdown, rebels, and absentees by
+   faction. No full MK name list — it crowded the image; individual votes
+   stay on the web page. Fixed, compact height. */
+/* Minimal QR encoder for the export footer: byte mode, EC level M,
+   version 4 only (33x33, 62-byte capacity — a vote deep link is 41),
+   mask chosen by lowest penalty of the four standard rules. No library,
+   no network call (an external QR API would leak the link and break
+   offline). Verified by decoding the generated code (OpenCV) back to
+   the exact vote URL; data codewords also cross-checked with segno. */
+function qrModules(text){
+  const dataBytes=[...new TextEncoder().encode(text)]; if(dataBytes.length>62) return null;
+  // GF(256), primitive 0x11d
+  const EXP=new Array(512), LOG=new Array(256); let gx=1;
+  for(let i=0;i<255;i++){ EXP[i]=gx; LOG[gx]=i; gx<<=1; if(gx&256) gx^=0x11d } for(let i=255;i<512;i++) EXP[i]=EXP[i-255];
+  const gmul=(a,b)=>a&&b?EXP[LOG[a]+LOG[b]]:0;
+  function rsDivisor(deg){ const res=new Array(deg-1).fill(0); res.push(1); let root=1;
+    for(let i=0;i<deg;i++){ for(let j=0;j<res.length;j++){ res[j]=gmul(res[j],root); if(j+1<res.length) res[j]^=res[j+1] } root=gmul(root,2) } return res }
+  function rsEc(data,deg){ const div=rsDivisor(deg), res=new Array(deg).fill(0);
+    for(const b of data){ const f=b^res.shift(); res.push(0); div.forEach((c,i)=>res[i]^=gmul(c,f)) } return res }
+  // Bit stream -> 64 data codewords (V4-M total data), 2 blocks x 32, 18 EC each
+  const bits=[]; const put=(v,n)=>{ for(let i=n-1;i>=0;i--) bits.push((v>>i)&1) };
+  put(4,4); put(dataBytes.length,8); dataBytes.forEach(b=>put(b,8)); put(0,Math.min(4,64*8-bits.length));
+  while(bits.length%8) bits.push(0);
+  const cw=[]; for(let i=0;i<bits.length;i+=8) cw.push(bits.slice(i,i+8).reduce((a,b)=>a*2+b,0));
+  for(let p=0;cw.length<64;p++) cw.push(p%2?0x11:0xec);
+  const blocks=[cw.slice(0,32),cw.slice(32,64)].map(d=>({d,ec:rsEc(d,18)}));
+  const finalCw=[]; for(let i=0;i<32;i++) blocks.forEach(b=>finalCw.push(b.d[i])); for(let i=0;i<18;i++) blocks.forEach(b=>finalCw.push(b.ec[i]));
+  const finalBits=[]; finalCw.forEach(b=>put2(finalBits,b)); function put2(arr,b){ for(let i=7;i>=0;i--) arr.push((b>>i)&1) }
+  const N=33, mod=Array.from({length:N},()=>new Array(N).fill(null));
+  const set=(x,y,v)=>{ if(x>=0&&x<N&&y>=0&&y<N) mod[y][x]=!!v };
+  function finder(cx,cy){ for(let dy=-4;dy<=4;dy++) for(let dx=-4;dx<=4;dx++){ const d=Math.max(Math.abs(dx),Math.abs(dy)); set(cx+dx,cy+dy, d!==2&&d!==4) } }
+  finder(3,3); finder(N-4,3); finder(3,N-4);
+  for(let i=0;i<N;i++){ if(mod[6][i]===null) set(i,6,i%2===0); if(mod[i][6]===null) set(6,i,i%2===0) }
+  // Alignment pattern (V4 centres [6,26], only (26,26) is new)
+  for(let dy=-2;dy<=2;dy++) for(let dx=-2;dx<=2;dx++){ const d=Math.max(Math.abs(dx),Math.abs(dy)); set(26+dx,26+dy,d!==1) }
+  set(8,N-8,true); // dark module
+  // Reserve format areas
+  const reserve=(x,y)=>{ if(mod[y]&&mod[y][x]===null) mod[y][x]=false };
+  for(let i=0;i<9;i++){ reserve(i,8); reserve(8,i) } for(let i=0;i<8;i++){ reserve(N-1-i,8); reserve(8,N-1-i) }
+  // Data placement, mask 2 (column mod 3 == 0), standard zigzag
+  const MASK=(x,y)=>x%3===0; let bitIdx=0, upward=true;
+  for(let col=N-1;col>0;col-=2){ if(col===6) col--; for(let i=0;i<N;i++){ const row=upward?N-1-i:i; for(const x of [col,col-1]){ if(mod[row][x]===null){ let v=bitIdx<finalBits.length?!!finalBits[bitIdx++]:false; if(MASK(x,row)) v=!v; mod[row][x]=v } } } upward=!upward }
+  // Format info: EC M (00) + mask 2 (010) -> BCH(15,5) generator 0x537, xor 0x5412
+  const fdata=(0b00<<3)|2;
+  let d=fdata<<10, g=0b10100110111; for(let dg=14;dg>=10;dg--) if((d>>dg)&1) d^=g<<(dg-10);
+  const fmt=((fdata<<10)|d)^0b101010000010010;
+  for(let i=0;i<15;i++){ const v=((fmt>>i)&1)===1;
+    set(8, i<6?i : i<8? i+1 : N-15+i, v); // vertical copy, column 8
+    set(i<8? N-1-i : i===8? 7 : 14-i, 8, v); // horizontal copy, row 8
+  }
+  set(8,N-8,true); // dark module, always on
+  return mod.map(r=>r.map(v=>!!v));
+}
+function exportVoteSeats(b){
+  if(KN===26){
+    return [...b.mk_votes.map(v=>({name:v.mk_name,faction:v.faction,result:v.result,absent:false,color:fcol(v.faction)}))]
+      .sort((x,y)=>partyRank(x.faction,26)-partyRank(y.faction,26)||listRank26(x.name)-listRank26(y.name)||disp(x.name).localeCompare(disp(y.name),'he'));
+  }
+  const present=new Set((b.mk_votes||[]).map(v=>v.mk_name));
+  const pool=new Set([...Object.keys(MKP),...Object.keys(mkIndex)]);
+  const missing=[...pool].filter(n=>!present.has(n)&&wasMkOn(n,b.vote_date)).map(n=>({mk_name:n,faction:(MKP[n]||mkIndex[n]||{}).faction||'',result:0,absent:true}));
+  return [...(b.mk_votes||[]),...missing]
+    .sort((x,y)=>partyRank(x.faction,25)-partyRank(y.faction,25)||listRank25(x.mk_name)-listRank25(y.mk_name)||disp(x.mk_name).localeCompare(disp(y.mk_name),'he'))
+    .map(v=>{const f=v.faction||(mkIndex[v.mk_name]||{}).faction||(MKP[v.mk_name]||{}).faction||''; return {name:v.mk_name,faction:f,result:v.result,absent:!!v.absent,color:fcol(f)}});
+}
+function exportVotePNG(id){
+  const b=KN===26?voteModel26(id):voteModel(id); if(!b){ toast('ההצבעה לא נמצאה'); return }
+  if(KN!==26) voteMkVotes(b);
+  const seats=exportVoteSeats(b), reb=rebels(b);
+  const absent=seats.filter(s=>s.absent), voted=seats.filter(s=>!s.absent);
+  const byF={}; (b.mk_votes||[]).forEach(v=>{const f=shortF(v.faction); (byF[f]??={f:0,a:0,n:0,full:v.faction}); byF[f][v.result===1?'f':v.result===2?'a':'n']++});
+  const frows=Object.entries(byF).sort((x,y)=>(y[1].f+y[1].a+y[1].n)-(x[1].f+x[1].a+x[1].n));
+  const absByF={}; absent.forEach(s=>{const f=shortF(s.faction||''); absByF[f]=(absByF[f]||0)+1});
+  const absGroups=Object.entries(absByF).sort((a,c)=>c[1]-a[1]);
+  const C={bg:'#f4efe3',surface:'#fbf8f1',surface2:'#efe8d7',line:'#ddd2ba',text:'#26221a',mid:'#5f5847',dim:'#857c66',for:'#3a8a18',against:'#cf3f1d',abstain:'#c98a04',accent:'#476b9e',gold:'#b98f1f'};
+  const W=1240, PAD=52, CW=W-PAD*2;
+  const xe=s=>String(s??'').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;').replace(/"/g,'&quot;');
+  const wrap=(s,n)=>{ const words=String(s||'').split(/\s+/).filter(Boolean), lines=[]; let cur=''; for(const w of words){ if((cur+' '+w).trim().length>n&&cur){lines.push(cur);cur=w} else cur=(cur+' '+w).trim() } if(cur)lines.push(cur); return lines.length?lines:[''] };
+  const titleLines=wrap(b.title,52).slice(0,3), subLines=(b.sub&&b.sub!==b.title)?wrap(b.sub,78).slice(0,2):[];
+  const nouns=b.kind==='noconfidence'?['הצעת אי־האמון התקבלה','הצעת אי־האמון נדחתה']:b.kind==='reservation'?['ההסתייגות התקבלה','ההסתייגות נדחתה']:['ההצעה התקבלה','ההצעה לא התקבלה'];
+  const f=b.total_for||0, a=b.total_against||0, n=b.total_abstain||0, tot=Math.max(f+a+n,1);
+  const outcome=b.has_tally?(f>a?`✓ ${nouns[0]} — בעד ניצח`:a>f?`✕ ${nouns[1]} — נגד ניצח`:'= תיקו — אין רוב בעד, ההצעה לא עברה'):(b.is_accepted!=null?(b.is_accepted?`✓ ${nouns[0]}`:`✕ ${nouns[1]}`):'');
+  // Vertical budget
+  const hemiH=seats.length?552:0;
+  const detailRows=Math.max(frows.length, Math.min(reb.length||1,10), 1);
+  const detailH=seats.length? 64+detailRows*34+58 : 0;
+  const noVotesH=seats.length?0:120; // no full MK name list — it crowded the image; the hemicycle + faction/rebel/absentee summaries carry the detail
+  const H=Math.round(210+titleLines.length*46+subLines.length*30+86+hemiH+detailH+(absent.length&&seats.length?26:0)+noVotesH+150); // +150: footer band with site link + QR
+  let y=0; const el=[];
+  const T=(x,yy,str,o={})=>el.push(`<text x="${x}" y="${yy}" font-family="${o.serif?"'Frank Ruhl Libre','Rubik'":"'Heebo','Rubik',Arial"} ,sans-serif" font-size="${o.s||16}" font-weight="${o.w||400}" fill="${o.c||C.text}" text-anchor="${o.anchor||'end'}" ${o.extra||''}>${xe(str)}</text>`);
+  const card=(yy,h)=>el.push(`<rect x="${PAD}" y="${yy}" width="${CW}" height="${h}" rx="20" fill="${C.surface}" stroke="${C.line}"/>`);
+  el.push(`<rect width="${W}" height="${H}" fill="${C.bg}"/>`);
+  // Masthead
+  T(W-PAD,58,'המנדט ה־121',{s:30,w:900,serif:1}); T(W-PAD,86,`הצבעה במליאה · הכנסת ה־${KN===26?'26':'25'} · ${fmtDate(b.vote_date)}`,{s:16,c:C.mid});
+  el.push(`<line x1="${PAD}" y1="106" x2="${W-PAD}" y2="106" stroke="${C.gold}" stroke-width="3"/>`); y=118;
+  // Title card
+  const titleCardH=44+titleLines.length*46+subLines.length*30+(b.kind_label?34:8); // no topic/subject categories on the export — the site dropped them
+  card(y,titleCardH);
+  let ty=y+38;
+  const chips=[b.kind_label,b.bill_type,(b.method_id&&b.method_id>=3)?VOTE_METHOD[b.method_id]:'',fmtDate(b.vote_date)].filter(Boolean);
+  let cx=W-PAD-24; chips.forEach(ch=>{ const w=ch.length*9.5+24; el.push(`<rect x="${cx-w}" y="${ty-22}" width="${w}" height="28" rx="14" fill="${C.surface2}" stroke="${C.line}"/><text x="${cx-w/2}" y="${ty-3}" font-family="'Heebo',Arial,sans-serif" font-size="14" font-weight="700" fill="${C.mid}" text-anchor="middle">${xe(ch)}</text>`); cx-=w+10 });
+  ty+=16; titleLines.forEach(l=>{ ty+=44; T(W-PAD-24,ty,l,{s:31,w:800}) });
+  subLines.forEach(l=>{ ty+=28; T(W-PAD-24,ty,l,{s:16,c:C.mid}) });
+  y+=titleCardH+18;
+  // Outcome + tally
+  card(y,96);
+  if(outcome) T(W-PAD-24,y+42,outcome,{s:23,w:800,c:f>a?C.for:a>f?C.against:C.abstain});
+  T(W-PAD-24,y+76,`${f} בעד · ${a} נגד${n?` · ${n} נמנעים`:''}${f!==a&&b.has_tally?` · הפרש של ${Math.abs(f-a)} ${Math.abs(f-a)===1?'קול':'קולות'}`:''} · הצביעו ${voted.length||(b.mk_votes||[]).length} ח״כים${absent.length?` · ${absent.length} לא השתתפו`:''}`,{s:16,c:C.mid});
+  T(PAD+150,y+62,`${f} – ${a}`,{s:34,w:900,anchor:'middle'});
+  const barW=CW-48; let bx=PAD+24+barW; // RTL: בעד starts at the right edge, then נגד, then נמנע leftwards
+  [[f,C.for],[a,C.against],[n,C.abstain]].forEach(([v,col])=>{ const w=barW*v/tot; if(w>0){ bx-=w; el.push(`<rect x="${bx}" y="${y+82}" width="${w}" height="8" fill="${col}"/>`) } });
+  y+=114;
+  if(seats.length){
+    T(W-PAD,y+26,'המליאה בהצבעה הזאת',{s:22,w:800,serif:1}); y+=40;
+    card(y,hemiH);
+    // Hemicycle: page geometry (seatsPos, 720x336) scaled in, NO gold rings.
+    const pos=seatsPos(seats.length), R=seats.length>90?12.5:15, assigned=[]; let idx=0;
+    while(idx<seats.length){ let end=idx+1; while(end<seats.length&&(seats[end].faction||'')===(seats[idx].faction||'')) end++; const chunk=pos.slice(idx,end).sort((p,q)=>p.r-q.r||q.a-p.a); for(let k=idx;k<end;k++) assigned[k]=chunk[k-idx]; idx=end }
+    const sc=(CW-70)/720, ox=PAD+35, oy=y+18;
+    seats.forEach((s,i)=>{ const p=assigned[i]; if(!p) return; const X=ox+p.x*sc, Y=oy+p.y*sc, r=R*sc;
+      if(s.absent){ el.push(`<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${r.toFixed(1)}" fill="${shade(s.color,0.32)}" stroke="rgba(0,0,0,.45)" stroke-width="0.8"/>`) }
+      else el.push(`<circle cx="${X.toFixed(1)}" cy="${Y.toFixed(1)}" r="${r.toFixed(1)}" fill="${s.color}" stroke="${VOTE_RING[s.result]||'rgba(0,0,0,.35)'}" stroke-width="${(s.result?5:1)*sc}"/>`);
+      const ini=initialsOf(s.name); if(ini){ const [ifill,istroke]=s.absent?['rgba(255,255,255,.5)','rgba(0,0,0,.3)']:initColors(s.color); el.push(`<text x="${X.toFixed(1)}" y="${Y.toFixed(1)}" dy="0.36em" text-anchor="middle" font-family="'Heebo',Arial,sans-serif" font-size="${(r*0.82).toFixed(1)}" font-weight="700" fill="${ifill}" stroke="${istroke}" stroke-width="0.6" paint-order="stroke">${xe(ini)}</text>`) } });
+    const ly=y+hemiH-26; let lx=W-PAD-24;
+    [['מילוי = סיעה',null],['בעד',C.for],['נגד',C.against],['נמנע',C.abstain],['כהה = לא השתתף/ה','#2e2a1f']].forEach(([label,col])=>{ const w=label.length*8.4+26; if(col) el.push(`<circle cx="${lx-8}" cy="${ly-5}" r="7" fill="none" stroke="${col}" stroke-width="3"/>`); T(lx-20,ly,label,{s:14,c:C.mid}); lx-=w+14 });
+    y+=hemiH+18;
+    // Factions (right half) + rebels / absentees (left half)
+    const half=(CW-16)/2, cardY=y;
+    card(cardY,detailH); el.push(`<line x1="${W/2}" y1="${cardY+14}" x2="${W/2}" y2="${cardY+detailH-14}" stroke="${C.line}"/>`);
+    let fy=cardY+36; T(W-PAD-24,fy,'איך הצביעה כל סיעה',{s:19,w:800});
+    T(PAD+24,fy,'⚡ חרגו מהסיעה ('+reb.length+')',{s:19,w:800,anchor:'start'});
+    fy+=14;
+    frows.forEach(([fname,c])=>{ fy+=34; const t=c.f+c.a+c.n||1, fx0=W-PAD-24-214, fw=half-300; T(W-PAD-24,fy,fname,{s:15,w:700,c:fcol(c.full)}); let sx=fx0; [[c.f,C.for],[c.a,C.against],[c.n,C.abstain]].forEach(([v,col])=>{ const w=fw*v/t; if(w>0){ sx-=w; el.push(`<rect x="${sx}" y="${fy-13}" width="${w}" height="14" fill="${col}"/>`) } }); el.push(`<text x="${W-PAD-32-140}" y="${fy}" font-family="'Heebo',Arial,sans-serif" font-size="15" font-weight="800" text-anchor="end"><tspan fill="${C.for}">${c.f}</tspan><tspan fill="${C.dim}"> · </tspan><tspan fill="${C.against}">${c.a}</tspan><tspan fill="${C.dim}"> · </tspan><tspan fill="${C.abstain}">${c.n}</tspan></text>`) });
+    let ry=cardY+50;
+    if(reb.length) reb.slice(0,10).forEach(v=>{ ry+=34; T(PAD+24+half-16,ry,`${disp(v.mk_name)} · ${shortF(v.faction)}`,{s:15}); T(PAD+36,ry,{1:'בעד',2:'נגד',3:'נמנע'}[v.result]||'',{s:14,w:800,c:[,C.for,C.against,C.abstain][v.result],anchor:'start'}) });
+    else { ry+=34; T(PAD+24,ry,'אף אחד לא חרג מעמדת סיעתו.',{s:15,c:C.mid,anchor:'start'}) }
+    y=cardY+detailH+18;
+    if(absent.length){ T(W-PAD,y+8,`לא השתתפו ${absent.length} ח״כים — ${absGroups.map(([g,c])=>`${g} ${c}`).join(' · ')}`,{s:14,c:C.mid}); y+=26 }
+  } else {
+    card(y,110); T(W-PAD-24,y+44,'אין רישום לפי ח״כ להצבעה זו',{s:19,w:800}); T(W-PAD-24,y+76,b.method_id?`הצבעה ${VOTE_METHOD[b.method_id]||''} — לא נרשם איך הצביע כל ח״כ, ולכן אין מפת מליאה ורשימת מצביעים.`:'פירוט לפי ח״כ טרם נאסף מהמאגר הרשמי.',{s:15,c:C.mid}); y+=128;
+  }
+  // Footer band: source on the right, site deep link + QR on the left
+  el.push(`<line x1="${PAD}" y1="${H-128}" x2="${W-PAD}" y2="${H-128}" stroke="${C.line}" stroke-width="1.5"/>`);
+  T(W-PAD,H-92,`מקור: נתוני ההצבעות הרשמיים של הכנסת · הצבעה מס׳ ${b.id}`,{s:14,c:C.mid});
+  T(W-PAD,H-64,`הופק ${new Date().toLocaleDateString('he-IL')} מאתר המנדט ה־121`,{s:14,c:C.dim}); // no «» here or below: guillemets are bidi-weak and flip sides in the rendered PNG
+  T(W-PAD,H-36,'מילוי המושב = סיעה · טבעת = ההצבעה (בעד/נגד/נמנע)',{s:13,c:C.dim});
+  const voteUrl=`https://mandat121.netlify.app/#vote=${b.id}`;
+  const qr=qrModules(voteUrl), qs=92, qx=PAD, qy=H-118, cell=qs/37; // 33 modules + 2-module quiet zone each side
+  el.push(`<rect x="${qx}" y="${qy}" width="${qs}" height="${qs}" rx="8" fill="#ffffff" stroke="${C.line}"/>`);
+  if(qr) qr.forEach((row,ry)=>row.forEach((v,rx)=>{ if(v) el.push(`<rect x="${(qx+(rx+2)*cell).toFixed(1)}" y="${(qy+(ry+2)*cell).toFixed(1)}" width="${cell.toFixed(1)}" height="${cell.toFixed(1)}" fill="${C.text}"/>`) }));
+  T(qx+qs+16,H-78,'לדף ההצבעה באתר המנדט ה־121:',{s:15,w:700,anchor:'start'});
+  el.push(`<text x="${qx+qs+16}" y="${H-48}" font-family="'Heebo',Arial,sans-serif" font-size="16" font-weight="700" fill="${C.accent}" text-anchor="start" direction="ltr" unicode-bidi="bidi-override">${xe(voteUrl.replace('https://',''))}</text>`);
+  T(qx+qs+16,H-22,'סרקו את הקוד — או היכנסו לכתובת',{s:13,c:C.dim,anchor:'start'});
+  const svg=`<svg xmlns="http://www.w3.org/2000/svg" dir="rtl" width="${W}" height="${H}" viewBox="0 0 ${W} ${H}">${el.join('')}</svg>`;
+  const url=URL.createObjectURL(new Blob([svg],{type:'image/svg+xml;charset=utf-8'}));
+  const img=new Image();
+  img.onload=()=>{ const scale=2, cv=document.createElement('canvas'); cv.width=W*scale; cv.height=H*scale; const ctx=cv.getContext('2d'); ctx.fillStyle=C.bg; ctx.fillRect(0,0,cv.width,cv.height); ctx.drawImage(img,0,0,cv.width,cv.height); URL.revokeObjectURL(url);
+    cv.toBlob(blob=>{ const aEl=document.createElement('a'); aEl.href=URL.createObjectURL(blob); aEl.download=`vote-${b.id}-k${KN}.png`; aEl.click(); setTimeout(()=>URL.revokeObjectURL(aEl.href),4000); toast('ה־PNG ירד ✓') },'image/png') };
+  img.onerror=()=>{ URL.revokeObjectURL(url); toast('ייצוא ה־PNG נכשל בדפדפן הזה') };
+  img.src=url;
+}
 function renderVote26(){
   const app=$('#app'), b=viewArg?voteModel26(viewArg):null;
   if(!b){ app.innerHTML=backBtnHTML('votes','› חזרה להצבעות')+'<div class="card empty" style="margin-top:.6rem"><div class="big">🗳️</div>ההצבעה לא נמצאה בכנסת ה־26.</div>'; return }
@@ -3218,6 +3403,7 @@ function renderVote26(){
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem">
       <a class="btn" href="https://knesset.gov.il/vote/heb/Vote_Res_Map.asp?vote_id_t=${b.id}" target="_blank" rel="noopener">דף ההצבעה הרשמי ↗</a>
+      <button class="btn" onclick="exportVotePNG('${b.id}')">🖼️ ייצוא PNG של דף ההצבעה</button>
     </div>
   </article>
   ${b.mk_votes.length?`
@@ -3282,6 +3468,7 @@ function renderVote(){
       ${b.lite?`<button class="btn primary" onclick="openBillAll('${b.lite.id}')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> לדף הצעת החוק — מסע החוק, סטטוס ויוזמים ←</button>`:''}
       ${b.bill_id?`<a class="btn" href="https://main.knesset.gov.il/Activity/Legislation/Laws/Pages/LawBill.aspx?t=lawsuggestionssearch&lawitemid=${b.bill_id}" target="_blank" rel="noopener">דף ההצעה בכנסת ↗</a>`:''}
       <a class="btn" href="https://knesset.gov.il/vote/heb/Vote_Res_Map.asp?vote_id_t=${b.id}" target="_blank" rel="noopener">דף ההצבעה הרשמי ↗</a>
+      <button class="btn" onclick="exportVotePNG('${b.id}')">🖼️ ייצוא PNG של דף ההצבעה</button>
       ${plnSess?`<button class="btn" onclick="openPlenum('${plnSess.sid}')">📜 דברי הכנסת של הישיבה (מס׳ ${plnSess.number}) ←</button>`:''}
     </div>
   </article>
@@ -4590,7 +4777,7 @@ function siteTopStarsHTML(){
     else if(kind==='committee'){ const c=committeeById(key); lbl=c?c.name:'ועדה'; go=`openCommittee('${key}')` }
     else if(kind==='faction'){ go=`openFaction('${jsq(key)}')` }
     const kindLbl={bill:'חוק',mk:'ח״כ',committee:'ועדה',faction:'סיעה',topic:'נושא'}[kind]||'';
-    return `<div class="row" ${go?`onclick="${go}"`:''}><b style="color:var(--accent);width:1.6rem">${idx+1}</b><span class="flex">${esc(lbl)}<br><span class="dim small">${esc(kindLbl)}</span></span>${starChip(kind,key)}</div>` }).join('');
+    return `<div class="row" ${go?`onclick="${go}"`:''}><b style="color:var(--accent);width:1.6rem">${idx+1}</b><span class="flex wrap">${esc(lbl)}<br><span class="dim small">${esc(kindLbl)}</span></span>${starChip(kind,key)}</div>` }).join('');
   return `<div class="sec-title">★ הכי נעקבים באתר כרגע <small>מה כל המבקרים מסמנים במעקב — לחצו לשם</small></div><div class="card rows rise">${rows}</div>`;
 }
 function renderMine(){
