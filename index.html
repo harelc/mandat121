@@ -3618,16 +3618,34 @@ function pngDoc(kicker,pageUrl,filename,sourceLine){
     }};
   return d;
 }
+async function mkPhotoDataURL(name){ // photo for the MK PNG card: official local file first (same-origin), then the Knesset photo URL; null -> initials disc
+  const cands=[OFFICIAL_PHOTOS[name]?.file, MKP[name]?.photo_url].filter(Boolean);
+  for(const u of cands){ try{ const r=await fetch(u); if(!r.ok) continue; const blob=await r.blob(); const du=await new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=()=>res(null); fr.readAsDataURL(blob) }); if(du) return du }catch(e){} }
+  return null;
+}
 function exportBillPNG(kn,id){
   const b=kn===26?K26B.find(x=>String(x.id)===String(id)):(ALLB_BY_ID[id]||ALLB_BY_ID[String(id)]); if(!b){ toast('ההצעה לא נמצאה'); return }
   const votes=(kn===26?K26V.filter(v=>String(v.item_id)===String(b.id)):VOTES_ALL.filter(v=>v.item_id===b.id)).slice().sort((x,y)=>(x.date||'').localeCompare(y.date||''));
   const d=pngDoc(`הצעת חוק · הכנסת ה־${kn}`,`https://mandat121.netlify.app/#${kn===26?'bill26':'bill'}=${b.id}`,`bill-${b.id}-k${kn}.png`,`מקור: נתוני החקיקה הרשמיים של הכנסת · הצעה מס׳ ${b.id}`);
   d.titleCard([kn===26?(b.status||''):statusBucket(b),b.type||'',b.committee||'',billActivityLabel(b)],b.name,b.summary||'');
-  // Journey, as one line of stages
+  // Journey: a real timeline — stages on a track, done = filled gold,
+  // pending = hollow, with the date under each reached stage.
   const rd={}; votes.forEach(v=>{ const k=v.kind==='pre1'?0:v.kind==='reading1'?1:v.kind==='reading2'?2:v.kind==='reading3'?3:(v.reading!=null?v.reading:null); if(k!=null&&(!rd[k]||v.date<rd[k])) rd[k]=v.date });
-  const stages=[['דיון מוקדם',rd[0]],['קריאה ראשונה',rd[1]],['קריאה שנייה',rd[2]],['קריאה שלישית',rd[3]],['ספר החוקים',b.publication_date||null]];
-  { const h=64; d.card(d.y,h); let ty=d.y+26; d.T(d.W-d.PAD-24,ty,'מסע הצעת החוק',{s:17,w:800}); ty+=30;
-    d.T(d.W-d.PAD-24,ty,stages.map(([l,dt])=>`${dt?'✓':'·'} ${l}${dt?' '+fmtDate(dt):' — טרם'}`).join('   ←   '),{s:15,c:d.C.mid}); d.y+=h+18 }
+  const cmtDate=kn===26?null:((CMT&&CMT.bill_committees&&CMT.bill_committees[String(b.id)])||[]).map(h=>h.date).filter(Boolean).sort()[0]||null;
+  const stages=[['דיון מוקדם',rd[0]],['ועדה',cmtDate],['קריאה ראשונה',rd[1]],['קריאה שנייה',rd[2]],['קריאה שלישית',rd[3]],['ספר החוקים',b.publication_date||null]];
+  { const h=118; d.card(d.y,h); d.T(d.W-d.PAD-24,d.y+30,'מסע הצעת החוק',{s:17,w:800});
+    const x0=d.PAD+70, x1=d.W-d.PAD-70, ty=d.y+62, n=stages.length;
+    const X=i=>x1-(x1-x0)*i/(n-1); // RTL: first stage at the right
+    const lastDone=stages.reduce((acc,[,dt],i)=>dt?i:acc,-1);
+    d.el.push(`<line x1="${X(0)}" y1="${ty}" x2="${X(n-1)}" y2="${ty}" stroke="${d.C.line}" stroke-width="4"/>`);
+    if(lastDone>0) d.el.push(`<line x1="${X(0)}" y1="${ty}" x2="${X(lastDone)}" y2="${ty}" stroke="${d.C.gold}" stroke-width="4"/>`);
+    stages.forEach(([label,dt],i)=>{ const x=X(i);
+      if(dt){ d.el.push(`<circle cx="${x}" cy="${ty}" r="13" fill="${d.C.gold}" stroke="${d.C.surface}" stroke-width="3"/><text x="${x}" y="${ty}" dy="0.36em" text-anchor="middle" font-family="'Heebo',Arial,sans-serif" font-size="14" font-weight="900" fill="#fff">✓</text>`) }
+      else d.el.push(`<circle cx="${x}" cy="${ty}" r="13" fill="${d.C.surface}" stroke="${d.C.line}" stroke-width="3"/>`);
+      d.T(x,ty+34,label,{s:14.5,w:dt?800:400,c:dt?d.C.text:d.C.dim,anchor:'middle'});
+      d.T(x,ty+56,dt?fmtDate(dt):'טרם',{s:12.5,c:dt?d.C.mid:d.C.dim,anchor:'middle'});
+    });
+    d.y+=h+18 }
   if(votes.length){ const rows=votes.slice(-8), h=52+rows.length*36; d.card(d.y,h); let ty=d.y+34; d.T(d.W-d.PAD-24,ty,`הצבעות מליאה (${votes.length})`,{s:19,w:800,serif:1});
     rows.forEach(v=>{ ty+=36; const acc=v.for!=null?v.for>v.against:null; d.T(d.W-d.PAD-24,ty,`${fmtDate(v.date)} · ${v.kind_label||''} · ${v.title&&v.title!==b.name?d.wrap(v.title,44)[0]:v.desc||''}`,{s:15}); if(v.for!=null) d.T(d.PAD+24,ty,`${v.for}–${v.against} · ${acc?'עברה':'נדחתה'}`,{s:15,w:800,c:acc?d.C.for:d.C.against,anchor:'start'}) });
     d.y+=h+18 }
@@ -3635,27 +3653,33 @@ function exportBillPNG(kn,id){
   if((b.topics||[]).length){ d.T(d.W-d.PAD,d.y+8,'נושאים: '+(b.topics||[]).join(' · '),{s:14,c:d.C.mid}); d.y+=30 }
   d.finish();
 }
-function exportMkPNG(name){
+async function exportMkPNG(name){
   name=normName(name);
+  const photo=await mkPhotoDataURL(name);
   const kn26=KN===26, e26=kn26?IDX26[name]:null, m25=kn26?null:mkIndex[name];
   const votes=kn26?(e26?.votes||[]):(m25?.votes||[]);
   const faction=kn26?(e26?.faction||(K26?.parties||[]).find(p=>(p.elected||[]).includes(name)||(p.candidates||[]).includes(name))?.name||''):realFaction(MKP[name]?.faction||m25?.faction||FACTION25[name]||factionOn(name,'9999-12-31')||'');
   const d=pngDoc(`חבר/ת כנסת · הכנסת ה־${KN}`,`https://mandat121.netlify.app/#mk=${encodeURIComponent(name)}`,`mk-k${KN}.png`,`מקור: נתוני ההצבעות הרשמיים של הכנסת`);
-  d.titleCard([shortF(faction)||'ללא סיעה',`כנסת ${KN}`,kn26?'':(RANK25[name]&&shortF(faction)!=='סיעת יחיד'?`מקום ${RANK25[name]} ברשימת ${shortF(faction)}`:'')],disp(name),kn26?'':(mkTenureText(name)?'כהונה: '+mkTenureText(name):''));
+  { const top=d.y; d.titleCard([shortF(faction)||'ללא סיעה',`כנסת ${KN}`,kn26?'':(RANK25[name]&&shortF(faction)!=='סיעת יחיד'?`מקום ${RANK25[name]} ברשימת ${shortF(faction)}`:'')],disp(name),kn26?'':(mkTenureText(name)?'כהונה: '+mkTenureText(name):''));
+    // Portrait disc at the card's left edge (text is right-anchored, so no
+    // collision); initials on the faction colour when no photo is fetchable.
+    const cx=d.PAD+74, cy=top+74, r=50;
+    if(photo){ d.el.push(`<clipPath id="mkph"><circle cx="${cx}" cy="${cy}" r="${r}"/></clipPath><image href="${photo}" x="${cx-r}" y="${cy-r}" width="${r*2}" height="${r*2}" preserveAspectRatio="xMidYMid slice" clip-path="url(#mkph)"/><circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${d.C.gold}" stroke-width="3"/>`) }
+    else { const ini=initialsOf(name), [ifill,istroke]=initColors(fcol(faction)); d.el.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="${fcol(faction)}" stroke="${d.C.gold}" stroke-width="3"/><text x="${cx}" y="${cy}" dy="0.36em" text-anchor="middle" font-family="'Heebo',Arial,sans-serif" font-size="34" font-weight="800" fill="${ifill}" stroke="${istroke}" stroke-width="0.7" paint-order="stroke">${ini}</text>`) } }
   if(!votes.length){ d.card(d.y,84); d.T(d.W-d.PAD-24,d.y+50,'אין הצבעות מליאה מתועדות בכנסת זו',{s:18,w:800}); d.y+=102; d.finish(); return }
   const c={1:0,2:0,3:0}; votes.forEach(v=>c[v.result]++); const tot=votes.length;
   let loyT=0,loy=0; const devs=[];
   for(const v of votes){ const bill=v.bill; const own=(bill.mk_votes||[]).find(x=>x.mk_name===name); const maj=factionMajorityCached(bill,shortF((own&&own.faction)||factionOn(name,bill.vote_date)||faction).trim()); if(!maj) continue; loyT++; if(v.result===maj) loy++; else if(maj!==3) devs.push(v) }
   const topics={}; votes.forEach(v=>(v.bill.topics||[]).forEach(t=>topics[t]=(topics[t]||0)+1)); const topTopics=Object.entries(topics).sort((a,b)=>b[1]-a[1]).slice(0,5);
-  { const h=150; d.card(d.y,h); const cy=d.y+75, cx=d.W-d.PAD-90, r=52, circ=2*Math.PI*r; let off=0;
+  { const h=172; d.card(d.y,h); const cy=d.y+75, cx=d.W-d.PAD-90, r=52, circ=2*Math.PI*r; let off=0;
     [[c[1],d.C.for],[c[2],d.C.against],[c[3],d.C.abstain]].forEach(([v,col])=>{ const len=circ*(v/tot); d.el.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${col}" stroke-width="17" stroke-dasharray="${Math.max(len-2,0)} ${circ}" transform="rotate(-90 ${cx} ${cy})" stroke-dashoffset="${-off}"/>`); off+=len });
     d.el.push(`<circle cx="${cx}" cy="${cy}" r="${r-13}" fill="${d.C.surface}"/>`); d.T(cx,cy+9,String(tot),{s:26,w:900,anchor:'middle'});
     let ty=d.y+42; [[`בעד ${c[1]} (${Math.round(c[1]/tot*100)}%)`,d.C.for],[`נגד ${c[2]} (${Math.round(c[2]/tot*100)}%)`,d.C.against],[`נמנע ${c[3]} (${Math.round(c[3]/tot*100)}%)`,d.C.abstain]].forEach(([l,col])=>{ d.T(d.W-d.PAD-190,ty,l,{s:17,c:col}); ty+=32 });
-    if(loyT) d.T(d.W-d.PAD-190,ty+6,`נאמנות לסיעה: ${Math.round(loy/loyT*100)}% (${loy}/${loyT}) · חריגות: ${devs.length}`,{s:15,c:d.C.mid});
-    if(topTopics.length) d.T(d.PAD+24,d.y+h-18,'מצביע/ה הרבה על: '+topTopics.map(([t,n])=>`${t} · ${n}`).join('   '),{s:14,c:d.C.mid,anchor:'start'});
+    if(loyT) d.T(d.W-d.PAD-190,ty+4,`נאמנות לסיעה: ${Math.round(loy/loyT*100)}% (${loy}/${loyT}) · חריגות: ${devs.length}`,{s:15,c:d.C.mid});
+    if(topTopics.length) d.T(d.W-d.PAD-24,d.y+h-16,'מצביע/ה הרבה על: '+topTopics.map(([t,n])=>`${t} · ${n}`).join('   '),{s:14,c:d.C.mid});
     d.y+=h+18 }
   const rows=votes.slice(0,8), h=52+rows.length*36; d.card(d.y,h); let ty=d.y+34; d.T(d.W-d.PAD-24,ty,'הצבעות אחרונות',{s:19,w:800,serif:1});
-  rows.forEach(v=>{ ty+=36; d.T(d.W-d.PAD-24,ty,`${fmtDate(v.bill.vote_date)} · ${d.wrap(v.bill.title||v.bill.name||'',58)[0]}`,{s:15}); d.T(d.PAD+24,ty,{1:'בעד',2:'נגד',3:'נמנע'}[v.result]||'',{s:15,w:800,c:[,d.C.for,d.C.against,d.C.abstain][v.result],anchor:'start'}) });
+  rows.forEach(v=>{ ty+=36; d.T(d.W-d.PAD-24,ty,`${fmtDate(v.bill.vote_date)} · ${d.wrap(v.bill.title||v.bill.name||'',46)[0]}`,{s:14.5}); d.T(d.PAD+24,ty,{1:'בעד',2:'נגד',3:'נמנע'}[v.result]||'',{s:15,w:800,c:[,d.C.for,d.C.against,d.C.abstain][v.result],anchor:'start'}) });
   d.y+=h+18; d.finish();
 }
 function exportFactionPNG(name){
