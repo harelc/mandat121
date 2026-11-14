@@ -1,0 +1,28 @@
+# Upload protocol-search shards (data/search_c + data/search_p) to the
+# mandat121-search R2 bucket. Manual dispatch only — used to probe the
+# upload path and to seed/refresh the bucket until the daily workflow
+# wires this in. Credentials: repo secrets R2_ACCESS_KEY_ID,
+# R2_SECRET_ACCESS_KEY, R2_ENDPOINT (bucket-scoped R2 token).
+name: r2-search-upload
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  upload:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Upload search shards to R2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: python3 -u upload_search_shards.py
