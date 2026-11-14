@@ -2169,7 +2169,7 @@ function openBillIn(kn,id){ if(KN!==kn) switchKnesset(kn); if(kn===26) openBill2
    ensureK25Archive re-applies the route once the owner is knowable. */
 function voteKn(id){ const s=String(id); return VOTE_BY_ID[s]?25:K26V_BY_ID[s]?26:null }
 function billKn(id){ const s=String(id); return ALLB_BY_ID[s]?25:K26B.some(b=>String(b.id)===s)?26:voteKn(s) }
-function mkKn(name){ const has26=!!k26Entry(name), has25=!!(mkIndex[name]||MKP[name]); return has25&&has26?KN:has26?26:has25?25:null }
+function mkKn(name){ const has26=!!k26Entry(name), has25=!!(mkIndex[name]||MKP[name]||TENURE[name]||FACTION_STINTS[name]||CONTACTS[name]); return has25&&has26?KN:has26?26:has25?25:null }
 function factionKn(name){ const in26=(K26?.parties||[]).some(p=>p.name===name), in25=currentFactions().some(f=>f.name===name||f.full===name); return in25&&in26?KN:in26?26:in25?25:null }
 function sessionKn(id){ const s=String(id); const in25=CMT?.recent_sessions?.some(x=>String(x.id)===s), in26=K26CMT?.recent_sessions?.some(x=>String(x.id)===s); return in25&&in26?KN:in26?26:in25?25:null }
 /* Committee ids are the official committee ids (K25: 4185–4287, K26:
@@ -4068,7 +4068,7 @@ function renderMkDetail(){
     // While the archive is still loading we can't tell the two apart, so
     // show a loading state; ensureK25Archive re-applies the route when it
     // lands and the redirect below fires then.
-    if(!e&&rec){ switchKnesset(25); openMk(name); return }
+    if(!e&&(rec||TENURE[name]||FACTION_STINTS[name])){ switchKnesset(25); openMk(name); return }
     if(!e){ app.innerHTML=backBtnHTML('mks','› כל חברי הכנסת')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>'+(K25_READY?'לא נמצא/ה ברשימת חברי הכנסת של כנסת 26, ולא כיהן/ה בכנסת 25.':'טוען את ארכיון כנסת 25…')+'</div>'; return }
     location.hash='mk='+encodeURIComponent(name);
     /* The party card lists the party's actual MKs, not the first `seats`
@@ -4114,7 +4114,7 @@ function renderMkDetail(){
       <div class="small dim">כהונה: ${esc(mkTenureText(name)||'—')}</div>
       </div>${starBtn('mk',name,name)}
     </div>
-    <p class="muted small" style="margin-top:1rem;line-height:1.9">לא הצביע/ה באף הצבעת מליאה מתועדת בכנסת 25 — נכנס/ה לכנסת אחרי ההצבעה המתועדת האחרונה או לא השתתף/ה בהצבעות בתקופת כהונתו/ה. לכן אין דונאט הצבעות, נאמנות לסיעה או היסטוריית הצבעות; שאר פרטי הכהונה — למטה.</p>
+    <p class="muted small" style="margin-top:1rem;line-height:1.9">לא הצביע/ה באף הצבעת מליאה מתועדת בכנסת 25 — נכנס/ה לכנסת אחרי ההצבעה המתועדת האחרונה או לא השתתף/ה בהצבעות בתקופת כהונתו/ה. לכן אין גרף הצבעות, נאמנות לסיעה או היסטוריית הצבעות; שאר פרטי הכהונה — למטה.</p>
   </div>
   ${mkContactHTML(name)}
   ${mkKnStrip(name)}
