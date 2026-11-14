@@ -16,7 +16,7 @@ import json
 import subprocess
 import sys
 
-VOLATILE_KEYS = {"generated_at", "fetched_at", "_meta"}
+VOLATILE_KEYS = {"generated_at", "fetched_at", "_meta", "today", "this_week"}
 MAX_FILES = 60
 MAX_DETAILS_PER_FILE = 8
 

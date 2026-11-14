@@ -1407,8 +1407,9 @@ const _lazyPromises={};
 function _lazyOnce(key,loader){ if(!_lazyPromises[key]) _lazyPromises[key]=Promise.resolve().then(loader).catch(()=>{ delete _lazyPromises[key] }); return _lazyPromises[key] }
 const _fetchJson=url=>fetch(url).then(r=>r.ok?r.json():null).catch(()=>null);
 const _normKeys=o=>{ const r={}; for(const[k,v]of Object.entries(o||{})) r[normName(k)]=v; return r };
-function ensureAgenda(){ const kn=KN; if(AG_CACHE[kn]){ AGENDA=AG_CACHE[kn]; return Promise.resolve(AGENDA) } if(AG_MAIN_LOADING.has(kn)) return Promise.resolve(null); AG_MAIN_LOADING.add(kn);
+function ensureAgenda(){ const kn=KN; if(AG_CACHE[kn]){ AGENDA=AG_CACHE[kn]; agRefreshToday(AGENDA); return Promise.resolve(AGENDA) } if(AG_MAIN_LOADING.has(kn)) return Promise.resolve(null); AG_MAIN_LOADING.add(kn);
   return _fetchJson(kn===26?'data/k26_agenda.json':'data/agenda.json').then(j=>{ AG_MAIN_LOADING.delete(kn); if(!j||j.error) return null;
+    agRefreshToday(j); // file's today/this_week are build-time stamps — the viewer's clock is authoritative
     j._loaded=new Set(j.loaded_months||[]); j._loading=new Set();
     (j.committees||[]).forEach(x=>x.docs=x.docs||[]); AG_CACHE[kn]=j;
     if(kn===KN){ AGENDA=j; if(view==='now') renderNow(); else if(view==='session') renderSessionDetail() } return j }).catch(()=>{ AG_MAIN_LOADING.delete(kn); return null }) }
@@ -2679,6 +2680,12 @@ const agDate=s=>{const[y,m,d]=s.split('-').map(Number);return new Date(y,m-1,d)}
 const agYmd=dt=>`${dt.getFullYear()}-${String(dt.getMonth()+1).padStart(2,'0')}-${String(dt.getDate()).padStart(2,'0')}`;
 const agAdd=(s,n)=>{const dt=agDate(s);dt.setDate(dt.getDate()+n);return agYmd(dt)};
 const agSunday=s=>agAdd(s,-agDate(s).getDay());
+/* "Today" is computed client-side (Asia/Jerusalem), not read from the data
+   file: build_agenda.py's today/this_week stamps go stale at midnight and
+   used to force a data commit + deploy every day for the date rollover
+   alone. meaningful_diff.py now treats those keys as volatile. */
+const agClientToday=()=>new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Jerusalem'});
+function agRefreshToday(j){ if(!j) return; const t=agClientToday(), sun=agSunday(t); j.today=t; j.this_week=[sun,agAdd(sun,6)] }
 /* No Fri/Sat in any calendar view: the Knesset work week is Sun–Thu, so
    week rows, month columns and day-stepping all stop at Thursday. */
 const AG_WORKDAYS=[0,1,2,3,4]; // getDay(): Sunday..Thursday
@@ -2700,7 +2707,7 @@ function agendaDefaultAnchor(){ // today, unless its week is unpublished — the
   const future=agAll().map(s=>s.start.slice(0,10)).filter(d=>d>AGENDA.today).sort()[0];
   return future||agendaLatestDate();
 }
-function renderAgenda(){ const b=$('#agendaBox'); if(b) b.innerHTML=agendaBodyHTML(); const l=$('#agendaPeriod'); if(l) l.textContent=agendaPeriodLabel(); const[ pv,nx]=AG_NAVLBL[agendaMode]; const p=$('#agendaPrev'),n=$('#agendaNext'); if(p)p.textContent=pv; if(n)n.textContent=nx }
+function renderAgenda(){ agRefreshToday(AGENDA); const b=$('#agendaBox'); if(b) b.innerHTML=agendaBodyHTML(); const l=$('#agendaPeriod'); if(l) l.textContent=agendaPeriodLabel(); const[ pv,nx]=AG_NAVLBL[agendaMode]; const p=$('#agendaPrev'),n=$('#agendaNext'); if(p)p.textContent=pv; if(n)n.textContent=nx }
 function agendaSetMode(m,explicitDay=false){ agendaMode=m;
   // Thursday rule (see agendaDefaultAnchor): if the anchor is still
   // today/this week on a Thursday, day view opens next Monday and week

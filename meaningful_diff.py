@@ -25,7 +25,10 @@ import json
 import subprocess
 import sys
 
-VOLATILE_KEYS = {"generated_at", "fetched_at"}
+# today/this_week: the agenda viewer computes them client-side
+# (agRefreshToday in index.html), so a midnight rollover in the build
+# stamp is not a data change and must not force a commit/deploy.
+VOLATILE_KEYS = {"generated_at", "fetched_at", "today", "this_week"}
 
 
 def scrub(obj):
