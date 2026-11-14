@@ -54,8 +54,12 @@ def s3_request(method, key, body=b"", content_type=None, cache_control=None,
     now = datetime.now(timezone.utc)
     amzdate = now.strftime("%Y%m%dT%H%M%SZ")
     datestamp = now.strftime("%Y%m%d")
-    host = endpoint.split("://", 1)[1]
-    uri = f"/{BUCKET}/{key}"
+    # Virtual-hosted addressing (bucket.endpoint/key): R2's S3 endpoint
+    # answers path-style requests (endpoint/bucket/key) with 404 even
+    # when the bucket exists and the token is Admin (probe run
+    # 43625707493 — LIST and PUT both 404ed after the permission fix).
+    host = f"{BUCKET}." + endpoint.split("://", 1)[1]
+    uri = f"/{key}"
     payload_hash = hashlib.sha256(body).hexdigest()
     headers = {"host": host, "x-amz-content-sha256": payload_hash,
                "x-amz-date": amzdate}
@@ -77,7 +81,7 @@ def s3_request(method, key, body=b"", content_type=None, cache_control=None,
     headers["Authorization"] = (
         f"AWS4-HMAC-SHA256 Credential={access}/{scope}, "
         f"SignedHeaders={signed}, Signature={sig}")
-    req = urllib.request.Request(endpoint + uri + (f"?{query}" if query else ""),
+    req = urllib.request.Request(f"https://{host}" + uri + (f"?{query}" if query else ""),
                                  data=body or None,
                                  method=method, headers=headers)
     with urllib.request.urlopen(req, timeout=120) as r:
