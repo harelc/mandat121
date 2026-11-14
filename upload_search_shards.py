@@ -171,6 +171,12 @@ def diagnose():
                   "or rename the target.")
             return 1
         print("bucket name + account match ✓")
+        for label, q in (("v2", "list-type=2&max-keys=5"), ("v1", "max-keys=5")):
+            try:
+                _, b = s3_request("GET", "", query=q)
+                print(f"LIST {label}: OK ({len(b)} bytes)")
+            except Exception as e:  # noqa: BLE001
+                print(f"LIST {label}: {e}")
         try:
             objs = list_objects()
             total = sum(objs.values())
