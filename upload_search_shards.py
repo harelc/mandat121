@@ -6,7 +6,8 @@ Layout in the bucket (public read via the r2.dev base):
   shards/<corpus-version>/search_c/<bigram>.json
   shards/<corpus-version>/search_p/<bigram>.json
   manifest.json  {"version":1,"corpora":{"c":{"version":…,"shards":
-                 {file: sha256}},"p":{…}}}  — PUT last, no-cache.
+                 {file: [sha256, size]}},"p":{…}}}  — PUT last, no-cache.
+                 The sizes double as the 2 GB guard's ledger (see below).
 
 The client reads manifest.json once, then fetches shards under the
 version prefix — a deploy can never mix two generations of shards.
@@ -85,37 +86,13 @@ def s3_request(method, key, body=b"", content_type=None, cache_control=None,
 
 # --- 2 GB storage guard -------------------------------------------------
 # R2's free tier is 10 GB, but this bucket is capped at 2 GB by policy:
-# the uploader accounts the whole bucket (S3 LIST), projects the
-# post-upload total (and the transient peak before stale generations
-# are cleaned up), and REFUSES to write anything if either would exceed
-# the cap. After a successful manifest flip it deletes stale shard
-# generations, so steady state is one generation + manifest.
+# the uploader accounts usage from the previous manifest (the bucket's
+# only writer — an object-scoped token cannot LIST anyway), projects
+# the post-upload total (and the transient peak before stale
+# generations are cleaned up), and REFUSES to write anything if either
+# would exceed the cap. After a successful manifest flip it deletes
+# stale shard generations, so steady state is one generation + manifest.
 CAP_BYTES = int(os.environ.get("R2_CAP_BYTES", 2_000_000_000))
-
-
-def list_objects():
-    import xml.etree.ElementTree as ET
-    out, token = {}, ""
-    while True:
-        q = "list-type=2" + (f"&continuation-token={urllib.parse.quote(token)}" if token else "")
-        _, body = s3_request("GET", "", query=q)
-        root = ET.fromstring(body)
-        nxt = ""
-        for el in root.iter():
-            if el.tag.endswith("Contents"):
-                key = size = None
-                for ch in el:
-                    if ch.tag.endswith("Key"):
-                        key = ch.text
-                    elif ch.tag.endswith("Size"):
-                        size = int(ch.text)
-                if key is not None:
-                    out[key] = size or 0
-            elif el.tag.endswith("NextContinuationToken"):
-                nxt = el.text or ""
-        if not nxt:
-            return out
-        token = nxt
 
 
 def local_corpus(d):
@@ -149,29 +126,41 @@ def main():
             print(f"search_{corpus}: no local dir, skipped")
             continue
         files, version = local_corpus(d)
-        manifest["corpora"][corpus] = {"version": version, "shards": files}
+        manifest["corpora"][corpus] = {"version": version, "shards": {
+            n: [h, (d / n).stat().st_size] for n, h in files.items()}}
         old_c = (old.get("corpora") or {}).get(corpus) or {}
         old_shards = old_c.get("shards") or {}
-        changed = [n for n, h in files.items() if old_shards.get(n) != h]
+        def old_hash(meta):
+            return meta[0] if isinstance(meta, list) else meta
+        changed = [n for n, h in files.items() if old_hash(old_shards.get(n)) != h]
         print(f"search_{corpus}: version {version}, {len(files)} shards, "
               f"{len(changed)} to upload")
         for n in changed:
             jobs.append((f"shards/{version}/search_{corpus}/{n}", d / n,
                          "application/json",
                          "public, max-age=86400, immutable"))
-    # 2 GB guard (pre-flight): account the bucket as it is, project the
-    # peak (current + new, before cleanup) and the steady state (after
-    # stale generations are deleted). Refuse BEFORE any write if either
-    # exceeds the cap.
-    existing = list_objects()
+    # 2 GB guard (pre-flight). Accounting is manifest-based, NOT S3 LIST:
+    # an object-scoped R2 token gets 403 on ListObjects (probe run
+    # 43625429053), and it doesn't need it — this script is the bucket's
+    # only writer, so the previous manifest IS the ledger. Shard entries
+    # are [sha256, size]; legacy {file: sha256} manifests count size 0
+    # (first guarded run re-uploads under the new format anyway).
+    def entry_size(meta):
+        return meta[1] if isinstance(meta, list) and len(meta) > 1 else 0
+    existing = {}  # key -> size, reconstructed from the old manifest
+    for cname, oc in (old.get("corpora") or {}).items():
+        over = oc.get("version")
+        if not over:
+            continue
+        for fn, meta in (oc.get("shards") or {}).items():
+            existing[f"shards/{over}/search_{cname}/{fn}"] = entry_size(meta)
     cur_total = sum(existing.values())
     new_bytes = sum(p.stat().st_size for _, p, _, _ in jobs)
     job_keys = {k for k, _, _, _ in jobs}
     overwritten = sum(s for k, s in existing.items() if k in job_keys)
     versions = {c["version"] for c in manifest["corpora"].values()}
     stale = {k: s for k, s in existing.items()
-             if k.startswith("shards/")
-             and not any(k.startswith(f"shards/{v}/") for v in versions)}
+             if not any(k.startswith(f"shards/{v}/") for v in versions)}
     peak = cur_total - overwritten + new_bytes
     steady = peak - sum(stale.values())
     print(f"R2 guard: bucket now {cur_total/1e9:.3f} GB, peak projection "
