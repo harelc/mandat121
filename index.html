@@ -507,9 +507,10 @@ select,input[type=search]{background:var(--surface);border:1px solid var(--line)
 .hero.compact{padding:.85rem 1rem .8rem}
 .hero.compact h1{font-size:clamp(1.25rem,3.5vw,1.65rem);line-height:1.25}
 .hero.compact p{font-size:.88rem;margin-top:.35rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
-.hero.compact .kpis{grid-template-columns:repeat(6,1fr);gap:.45rem;margin-top:.65rem}
-.hero.compact .kpi{padding:.45rem .25rem;border-radius:12px}
-.hero.compact .kpi b{font-size:1.05rem}
+.hero.compact .kpis{grid-template-columns:repeat(6,1fr);gap:.35rem;margin-top:.55rem}
+.hero.compact .kpi{padding:.28rem .15rem;border-radius:9px;background:transparent}
+.hero.compact .kpi b{font-size:.92rem;line-height:1.15}
+.hero.compact .kpi span{font-size:.6rem}
 @media(max-width:700px){.hero.compact .kpis{grid-template-columns:repeat(3,1fr)}}
 .hero h1{font-size:clamp(1.7rem,5.5vw,2.7rem);font-weight:900;line-height:1.15}
 .hero p{color:var(--mid);max-width:105ch;margin-top:.5rem}
@@ -699,7 +700,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
     <div class="logo" onclick="go('now')">המנדט <em>ה־121</em></div>
     <div class="kswitch" role="tablist" aria-label="בחירת כנסת">
       <button id="ksw25" onclick="switchKnesset(25)">כנסת 25</button>
-      <button id="ksw26" class="on" onclick="switchKnesset(26)">כנסת 26 <span class="kdot" title="מתמלאת ככל שנתונים מתפרסמים"></span></button>
+      <button id="ksw26" class="on" onclick="switchKnesset(26)">כנסת 26 <span class="kdot" title="הכנסת הנוכחית"></span></button>
     </div>
     <div class="search"><span class="mag" aria-hidden="true"><svg class="icn" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg></span><input id="globalSearch" type="search" placeholder="חיפוש חוק, הצבעה, ח״כ, סיעה, ועדה, נושא…" aria-label="חיפוש" autocomplete="off"><div id="searchDrop" class="search-drop" role="listbox" aria-label="תוצאות חיפוש" hidden></div></div>
   </div>
@@ -708,8 +709,8 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
 <main id="app"><div class="empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>טוען את נתוני הכנסת…</div></main>
 
 <footer>
-  <p class="foot-links"><a href="#intro" onclick="openIntro();return false">▶ הסבר מצויר בפחות מדקה</a> · <a href="#tab=about">אודות</a> · <a href="https://github.com/harelc/mandat121" target="_blank" rel="noopener">הקוד ב־GitHub ↗</a></p>
-  <p>המנדט ה־121 — 120 נבחרו, ה־121 מפקח. מעקב אזרחי אחרי הכנסת. כל המידע מגיע מפרסומים רשמיים של הכנסת (חוקים, הצבעות המליאה, ועדות ודיונים של כנסת 26, המתמלאת ככל שהכנסת מפרסמת; כנסת 25 שמורה כאן במלואה). המעקב וההצבעות שלי נשמרים רק בדפדפן הזה.</p>
+  <p class="foot-links"><a href="#intro" onclick="openIntro();return false">הסבר מצויר בפחות מדקה ▶</a> · <a href="#tab=about">אודות</a> · <a href="https://github.com/harelc/mandat121" target="_blank" rel="noopener">הקוד ב־GitHub ↗</a></p>
+  <p>המנדט ה־121 — 120 נבחרו, ה־121 מפקח. מעקב אזרחי אחרי הכנסת. כל המידע מגיע מפרסומים רשמיים של הכנסת (חוקים, הצבעות המליאה, ועדות ודיונים של כנסת 26; כנסת 25 שמורה כאן במלואה). המעקב וההצבעות שלי נשמרים רק בדפדפן הזה.</p>
   <p class="foot-meta">&copy; הראל קין | <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener">CC BY-NC-SA 4.0</a></p>
   <div id="visit-line" hidden style="margin-top:.5rem"></div>
   <div class="foot-bmc"><span id="bmc-wrap" class="bmc-wrap"><a class="bmc-btn" href="https://www.buymeacoffee.com/harelc" target="_blank" rel="noopener"><img src="https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg" alt="">אהבתם? רוצים לתמוך בפיתוח? קנו לי קפה</a><button type="button" class="bmc-x" onclick="document.getElementById('bmc-wrap').remove()" title="סגור" aria-label="סגירת כפתור התמיכה">&times;</button></span></div>
@@ -887,7 +888,31 @@ let S=STORE['26'];
 let prevSeen=S.lastSeen;
 function save(){S.lastSeen=new Date().toISOString().slice(0,10);localStorage.setItem(LS,JSON.stringify(STORE))}
 function setKN(n){ if(KN===n) return; KN=n; S=STORE[String(n)]; prevSeen=S.lastSeen; AGENDA=AG_CACHE[n]||null; agendaAnchor=null; agendaLastBody=''; save(); renderKSwitch(); buildTabs(); if(n===25) ensureK25Archive() }
-function switchKnesset(n){ setKN(n); render(); window.scrollTo({top:0}); toast(n===26?'כנסת 26 — מתמלאת ככל שנתונים מתפרסמים':'כנסת 25 — כיסוי מלא') }
+/* Does this Knesset's dataset own the entity the current hash points at?
+   Used by the manual Knesset switch: staying on a faction/MK/bill page
+   across the switch only works if the other era has that same entity. */
+function routeEntityInKn(kn,h){
+  if(h.get('bill')){ const id=h.get('bill'); return kn===25?!!(ALLB_BY_ID[id]||VOTE_BY_ID[id]):K26B.some(b=>String(b.id)===String(id))||!!K26V_BY_ID[String(id)] }
+  if(h.get('vote')){ const id=h.get('vote'); return kn===25?!!VOTE_BY_ID[id]:!!K26V_BY_ID[String(id)] }
+  if(h.get('mk')){ const nm=h.get('mk'); return kn===25?!!(mkIndex[nm]||MKP[nm]):!!k26Entry(nm) }
+  if(h.get('faction')){ const nm=h.get('faction'); return kn===25?currentFactions().some(f=>f.name===nm||f.full===nm):(K26?.parties||[]).some(p=>p.name===nm) }
+  if(h.get('committee')){ const id=String(h.get('committee')); return kn===25?!!CMT_BY_ID[id]:(K26CMT?.committees||[]).some(c=>String(c.id)===id) }
+  if(h.get('session')){ const id=String(h.get('session')); return kn===25?!!CMT?.recent_sessions?.some(x=>String(x.id)===id):!!K26CMT?.recent_sessions?.some(x=>String(x.id)===id) }
+  if(h.get('plenum')) return kn===25;
+  if(h.get('bill26')) return kn===26;
+  return false;
+}
+function switchKnesset(n){ setKN(n);
+  // Detail pages (#faction=, #mk=, …) are not in render()'s tab dispatch —
+  // it used to dump the user on Now of the other era, losing the page they
+  // were reading (e.g. Likud's faction page). If the other Knesset has the
+  // same entity, re-run the route and stay on it; otherwise fall back to
+  // that era's Now. While the K25 archive is still loading ownership is
+  // unknowable — applyRoute shows the pending state and resolves on land.
+  const h=new URLSearchParams(location.hash.slice(1));
+  const detail=['bill','vote','mk','faction','committee','session','plenum','bill26','voterec'].some(k=>h.get(k));
+  if(detail&&(routeEntityInKn(n,h)||(n===25&&!K25_READY))) applyRoute(); else render();
+  window.scrollTo({top:0}); toast(n===26?'כנסת 26 — הכנסת הנוכחית':'כנסת 25 — כיסוי מלא') }
 function renderKSwitch(){ const a=$('#ksw25'),b=$('#ksw26'); if(a)a.classList.toggle('on',KN===25); if(b)b.classList.toggle('on',KN===26) }
 const followedBill=id=>S.followBills.includes(String(id));
 const followedMk=n=>S.followMks.includes(n);
@@ -1513,7 +1538,8 @@ const mkSessPill=a=>`<span class="chip acc">${a.kind==='plenum'?'לדבריו/ה
 function mkHighlightsHTML(name){
   const h=MK_HIGHLIGHTS?.by_mk?.[normName(name)]; if(!h) return '';
   const hl=h.highlights||[], apps=(h.appearances||[]).slice(0,8);
-  const sessLine=[h.committee_sessions?`<b>${h.committee_sessions}</b> ישיבות ועדה`:null,h.archive_sessions?`<b>${h.archive_sessions}</b> ישיבות ועדה בארכיון ההיסטורי`:null,h.plenum_sessions?`<b>${h.plenum_sessions}</b> ישיבות מליאה`:null].filter(Boolean).join(' ו־');
+  const cmtSess=(h.committee_sessions||0)+(h.archive_sessions||0); // one count for readers: recent + historical-archive committee sittings are the same thing
+  const sessLine=[cmtSess?`<b>${cmtSess}</b> ישיבות ועדה`:null,h.plenum_sessions?`<b>${h.plenum_sessions}</b> ישיבות מליאה`:null].filter(Boolean).join(' ו־');
   return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> בפרוטוקולים <small class="dim">ועדות ומליאה · דבריו/ה המתועדים — והקטעים הבולטים</small></h3>
   <div class="small muted" style="margin-top:.35rem;line-height:1.9">דיבר/ה ב־${sessLine} מתועדות · <b>${h.turns.toLocaleString('he-IL')}</b> קטעים · <b>${h.words.toLocaleString('he-IL')}</b> מילים</div>
   ${hl.length?`<h4 style="margin-top:.7rem">הקטעים הבולטים</h4><div class="rows" style="margin:.35rem -.9rem 0">${hl.map(x=>`<div class="row" onclick="${openMkTurn(x,name)}"><span class="flex" style="white-space:normal">״${esc(x.excerpt)}…״<br><span class="dim small">${esc(x.committee)} · ${fmtDate(x.date)} · ${x.words} מילים בקטע</span></span>${mkTurnPill(x)}</div>`).join('')}</div>`:''}
@@ -1977,7 +2003,7 @@ const ICON_PATHS={
   plenum:'<path d="M4 4.5h16V16H9.5L4 19.8z"/><path d="M8 8.5h8M8 11.8h5.5"/>',
 };
 const icon=n=>`<svg class="icn" viewBox="0 0 24 24" aria-hidden="true">${ICON_PATHS[n]||''}</svg>`;
-const TABS=[['now','home','עכשיו'],['mine','mine','שלי'],['bills','bill','חוקים'],['votes','vote','הצבעות'],['mks','mks','ח״כים'],['factions','factions','סיעות'],['plenum','plenum','דברי הכנסת'],['committees','committees','ועדות'],['analysis','analysis','ניתוח']];
+const TABS=[['now','home','עכשיו'],['mine','mine','שלי'],['bills','bill','חוקים'],['votes','vote','הצבעות'],['mks','mks','ח״כים'],['factions','factions','סיעות'],['committees','committees','ועדות'],['plenum','plenum','דברי הכנסת'],['analysis','analysis','ניתוח']];
 function myCount(){return Object.keys(S.myVotes).length}
 function followCount(){return S.followBills.length+S.followMks.length+(S.followCommittees?.length||0)+(S.followFactions?.length||0)+(S.followTopics?.length||0)}
 function buildTabs(){const active=view==='vote'?'votes':(view==='billAll'||view==='bill26')?'bills':view==='mk'?'mks':view==='faction'?'factions':(view==='committee'||view==='session')?'committees':view==='plenumSession'?'plenum':view; $('#tabs').innerHTML=TABS.map(([v,ic,l])=>`<button class="tab ${active===v?'active':''}" onclick="go('${v}')"><span class="ic">${icon(ic)}</span>${l}${v==='mine'&&(myCount()||followCount())?`<span class="dot">${myCount()+followCount()}</span>`:''}</button>`).join('')}
@@ -2249,7 +2275,7 @@ function committeeFeedHTML(limit=8){
   ${s.items.length?s.items.slice(0,3).map(it=>`<div class="small" style="padding:.28rem 0;border-top:1px solid var(--line)">${it.in_dataset?`<a href="#" onclick="event.preventDefault();event.stopPropagation();openBillPage('${it.item_id}')">${esc(it.name)}</a>`:esc(it.name)}${it.status?`<br><span class="dim">${esc(it.status)}</span>`:''}</div>`).join(''):'<div class="small muted">סדר היום טרם פורסם</div>'}
   ${s.docs.length?`<div style="margin-top:.45rem" onclick="event.stopPropagation()">${s.docs.slice(0,3).map(d=>`<a class="chip" href="${esc(d.path)}" target="_blank" rel="noopener"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> ${esc(d.group)}</a>`).join(' ')}</div>`:''}</div>`).join('')}</div>`;
 }
-function openSession(id){ const kn=sessionKn(id); if(kn&&kn!==KN) switchKnesset(kn); navTo('session='+id,()=>{viewArg=String(id); view='session'; buildTabs(); renderSessionDetail(); window.scrollTo({top:0})}) }
+function openSession(id){ _protoAutoFor=null; const kn=sessionKn(id); if(kn&&kn!==KN) switchKnesset(kn); navTo('session='+id,()=>{viewArg=String(id); view='session'; buildTabs(); renderSessionDetail(); window.scrollTo({top:0})}) }
 // In-app committee-session page. Why not link out? The official
 // AllCommitteesAgenda.aspx deep link drops its ItemID and lands on a generic
 // agenda page (and main.knesset.gov.il bot-walls non-browser agents), so the
@@ -2284,16 +2310,28 @@ function renderSessionDetail(){
     ${bills.length?`<h3 style="margin-top:1rem">חוקים שנידונו בישיבה (${bills.length})</h3><div class="rows" style="margin:.4rem -.9rem 0">${bills.map(({bid,h})=>{const b=ALLB_BY_ID[bid]; const nm=b?(displayText(b)||b.name):'הצעת חוק '+bid; return `<div class="row" onclick="openBillPage('${bid}')"><span class="flex">${esc(b?.name||nm)}<br><span class="dim small">${esc(h.status||'')}</span></span><span class="chip acc">לחוק ←</span></div>`}).join('')}</div>`:''}
     ${s&&(s.docs||[]).length?`<h3 style="margin-top:1rem">מסמכי הישיבה</h3><div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.45rem">${(s.docs||[]).map(d=>{const isProto=(d.group||'').includes('פרוטוקול'); return `<a class="chip" href="${esc(d.path)}" target="_blank" rel="noopener" title="קישור חיצוני לקובץ הרשמי באתר הכנסת"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/></svg> ${isProto?'פרוטוקול הוועדה — מסמך המקור הרשמי ↗':esc(d.group)+' ↗'}</a>`}).join('')}</div>`:''}
     ${EXTRAS?.broadcasts?.[String(id)]?`<div style="margin-top:1.1rem"><a class="btn" href="${esc(EXTRAS.broadcasts[String(id)])}" target="_blank" rel="noopener">📺 שידור הישיבה בארכיון הכנסת ↗</a></div>`:''}
-    <div style="margin-top:1.1rem"><button class="btn primary" onclick="toggleProtocol('${id}')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> הצג את פרוטוקול הישיבה</button><div id="protoBox" style="margin-top:.7rem"></div></div>
+    <div style="margin-top:1.1rem"><button id="protoToggleBtn" class="btn ghost small" onclick="toggleProtocol('${id}')"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> הסתר את פרוטוקול הישיבה</button><div id="protoBox" style="margin-top:.7rem"></div></div>
     <p class="small dim" style="margin-top:1rem">הדף הזה נבנה מהפרסומים הרשמיים של הכנסת. הקישור הישיר לדף הישיבה באתר הכנסת אינו יציב (האתר מפנה לעמוד כללי), ולכן סדר היום והמסמכים — כולל פרוטוקול הוועדה — מוצגים כאן, עם קישור ישיר לקבצי המסמכים הרשמיים.</p>
   </article>`;
+  autoOpenProtocol(id); // the protocol is the point of this page — fetch it on open, don't gate it behind a click
+}
+/* Auto-open the protocol once per session visit. Re-renders of the same
+   session (archive landing, extras landing) repaint the already-fetched
+   turns instead of refetching or toggling it shut; a manual collapse is
+   remembered for the rest of the visit via _protoAutoFor. */
+let _protoAutoFor=null;
+function autoOpenProtocol(id){
+  const sid=String(id);
+  if(PROTO_CUR&&PROTO_CUR.id===sid){ renderProtocol(); return }
+  if(_protoAutoFor===sid) return;
+  _protoAutoFor=sid; toggleProtocol(sid);
 }
 /* Inline protocol: speaker turns colour-coded — MKs by faction colour (the
    meaningful encoding), officials/guests by a muted per-person palette. */
 async function toggleProtocol(id){
   ensureK25Archive().then(()=>{ if(PROTO_CUR) renderProtocol() }); // bill tags in the text link only once the bill index exists
   const box=$('#protoBox'); if(!box) return;
-  if(PROTO_CUR&&PROTO_CUR.id===String(id)){ PROTO_CUR=null; box.innerHTML=''; return }
+  if(PROTO_CUR&&PROTO_CUR.id===String(id)){ PROTO_CUR=null; box.innerHTML=''; const tb=$('#protoToggleBtn'); if(tb) tb.lastChild.textContent=' הצג את פרוטוקול הישיבה'; return }
   box.innerHTML='<p class="muted small">טוען פרוטוקול…</p>';
   try{
     // Fast path: the statically pre-parsed recent window (build_protocols.py).
@@ -2664,18 +2702,18 @@ const k25CtaHTML=(label,sub)=>`<button class="k25-cta" onclick="switchKnesset(25
    civic framing; only the era's data fills the slots. K26 differences
    (presence history, "what's coming" cards) live BELOW this block, not
    in a differently-shaped hero. */
-function homeHeroHTML({kn,badge,h1,lead,kpis,newVotes}){
-  return `<section class="card hero rise"><span class="badge ${kn===26?'k26':''}">${badge}</span>
+function homeHeroHTML({kn,badge,h1,lead,kpis,newVotes,compact}){
+  return `<section class="card hero rise${compact?' compact':''}"><span class="badge ${kn===26?'k26':''}">${badge}</span>
     <h1 style="margin-top:.4rem">${h1}</h1>
     <p>${lead}</p>
-    <div class="card pad" style="margin-top:.8rem;background:var(--surface)"><h3>איך מפקחים? שלוש שאלות לכל חוק</h3><p class="small muted" style="line-height:1.9;margin-top:.3rem"><b style="color:var(--text)">1. מי יזם ומי שינה?</b> — עקבו אחרי מסע החוק והוועדה שדנה בו. <b style="color:var(--text)">2. מי הופיע ומי נעדר?</b> — בוועדות ובמליאה. <b style="color:var(--text)">3. מי הצביע איך?</b> — ואיך הייתם מצביעים אתם. כל דף באתר עונה על אחת מהן.</p></div>
-    ${prevSeen?`<div class="card pad" style="margin-top:.8rem"><h3>הפיקוח שלכם מאז הביקור הקודם <small class="dim">${fmtDate(prevSeen)}</small></h3><p class="small muted" style="margin-top:.3rem;line-height:1.9">${newVotes?`<b style="color:var(--text)">${newVotes} הצבעות מליאה חדשות</b> התקיימו מאז. פתחו אותן, סמנו איך הייתם מצביעים, ובדקו מי הצביע כמוכם.`:'לא התקיימו הצבעות מליאה חדשות מאז הביקור הקודם — הכנסת לא מצביעה כל יום. בינתיים אפשר לעבור על הוועדות.'}</p><div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.5rem"><button class="btn" onclick="go('votes')">להצבעות ←</button><button class="btn ghost" onclick="go('mine')">לפיקוח שלי ←</button></div></div>`:''}
+    ${compact?`<p class="small muted" style="line-height:1.9;margin-top:.3rem"><b style="color:var(--text)">איך מפקחים?</b> לכל חוק כמה שאלות בסיסיות: מי יזם ומי שינה · מי הופיע ומי נעדר מהדיונים עליו · מי הצביע איך — ואיך הייתם מצביעים אתם.</p>`:`<div class="card pad" style="margin-top:.8rem;background:var(--surface)"><h3>איך מפקחים? כמה שאלות בסיסיות לכל חוק</h3><p class="small muted" style="line-height:1.9;margin-top:.3rem"><b style="color:var(--text)">מי יזם ומי שינה?</b> — עקבו אחרי מסע החוק והוועדה שדנה בו. <b style="color:var(--text)">מי הופיע ומי נעדר מהדיונים עליו?</b> — בוועדות ובמליאה. <b style="color:var(--text)">מי הצביע איך?</b> — ואיך הייתם מצביעים אתם. כל דף באתר עונה על אחת מהן.</p></div>`}
+    ${prevSeen?`<div class="card pad" style="margin-top:.8rem"><h3>הפיקוח שלכם מאז הביקור הקודם <small class="dim">${fmtDate(prevSeen)}</small></h3><p class="small muted" style="margin-top:.3rem;line-height:1.9">${newVotes?`<b style="color:var(--text)">${newVotes} הצבעות מליאה חדשות</b> התקיימו מאז. פתחו אותן, סמנו איך הייתם מצביעים, ובדקו מי הצביע כמוכם.`:'לא התקיימו הצבעות מליאה חדשות מאז הביקור הקודם — הכנסת לא מצביעה כל יום. בינתיים אפשר לעקוב אחרי מה שכן זז: דיוני הוועדות ופרוטוקולי המליאה, והצעות חוק חדשות שעוד לפני ההצבעה.'} <button class="btn ghost small" style="padding:.15rem .6rem;vertical-align:baseline" onclick="go('mine')">למעקב שלי ←</button></p></div>`:''}
     ${kpis}
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn primary" style="margin-top:.9rem" onclick="openIntro()">▶ חדשים כאן? הסבר מצויר בפחות מדקה</button>
+    <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn primary" style="margin-top:.9rem" onclick="openIntro()">חדשים כאן? הסבר מצויר בפחות מדקה ▶</button>
     ${followCount()?`<button class="btn" style="margin-top:.9rem" onclick="go('mine')">★ המעקב שלי (${followCount()})</button>`:''}</div>
   </section>`;
 }
-const CIVIC_LEAD=kn=>`בישראל אין בית שני ואין וטו נשיאותי: הפיקוח של הכנסת על <b>הממשלה</b> הוא כמעט הבלם המוסדי היחיד בין בחירות לבחירות — והוא עובד רק אם מישהו מסתכל. ביום הבחירות חולקו 120 מנדטים. <b>המנדט ה־121 נשאר אצלכם</b> — והוא עובד כל הקדנציה: מעקב אזרחי חי אחרי כל חוק, כל הצבעה וכל ח״כ בכנסת ה־${kn}, כדי שהכנסת תישאר רשות עצמאית, לא חותמת גומי. סמנו איך הייתם מצביעים, וגלו מי מבין כל הח״כים מצביע כמוכם.`;
+const CIVIC_LEAD=kn=>`בישראל אין בית עליון של בית המחוקקים ואין וטו נשיאותי: הפיקוח של הכנסת על <b>הממשלה</b> הוא כמעט הבלם המוסדי היחיד בין בחירות לבחירות — והוא עובד רק אם מישהו מסתכל. ביום הבחירות חולקו 120 מנדטים. <b>המנדט ה־121 נשאר אצלכם</b> — והוא עובד כל הקדנציה: מעקב אזרחי חי אחרי כל חוק, כל הצבעה וכל ח״כ בכנסת ה־${kn}, כדי שהכנסת תישאר רשות עצמאית, לא חותמת גומי. סמנו איך הייתם מצביעים, וגלו מי מבין כל הח״כים מצביע כמוכם.`;
 function renderNow26(){
   ensureLivePresence(); // live in-the-building overlay; re-renders when it lands
   ensurePresence26(); // arrival-order history under the hemicycle; re-renders when it lands
@@ -2693,8 +2731,7 @@ function renderNow26(){
   const legendMap={}; seats.forEach(s=>{ const f=shortF(s.faction); (legendMap[f]??={n:0,color:s.color}); legendMap[f].n++ });
   const legend=Object.entries(legendMap).sort((a,b)=>b[1].n-a[1].n||partyRank(a[0],26)-partyRank(b[0],26));
   $('#app').innerHTML=`
-  ${homeHeroHTML({kn:26,badge:'כנסת 26 · בבנייה',h1:'הכנסת ה־26 מתמלאת, נתון אחרי נתון.',lead:CIVIC_LEAD(26),kpis:homeKpisHTML({members:seats.length,factions:serving?legend.length:parties.length,bills:K26B.length,votes:K26V.length,detailed:K26V.filter(v=>v.for!=null).length,lastVote:K26V.length?fmtDate([...K26V].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date):''}),newVotes:prevSeen?K26V.filter(v=>(v.date||'')>prevSeen).length:0})}
-  <section class="card pad rise" style="margin-top:.85rem"><h3>למה לעקוב דווקא מעכשיו?</h3><p class="small muted" style="line-height:1.9;margin-top:.3rem">כנסת חדשה היא הרגע שבו הרגלים נקבעים: אילו ועדות עובדות, מי מגיע למשכן, מי מדבר ומי שותק. כאן כבר אפשר לראות את נוכחות הח״כים במשכן יום אחרי יום; וברגע שיתפרסמו החוקים, הישיבות וההצבעות הראשונים — הם יופיעו כאן, עם אותן שלוש שאלות פיקוח שלמעלה.</p></section>
+  ${homeHeroHTML({kn:26,compact:true,badge:'כנסת 26 · הכנסת הנוכחית',h1:'הכנסת ה־26, במעקב אזרחי שוטף.',lead:`<b>המנדט ה־121 נשאר אצלכם</b> — מעקב אזרחי חי אחרי כל חוק, כל הצבעה וכל ח״כ בכנסת ה־26. סמנו איך הייתם מצביעים, וגלו מי מצביע כמוכם.`,kpis:homeKpisHTML({members:seats.length,factions:serving?legend.length:parties.length,bills:K26B.length,votes:K26V.length,detailed:K26V.filter(v=>v.for!=null).length,lastVote:K26V.length?fmtDate([...K26V].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date):''}),newVotes:prevSeen?K26V.filter(v=>(v.date||'')>prevSeen).length:0})}
   <div id="plenumTvBox"></div>
   ${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?agendaHTML():''}
   <div class="sec-title">${serving?'מליאת הכנסת ה־26':'המליאה הנכנסת'} <small>${serving?'מי מכהן/ת בפועל — כולל כניסות ויציאות לפי החוק הנורווגי':'רחפו או לחצו על מושב — חלקם כיהנו גם בכנסת 25'}</small></div>
@@ -2705,10 +2742,10 @@ function renderNow26(){
   ${presenceArrivalsHTML(seats)}
   ${presenceGridHTML(seats)}
   ${siteTopStarsHTML()}
-  <div class="sec-title">מה כבר יש, ומה יגיע</div>
+  <div class="sec-title">מה יש כאן</div>
   <div class="grid c2">
-    <div class="card pad"><h3>✓ כבר כאן</h3><div class="small muted" style="line-height:2">תוצאות הבחירות הרשמיות ומנדטים<br>רשימות המועמדים בסדר הרשמי (466)<br>120 הנבחרים וצבעי הסיעות של כנסת 26<br>${serving?'מי מכהן/ת בפועל — מעל המפה<br>':''}${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?'סדר היום — ישיבות שפורסמו כבר כאן, מעל המפה<br>':''}${PRESENCE26&&presenceTrackedDays()?'סדר ההגעה למשכן וימי נוכחות — מתחת למפה, מתעדכן כל 5 דקות בימי עבודה<br>':''}קישור מהנבחרים להיסטוריית ההצבעות שלהם בכנסת 25</div></div>
-    <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> יגיע בהמשך — מעצמו</h3><div class="small muted" style="line-height:2">${serving?'':'רשימת הח״כים הרשמית של הכנסת ה־26<br>'}הצעות החוק הראשונות<br>ישיבות הוועדות הראשונות<br>ההצבעות הראשונות במליאה — ומהן גם ״אני הייתי מצביע״ ו״מי מצביע כמוני״<br><span class="dim">${serving?'המכהנים והתפקידים כבר פורסמו (עם ישיבת הפתיחה, 10 בנובמבר 2026); חוקים, ועדות והצבעות עוד לא פורסמו. ברגע שיתפרסמו — הם יופיעו כאן לבד.':'הכנסת החדשה עוד לא פרסמה כלום. ברגע שתתחיל — זה יופיע כאן לבד.'}</span></div></div>
+    <div class="card pad"><h3>✓ כבר כאן</h3><div class="small muted" style="line-height:2">תוצאות הבחירות הרשמיות ומנדטים<br>רשימות המועמדים בסדר הרשמי (466)<br>120 חברי הכנסת וצבעי הסיעות של כנסת 26<br>${serving?'מי מכהן/ת בפועל<br>':''}${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?'סדר היום — ישיבות המליאה והוועדות<br>':''}${PRESENCE26&&presenceTrackedDays()?'סדר ההגעה למשכן וימי נוכחות — מתעדכן כל 5 דקות בימי עבודה<br>':''}קישור מחברי הכנסת להיסטוריית ההצבעות שלהם בכנסת 25</div></div>
+    <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> מתעדכן שוטף</h3><div class="small muted" style="line-height:2">הצעות חוק חדשות<br>ישיבות ועדות וסדרי יום<br>הצבעות מליאה — ומהן גם ״אני הייתי מצביע״ ו״מי מצביע כמוני״<br><span class="dim">כל הנתונים נמשכים מהפרסומים הרשמיים של הכנסת ומתעדכנים כאן באופן שוטף.</span></div></div>
   </div>
   ${k25CtaHTML('👀 לראות איך זה נראה עם נתונים מלאים — כנסת 25 ←')}`;
   renderPlenumTv(); // repaint into the fresh #plenumTvBox (the innerHTML above replaced it)
@@ -2916,7 +2953,9 @@ function agendaHTML(){
 function renderNow(){
   if(KN===26){ renderNow26(); return }
   ensureK25Archive(); // the K25 hemicycle below is built only in this branch — and only once its archive has been asked for
-  ensureAgenda();
+  // No agenda calendar here: the calendar is a live, today-anchored view and
+  // belongs to the current Knesset (26). On this archive home it rendered
+  // the frozen K25 schedule against today's date — an empty, stale month.
   ensurePlenumTv(); // live plenum TV block (#plenumTvBox); paints itself when the status read lands
   const app=$('#app');
   const latest=VOTES_ALL.reduce((mx,v)=>(v.date||'')>mx?(v.date||''):mx,'');
@@ -2937,11 +2976,9 @@ function renderNow(){
     .sort((a,b)=>partyRank(a.faction,25)-partyRank(b.faction,25)||listRank25(a.name)-listRank25(b.name)||disp(a.name).localeCompare(disp(b.name),'he'));
   const fac25={}; seats25.forEach(s=>{const f=shortF(s.faction); (fac25[f]??={n:0,color:s.color}); fac25[f].n++});
   app.innerHTML=`
-  ${homeHeroHTML({kn:25,badge:'כנסת 25 · ארכיון מלא',h1:'מי הצביע איך,<br>על מה — ולמה זה משנה לך.',lead:CIVIC_LEAD(25),kpis:homeKpisHTML({members:seats25.length,factions:Object.keys(fac25).length,bills:ALLB.length,votes:VOTES_ALL.length,detailed:Object.keys(VOTE_RES.votes||{}).length,lastVote:fmtDate(latest)}),newVotes:newSince.length})}
+  ${homeHeroHTML({kn:25,compact:true,badge:'כנסת 25 · ארכיון מלא',h1:'הכנסת ה־25, במעקב אזרחי שוטף.',lead:`<b>המנדט ה־121 נשאר אצלכם</b> — מעקב אזרחי חי אחרי כל חוק, כל הצבעה וכל ח״כ בכנסת ה־25. סמנו איך הייתם מצביעים, וגלו מי מצביע כמוכם.`,kpis:homeKpisHTML({members:seats25.length,factions:Object.keys(fac25).length,bills:ALLB.length,votes:VOTES_ALL.length,detailed:Object.keys(VOTE_RES.votes||{}).length,lastVote:fmtDate(latest)}),newVotes:newSince.length})}
 
   <div id="plenumTvBox"></div>
-
-  ${agendaHTML()}
 
   <div class="sec-title">מליאת הכנסת ה־25 <small>120 הח״כים, בסדר הישיבה של הכנסת הזאת — רחפו או לחצו על מושב</small></div>
   <div class="card pad plenum-wrap home rise"><div id="k25plenum">${plenumSVG(seats25,'k25',null)}</div>
@@ -3762,7 +3799,7 @@ function renderMks26(){
   const hasMine=Object.keys(S.myVotes).length>0;
   const presentN=LIVE_PRESENCE.map?list.filter(x=>livePresenceOf(x.n)===true).length:0;
   $('#app').innerHTML=`
-  <div class="sec-title">${servingSeats?'חברי הכנסת ה־26':'הנבחרים לכנסת ה־26'} <small>${list.length} מתוך ${elected.length} · ★ = במעקב${presentN?` · <span style="color:var(--for);font-weight:800">${presentN} כעת במשכן (מסומנים בירוק)</span>`:''}</small></div>
+  <div class="sec-title">חברי הכנסת ה־26 <small>${list.length} מתוך ${elected.length} · ★ = במעקב${presentN?` · <span style="color:var(--for);font-weight:800">${presentN} כעת במשכן (מסומנים בירוק)</span>`:''}</small></div>
   <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-bottom:.9rem"><input type="search" data-keep="mkQ" placeholder="חיפוש נבחר/ת…" value="${esc(mkFilter.q)}" style="flex:1;min-width:170px" oninput="mkFilter.q=this.value;renderMksKeep(this)">
   <select onchange="mkFilter.faction=this.value;if(this.value)mkFilter.sort='list';renderMks()" aria-label="סינון לפי סיעה"><option value="">כל הסיעות</option>${parties.map(f=>`<option ${mkFilter.faction===f?'selected':''}>${esc(f)}</option>`).join('')}</select></div>
   ${mkSortPillsHTML()}
@@ -3972,7 +4009,7 @@ function renderMkDetail(){
     // show a loading state; ensureK25Archive re-applies the route when it
     // lands and the redirect below fires then.
     if(!e&&rec){ switchKnesset(25); openMk(name); return }
-    if(!e){ app.innerHTML=backBtnHTML('mks','› כל הנבחרים')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>'+(K25_READY?'לא נמצא/ה ברשימת הנבחרים לכנסת 26, ולא כיהן/ה בכנסת 25.':'טוען את ארכיון כנסת 25…')+'</div>'; return }
+    if(!e){ app.innerHTML=backBtnHTML('mks','› כל חברי הכנסת')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>'+(K25_READY?'לא נמצא/ה ברשימת חברי הכנסת של כנסת 26, ולא כיהן/ה בכנסת 25.':'טוען את ארכיון כנסת 25…')+'</div>'; return }
     location.hash='mk='+encodeURIComponent(name);
     /* The party card lists the party's actual MKs, not the first `seats`
        candidates: after pre-swearing resignations the elected are not a
@@ -3981,15 +4018,15 @@ function renderMkDetail(){
        wins — Norwegian-law replacements are beyond the elected cut. */
     const srv26=e.party.candidates.filter(n=>(K26_TENURE[n]||[]).some(x=>!x[1]));
     const partyMks26=srv26.length?srv26:e.party.candidates.filter(n=>(e.party.elected||[]).includes(n));
-    app.innerHTML=`${backBtnHTML('mks','› כל הנבחרים')}
+    app.innerHTML=`${backBtnHTML('mks','› כל חברי הכנסת')}
     <div class="card pad rise" style="margin-top:.6rem"><div style="display:flex;gap:1rem;align-items:center">${avatar(name,e.party.name,84)}
       <div style="flex:1"><h1 style="font-size:1.5rem">${esc(disp(name))} ${followedMk(name)?'★':''}</h1>
       <button class="chip" style="color:${e.party.color||fcol(e.party.name)};font-weight:700" onclick="openFaction('${jsq(e.party.name)}')">${esc(e.party.name)} · כנסת 26 ←</button>
       <div class="small dim">${e.rank?`מקום ${e.rank} ברשימת ${esc(e.party.name)} · `:''}${e.serving?'מכהן/ת בפועל':e.elected?'נבחר/ה לכנסת ה־26':'מועמד/ת ברשימה — לא נכנס/ה לכנסת ה־26'}</div>
       ${mkPresenceLineHTML(name)}
-      <span class="chip acc" style="margin-top:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> היסטוריית ההצבעות תתחיל עם הצבעות כנסת 26 הראשונות</span></div>${starBtn('mk',name,name)}</div>
+      <span class="chip acc" style="margin-top:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg> היסטוריית ההצבעות של כנסת 26</span></div>${starBtn('mk',name,name)}</div>
     ${rec?`<div style="margin-top:1rem"><h3>בכנסת 25</h3><div class="small muted" style="line-height:1.9">${rec.votes.length} הצבעות מתועדות · סיעה אז: ${esc(shortF(rec.faction))} · <span style="color:var(--for)">${rec.votes.filter(v=>v.result===1).length} בעד</span> / <span style="color:var(--against)">${rec.votes.filter(v=>v.result===2).length} נגד</span> / <span style="color:var(--abstain)">${rec.votes.filter(v=>v.result===3).length} נמנע</span><br>איך הצביע/ה על ביטחון, כלכלה, זכויות — הכל שמור בכרטיס של כנסת 25.</div>
-    <button class="btn primary" style="margin-top:.6rem" onclick="switchKnesset(25);openMk('${jsq(name)}')">לכל ההצבעות בכנסת 25 ←</button></div>`:K25_READY?'<p class="muted small" style="margin-top:1rem">לא כיהן/ה בכנסת 25. הכרטיס יתמלא מההצבעה הראשונה.</p>':'<p class="muted small" style="margin-top:1rem">טוען את היסטוריית כנסת 25…</p>'}
+    <button class="btn primary" style="margin-top:.6rem" onclick="switchKnesset(25);openMk('${jsq(name)}')">לכל ההצבעות בכנסת 25 ←</button></div>`:K25_READY?'<p class="muted small" style="margin-top:1rem">לא כיהן/ה בכנסת 25.</p>':'<p class="muted small" style="margin-top:1rem">טוען את היסטוריית כנסת 25…</p>'}
     </div>
     ${mkContactHTML(name)}
     ${mkKnStrip(name)}
@@ -3998,7 +4035,10 @@ function renderMkDetail(){
     ${mkRolesHTML(name)}
     ${mkCommitteesHTML(name)}
     ${mkHighlightsHTML(name)}
-    <div class="card pad" style="margin-top:.85rem"><h3>${esc(e.party.name)} — חברי הכנסת של הסיעה (${partyMks26.length})</h3><div class="rows" style="margin:.5rem -.9rem 0">${partyMks26.map(n=>{const r=e.party.candidates.indexOf(n)+1, srv=(K26_TENURE[n]||[]).some(x=>!x[1]); return `<div class="row" style="cursor:pointer;${n===name?'background:var(--surface2)':''}" onclick="openMk('${jsq(n)}')"><b style="width:1.6rem;color:var(--accent)">${r}</b><span class="flex">${esc(disp(n))} ${n===name?'← כאן':''}</span><span class="chip for">${srv?'מכהן/ת':'נבחר/ה'}</span></div>`}).join('')}</div>${partyMks26.some((n,i)=>e.party.candidates.indexOf(n)!==i)?'<p class="small dim" style="margin-top:.6rem">המספר הוא המקום ברשימת המועמדים המקורית; מקומות שדולגו הם מועמדים שפרשו לפני ההשבעה, והבאים אחריהם נכנסו במקומם.</p>':''}</div>`;
+    ${(()=>{ const peers26=partyMks26.filter(n=>n!==name).slice(0,10); return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="12" cy="17" r="2.6"/><path d="M9.3 8.6 10.6 14M14.7 8.6 13.4 14M9.6 7h4.8"/></svg> ${esc(e.party.name)} <small class="dim">${partyMks26.length} חברי כנסת</small></h3>
+    <div style="margin-top:.55rem"><button class="btn primary" onclick="openFaction('${jsq(e.party.name)}')">לדף הסיעה ←</button></div>
+    ${peers26.length?`<div class="chips" style="margin-top:.6rem"><span class="small dim" style="align-self:center">חברי סיעה:</span>${peers26.map(n=>`<button class="chip" onclick="openMk('${jsq(n)}')">${esc(disp(n))}</button>`).join('')}${partyMks26.length-1>peers26.length?`<button class="chip" onclick="openFaction('${jsq(e.party.name)}')">ועוד ${partyMks26.length-1-peers26.length}…</button>`:''}</div>`:''}
+    </div>` })()}`;
     window.scrollTo(0,0); return }
   const m=mkIndex[name]; if(!m){app.innerHTML=backBtnHTML('mks','› כל הח״כים')+'<div class="card empty" style="margin-top:.6rem"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="8" r="3.6"/><path d="M5 20c.9-3.4 3.7-5.2 7-5.2s6.1 1.8 7 5.2"/></svg></div>לא נמצאו הצבעות מתועדות לח״כ הזה/זו באתר — לא בכנסת 25 ולא בכנסת 26.</div>';return}
   const pfaction=realFaction(MKP[name]?.faction||m.faction||FACTION25[name]||'');
@@ -4037,7 +4077,7 @@ function renderMkDetail(){
     <div style="display:flex;gap:1rem;align-items:center">
       ${avatar(name,pfaction,84)}
       <div style="flex:1"><h1 style="font-size:1.5rem">${esc(disp(name))} ${followedMk(name)?'★':''}</h1>
-      ${hasFactionPage?`<button class="chip" style="color:${fcol(pfaction)};font-weight:700" onclick="openFaction('${jsq(pshort)}')">${esc(pshort)} ←</button>`:pfaction?`<span class="chip" style="color:${fcol(pfaction)};font-weight:700">${esc(pshort)}</span>`:'<span class="chip">ללא סיעה</span>'}
+      ${pfaction?`<button class="chip" style="color:${fcol(pfaction)};font-weight:700" onclick="openFaction('${jsq(pshort)}')">${esc(pshort)} · כנסת 25 ←</button>`:'<span class="chip">ללא סיעה</span>'}
       <div class="small dim">${tot} הצבעות מתועדות בכנסת 25${rank25Txt?` · ${rank25Txt}`:''}</div>
       ${isFormerMk(name)?`<span class="chip" style="margin-top:.4rem">${formerBadgeText(name)} · כהונה: ${esc(mkTenureText(name)||'—')}</span>`:''}
       ${k26elected?`<span class="chip acc" style="margin-top:.4rem"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> נבחר/ה לכנסת ה־26 · מקום ${k26elected.rank} ברשימת ${esc(k26elected.p)}</span>`:''}
@@ -4437,7 +4477,7 @@ function renderFactionDetail(){
     <article class="card pad rise" style="margin-top:.6rem"><div class="card-top"><span class="chip acc">${p.seats} מושבים</span><span class="chip">כנסת 26</span><span style="margin-inline-start:auto">${starBtn('faction',p.name,p.name)}</span></div>
       <h1 style="font-size:1.55rem;color:${p.color}">${esc(p.name)}</h1>
       <div class="progress" style="margin:.7rem 0"><i style="width:${p.seats/120*100}%;background:${p.color}"></i></div>
-      <p class="small muted">הנבחרים לפי סדר הרשימה הרשמי. היסטוריית הצבעות תתחיל להיבנות עם הצבעות כנסת 26 הראשונות; מי שכיהנו בכנסת 25 מקושרים להיסטוריית ההצבעות שלהם.</p>
+      <p class="small muted">חברי הכנסת לפי סדר הרשימה הרשמי. מי שכיהנו בכנסת 25 מקושרים להיסטוריית ההצבעות שלהם.</p>
       <div class="rows" style="margin:.6rem -.9rem 0">${p.elected.map(n=>{const r=(p.candidates||[]).indexOf(n)+1; return `<div class="row" onclick="openMk('${jsq(n)}')"><b style="width:1.7rem;color:${p.color}">${r}</b>${avatar(n,p.name,34)}<span class="flex">${esc(disp(n))}${IDX25[n]?`<br><span class="dim small">בכנסת 25: ${IDX25[n].votes.length} הצבעות</span>`:`<br><span class="dim small">${K25_READY?'לא כיהן/ה בכנסת 25':'היסטוריית כנסת 25 נטענת…'}</span>`}</span><span class="chip acc">לכרטיס ←</span></div>`}).join('')}</div>
       ${p.elected.some((n,i)=>(p.candidates||[]).indexOf(n)!==i)?'<p class="small dim" style="margin-top:.6rem">המספרים הם המקומות ברשימת המועמדים הרשמית כפי שהוגשה לוועדת הבחירות; פער במספור הוא מועמד שפרש מהרשימה לפני ההשבעה, והבא אחריו נכנס במקומו.</p>':''}
     </article>`;
@@ -4806,7 +4846,7 @@ function renderAbout(){
 
   <section class="card hero rise">
     <h1>120 מנדטים חולקו ביום הבחירות.<br>ה־121 נשאר אצל האזרחים.</h1>
-    <p class="about-lead" style="margin-top:.7rem"><b>המנדט ה־121</b> הוא מעקב אזרחי חי אחרי הכנסת: כל חוק, כל הצבעת מליאה, כל ח״כ, סיעה, ועדה ודיון — במקום אחד, בשפה קריאה, ועם הכלים לסמן איך הייתם מצביעים בעצמכם ולראות מי מבין כל הח״כים מצביע כמוכם באמת. כרגע במאגר כנסת 25: <b>${n(ALLB.length)} חוקים</b>, <b>${n(VOTES_ALL.length)} הצבעות מליאה</b> ו־<b>${n(Object.keys(VOTE_RES.votes||{}).length)} הצבעות עם תוצאות לפי ח״כ</b>; כנסת 26 מתמלאת ככל שהכנסת מפרסמת נתונים.</p>
+    <p class="about-lead" style="margin-top:.7rem"><b>המנדט ה־121</b> הוא מעקב אזרחי חי אחרי הכנסת: כל חוק, כל הצבעת מליאה, כל ח״כ, סיעה, ועדה ודיון — במקום אחד, בשפה קריאה, ועם הכלים לסמן איך הייתם מצביעים בעצמכם ולראות מי מבין כל הח״כים מצביע כמוכם באמת. כרגע במאגר כנסת 25: <b>${n(ALLB.length)} חוקים</b>, <b>${n(VOTES_ALL.length)} הצבעות מליאה</b> ו־<b>${n(Object.keys(VOTE_RES.votes||{}).length)} הצבעות עם תוצאות לפי ח״כ</b>; כנסת 26 היא הכנסת הנוכחית, ונתוניה מתעדכנים מהפרסומים הרשמיים.</p>
   </section>
 
   <section class="card pad about-card rise" style="margin-top:.85rem">
@@ -4981,7 +5021,6 @@ function renderMine(){
   ${feedTop.length?`<div class="card pad rise" style="margin-bottom:.85rem"><h3>🔔 פעילות במעקב שלי ${feedNew?`<span class="chip" style="background:var(--against-dim);color:var(--against);font-weight:800">${feedNew} חדשות מאז הביקור הקודם</span>`:''} <small class="dim">כל מה שהחוקים, הח״כים, הוועדות, הסיעות והנושאים שאתם עוקבים אחריהם עשו — מהחדש לישן</small></h3>
   <div class="rows" style="margin:.5rem -.9rem 0">${feedTop.map(e=>`<div class="row" onclick="${e.go}"><span style="font-size:1.05rem">${e.icon}</span><span class="flex">${esc(e.title)}<br><span class="dim small">${esc(e.sub||'')}</span></span>${prevSeen&&(e.date||'')>prevSeen?'<span class="chip" style="background:var(--against-dim);color:var(--against);font-weight:800">חדש</span>':''}<span class="dim small">${fmtDate(e.date)}</span></div>`).join('')}</div>
   ${feed.length>feedTop.length?`<div class="small dim" style="margin-top:.45rem">מוצגות ${feedTop.length} הפעולות האחרונות מתוך ${feed.length} שנמצאו במעקב שלך.</div>`:''}</div>`:followCount()?`<div class="card pad rise" style="margin-bottom:.85rem"><h3>🔔 פעילות במעקב שלי</h3><p class="muted small" style="margin-top:.35rem">עוד לא נרשמה פעילות לישויות שבמעקב שלך במאגר הנטען — פעילות תופיע כאן כשהחוקים יתעדכנו, יתקיימו הצבעות וישיבות.</p></div>`:''}
-  <div class="sec-title">שלי <small>הצבעות, מעקב ומי מייצג אותי — נשמר מקומית</small></div>
   ${prevSeen&&newSince.length?`<div class="card pad rise" style="margin-bottom:.85rem"><b>מאז הביקור הקודם (${fmtDate(prevSeen)}):</b> <span class="muted">${newSince.length} הצבעות חדשות במליאה.</span> <button class="btn" style="margin-inline-start:.5rem" onclick="go('now')">לראות ←</button></div>`:''}
   <div class="grid c2">
     <div class="card pad"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> איך הייתי מצביע/ה (${mineBills.length})</h3>
