@@ -4923,9 +4923,10 @@ function plenumBrowserHTML(){
   let list=plenumEntries().map(e=>({...e,score:0,hits:[],votesThatDay:vc[e.date]||0}));
   if(q&&plenumHitsFor===q&&plenumHits){ for(const e of list){ const h=plenumHits[e.sid]; if(h){ e.score=h.score; e.hits=h.hits } }
     list=list.filter(e=>e.score>0||String(e.number)===q).sort((a,b)=>b.score-a.score||b.number-a.number) }
-  else if(q){ return `<input type="search" data-keep="plenumQ" placeholder="חיפוש בדברי הכנסת — מילה, או מספר ישיבה…" value="${esc(plenumFilter.q)}" style="width:100%;margin-bottom:.7rem" oninput="plenumFilter.q=this.value;plenumFilter.limit=30;keepSearchFocus(this,renderPlenum)"><div class="card empty">מחפש בדברי הכנסת…</div>` }
+  const inputHTML=`<input type="search" data-keep="plenumQ" placeholder="חיפוש בדברי הכנסת — מילה, או מספר ישיבה…" value="${esc(plenumFilter.q)}" style="width:100%;margin-bottom:.35rem" oninput="plenumFilter.q=this.value;plenumFilter.limit=30;keepSearchFocus(this,renderPlenum)"><div class="small dim" style="margin-bottom:.7rem">החיפוש כאן במליאה בלבד · <a href="javascript:void 0" onclick="openProtocolSearch(plenumFilter.q)">לחיפוש גם בפרוטוקולי הוועדות ←</a></div>`;
+  if(q&&!(plenumHitsFor===q&&plenumHits)){ return `${inputHTML}<div class="card empty">מחפש בדברי הכנסת…</div>` }
   const shown=list.slice(0,plenumFilter.limit);
-  return `<input type="search" data-keep="plenumQ" placeholder="חיפוש בדברי הכנסת — מילה, או מספר ישיבה…" value="${esc(plenumFilter.q)}" style="width:100%;margin-bottom:.7rem" oninput="plenumFilter.q=this.value;plenumFilter.limit=30;keepSearchFocus(this,renderPlenum)">
+  return `${inputHTML}
   <div class="small dim" style="margin-bottom:.6rem">${q?`${list.length.toLocaleString('he-IL')} ישיבות נמצאו`:`${list.length.toLocaleString('he-IL')} ישיבות מליאה בכנסת 25 · מהאחרונה לראשונה`} · לחיצה על ישיבה: ההצבעות של אותו היום והמסמך הרשמי</div>
   ${shown.length?`<div class="card rows">${shown.map(e=>`<div class="row" onclick="openPlenum('${e.sid}')"><span class="chip acc">${fmtDate(e.date)}</span><span class="flex">ישיבת מליאה מס׳ ${e.number}<br><span class="dim small">${e.votesThatDay?`${e.votesThatDay} הצבעות באותו היום`:'ללא הצבעות באותו היום'}${e.hits.length?` · ${e.hits.map(([w,c])=>`${esc(w)} ×${c}`).join(' · ')}`:''}</span></span>${e.score?`<b>${e.score}</b>`:''}<span class="chip acc">לישיבה ←</span></div>`).join('')}</div>
   ${list.length>shown.length?`<div style="text-align:center;margin-top:1rem"><button class="btn" onclick="plenumFilter.limit+=30;renderPlenum()">עוד ${Math.min(30,list.length-shown.length)} ישיבות</button></div>`:''}`:'<div class="card empty"><div class="big">🔍</div>לא נמצאו ישיבות בסינון הזה.</div>'}`;
@@ -4933,7 +4934,7 @@ function plenumBrowserHTML(){
 function renderPlenum(){
   if(KN===26){ $('#app').innerHTML=`<div class="sec-title">דברי הכנסת <small>מליאה · כנסת 26</small></div><div class="card empty"><div class="big">${icon('plenum')}</div>דברי הכנסת של כנסת 26 עוד לא פורסמו.<br><span class="small">כשתתכנס הכנסת ויתפרסמו ישיבות המליאה הראשונות, יופיעו כאן כל הישיבות עם חיפוש מלא בפרוטוקולים — כמו בכנסת 25.</span><br>${k25CtaHTML('📜 לדברי הכנסת של כנסת 25 ←')}</div>`; return }
   ensurePlenumSearch(); // one search only in this tab (plenumBrowserHTML); the cross-corpus חיפוש בפרוטוקולים is its own page (view 'protocols')
-  $('#app').innerHTML=`<div class="sec-title">דברי הכנסת <small>מליאה · כל ישיבות כנסת 25 · ${Object.keys(PLENUM_SEARCH).length||418} ישיבות</small></div>${protoSearchBannerHTML()}${plenumBrowserHTML()}`;
+  $('#app').innerHTML=`<div class="sec-title">דברי הכנסת <small>מליאה · כל ישיבות כנסת 25 · ${Object.keys(PLENUM_SEARCH).length||418} ישיבות</small></div>${plenumBrowserHTML()}`;
 }
 function renderPlenumSession(){
   ensurePlenumSearch();
