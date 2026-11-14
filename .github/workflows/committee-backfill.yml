@@ -1,0 +1,74 @@
+# Full committee-protocol search backfill (K25).
+#
+# build_committee_search.py enumerates all 10,855 K25 committee
+# sessions and streams every published protocol docx into the sharded
+# inverted index (word counters only). The shards are uploaded to the
+# mandat121protocols R2 bucket in the SAME job — they never enter git.
+# Only the small metadata returns to the repo:
+#   data/protocol_search.json   ({sid: {committee, date}})
+#   data/search_c/manifest.json (indexed session ids; makes the next
+#                                run incremental)
+# The client reads shards from R2 first; the committed data/search_*
+# shards remain a (stale, 268-sitting) fallback.
+#
+# Manual dispatch only. Resumable: the builder checkpoints every 100
+# sessions, and a rerun skips everything in the manifest — including
+# across workflow runs, since the manifest is committed back.
+name: committee-backfill
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: committee-backfill
+  cancel-in-progress: false
+
+jobs:
+  backfill:
+    runs-on: ubuntu-latest
+    timeout-minutes: 350
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+
+      - name: Build committee search index (streaming, resumable)
+        run: python3 -u build_committee_search.py
+
+      - name: Upload shards to R2
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
+        run: python3 -u upload_search_shards.py
+
+      - name: Commit index metadata only (never the shards)
+        run: |
+          git config user.name "mandat121-data-bot"
+          git config user.email "actions@github.com"
+          git add data/protocol_search.json data/search_c/manifest.json
+          if git diff --cached --quiet; then
+            echo "No metadata changes."
+            exit 0
+          fi
+          git commit -m "data: committee protocol search backfill metadata ($(date -u +%Y-%m-%d))"
+          for attempt in 1 2 3; do
+            git fetch origin main
+            if ! git rebase origin/main; then
+              git rebase --abort
+              echo "::error::Rebase conflicted (attempt $attempt) — refusing to force."
+              exit 1
+            fi
+            if git push origin main; then
+              echo "Pushed on attempt $attempt."
+              exit 0
+            fi
+            echo "Push rejected, retrying…"
+          done
+          echo "::error::Could not push after 3 attempts."
+          exit 1
