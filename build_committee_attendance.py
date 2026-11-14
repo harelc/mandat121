@@ -79,18 +79,21 @@ def main() -> None:
             if meta[0] == cname and sid in spoke_in
         ]
         sids.sort(key=lambda x: x[1], reverse=True)
-        sids = sids[:N_SESSIONS]
         if not sids:
             continue
-        spoke = {}
-        for i, (sid, _d) in enumerate(sids):
+        # Histogram over ALL of the committee's protocolled sessions:
+        # per roster member, in how many sessions they spoke at least once.
+        spoke_counts = {n: 0 for n in names}
+        for sid, _d in sids:
             for mk in spoke_in[sid] & set(names):
-                spoke.setdefault(mk, []).append(i)
+                spoke_counts[mk] += 1
         out[str(cid)] = {
             "as_of": (cmt_meta.get(str(cid)) or {}).get("last_session"),
             "members": names,
-            "sessions": [{"id": sid, "date": d} for sid, d in sids],
-            "spoke": spoke,
+            "total_sessions": len(sids),
+            "first_session": sids[-1][1],
+            "last_session": sids[0][1],
+            "spoke_counts": spoke_counts,
         }
 
     payload = {
@@ -98,7 +101,7 @@ def main() -> None:
             "method": "Speaking turns in published committee protocols "
                       "(cmt_hl speaker stats). Not an official attendance "
                       "register; silent attendees are not marked.",
-            "sessions_per_committee": N_SESSIONS,
+            "scope": "all protocolled sessions of each committee in the term",
             "committees": len(out),
         },
         "by_committee": out,
