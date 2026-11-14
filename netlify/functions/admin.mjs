@@ -110,10 +110,16 @@ export default async function handler(request) {
   const logStore = getStore("admin-log");
   const { blobs: lb } = await logStore.list({ prefix: "star:" });
   let starLog = [];
-  for (const { key } of lb.sort((a, b) => b.key.localeCompare(a.key)).slice(0, 7)) {
+  // Keys are star:YYYY-MM-DD; take the 7 most recent days, oldest first.
+  for (const { key } of lb.sort((a, b) => a.key.localeCompare(b.key)).slice(-7)) {
     const day = await logStore.get(key, { type: "json" }).catch(() => null);
     if (Array.isArray(day)) starLog = starLog.concat(day);
   }
+  // Never trust append/concat order (concurrent stars.mjs writers read-
+  // modify-write the same day blob, so entries can land out of order):
+  // sort by the ISO timestamp itself. The page reverses this, so return
+  // ascending and the newest entry renders first.
+  starLog.sort((a, b) => String(a.t || "").localeCompare(String(b.t || "")));
 
   return Response.json({
     generated: new Date().toISOString(),
