@@ -2169,7 +2169,8 @@ function openBillIn(kn,id){ if(KN!==kn) switchKnesset(kn); if(kn===26) openBill2
    ensureK25Archive re-applies the route once the owner is knowable. */
 function voteKn(id){ const s=String(id); return VOTE_BY_ID[s]?25:K26V_BY_ID[s]?26:null }
 function billKn(id){ const s=String(id); return ALLB_BY_ID[s]?25:K26B.some(b=>String(b.id)===s)?26:voteKn(s) }
-function mkKn(name){ const has26=!!k26Entry(name), has25=!!(mkIndex[name]||MKP[name]||TENURE[name]||FACTION_STINTS[name]||CONTACTS[name]); return has25&&has26?KN:has26?26:has25?25:null }
+function mkKn(name){ const e26=k26Entry(name); const has26=!!(e26&&(e26.elected||e26.serving)); // a candidate who didn't enter K26 is not "in K26" — if they served in K25, their page is the K25 one
+  const has25=!!(mkIndex[name]||MKP[name]||TENURE[name]||FACTION_STINTS[name]||CONTACTS[name]); return has25&&has26?KN:has26?26:has25?25:null }
 function factionKn(name){ const in26=(K26?.parties||[]).some(p=>p.name===name), in25=currentFactions().some(f=>f.name===name||f.full===name); return in25&&in26?KN:in26?26:in25?25:null }
 function sessionKn(id){ const s=String(id); const in25=CMT?.recent_sessions?.some(x=>String(x.id)===s), in26=K26CMT?.recent_sessions?.some(x=>String(x.id)===s); return in25&&in26?KN:in26?26:in25?25:null }
 /* Committee ids are the official committee ids (K25: 4185–4287, K26:
