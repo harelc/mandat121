@@ -18,3 +18,6 @@ node_modules/
 
 # local test snapshots
 __search_test.html
+
+# Local API reference notes (kept on disk, not tracked)
+KNESSET_APIS.md
