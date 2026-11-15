@@ -507,6 +507,10 @@ select,input[type=search]{background:var(--surface);border:1px solid var(--line)
 .hero.compact{padding:.85rem 1rem .8rem}
 .hero.compact h1{font-size:clamp(1.25rem,3.5vw,1.65rem);line-height:1.25}
 .hero.compact p{font-size:.88rem;margin-top:.35rem;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden}
+.hero.compact p.clamp{cursor:pointer}
+.hero.compact p.clamp::after{content:' · להרחבה ▾';color:var(--accent);font-weight:700;font-size:.78rem}
+.hero.compact p.clamp.exp{display:block;overflow:visible;-webkit-line-clamp:unset}
+.hero.compact p.clamp.exp::after{content:' · לקיפול ▴'}
 .hero.compact .kpis{grid-template-columns:repeat(6,1fr);gap:.35rem;margin-top:.55rem}
 .hero.compact .kpi{padding:.28rem .15rem;border-radius:9px;background:transparent}
 .hero.compact .kpi b{font-size:.92rem;line-height:1.15}
@@ -2817,8 +2821,8 @@ const k25CtaHTML=(label,sub)=>`<button class="k25-cta" onclick="switchKnesset(25
 function homeHeroHTML({kn,badge,h1,lead,kpis,newVotes,compact}){
   return `<section class="card hero rise${compact?' compact':''}"><span class="badge ${kn===26?'k26':''}">${badge}</span>
     <h1 style="margin-top:.4rem">${h1}</h1>
-    <p>${lead}</p>
-    ${compact?`<p class="small muted" style="line-height:1.9;margin-top:.3rem"><b style="color:var(--text)">איך מפקחים?</b> לכל חוק כמה שאלות בסיסיות: מי יזם ומי שינה · מי הופיע ומי נעדר מהדיונים עליו · מי הצביע איך — ואיך הייתם מצביעים אתם.</p>`:`<div class="card pad" style="margin-top:.8rem;background:var(--surface)"><h3>איך מפקחים? כמה שאלות בסיסיות לכל חוק</h3><p class="small muted" style="line-height:1.9;margin-top:.3rem"><b style="color:var(--text)">מי יזם ומי שינה?</b> — עקבו אחרי מסע החוק והוועדה שדנה בו. <b style="color:var(--text)">מי הופיע ומי נעדר מהדיונים עליו?</b> — בוועדות ובמליאה. <b style="color:var(--text)">מי הצביע איך?</b> — ואיך הייתם מצביעים אתם. כל דף באתר עונה על אחת מהן.</p></div>`}
+    <p class="clamp" onclick="this.classList.toggle('exp')" title="לחצו להרחבה או לקיפול">${lead}</p>
+    ${compact?`<p class="small muted clamp" onclick="this.classList.toggle('exp')" title="לחצו להרחבה או לקיפול" style="line-height:1.9;margin-top:.3rem"><b style="color:var(--text)">איך מפקחים?</b> לכל חוק כמה שאלות בסיסיות: מי יזם ומי שינה · מי הופיע ומי נעדר מהדיונים עליו · מי הצביע איך — ואיך הייתם מצביעים אתם.</p>`:`<div class="card pad" style="margin-top:.8rem;background:var(--surface)"><h3>איך מפקחים? כמה שאלות בסיסיות לכל חוק</h3><p class="small muted" style="line-height:1.9;margin-top:.3rem"><b style="color:var(--text)">מי יזם ומי שינה?</b> — עקבו אחרי מסע החוק והוועדה שדנה בו. <b style="color:var(--text)">מי הופיע ומי נעדר מהדיונים עליו?</b> — בוועדות ובמליאה. <b style="color:var(--text)">מי הצביע איך?</b> — ואיך הייתם מצביעים אתם. כל דף באתר עונה על אחת מהן.</p></div>`}
     ${prevSeen?`<div class="card pad" style="margin-top:.8rem"><h3>הפיקוח שלכם מאז הביקור הקודם <small class="dim">${fmtDate(prevSeen)}</small></h3><p class="small muted" style="margin-top:.3rem;line-height:1.9">${newVotes?`<b style="color:var(--text)">${newVotes} הצבעות מליאה חדשות</b> התקיימו מאז. פתחו אותן, סמנו איך הייתם מצביעים, ובדקו מי הצביע כמוכם.`:'לא התקיימו הצבעות מליאה חדשות מאז הביקור הקודם — הכנסת לא מצביעה כל יום. בינתיים אפשר לעקוב אחרי מה שכן זז: דיוני הוועדות ופרוטוקולי המליאה, והצעות חוק חדשות שעוד לפני ההצבעה.'} <button class="btn ghost small" style="padding:.15rem .6rem;vertical-align:baseline" onclick="go('mine')">למעקב שלי ←</button></p></div>`:''}
     ${kpis}
     <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn primary" style="margin-top:.9rem" onclick="openIntro()">חדשים כאן? הסבר מצויר בפחות מדקה ▶</button>
@@ -5265,9 +5269,22 @@ function siteTopStarsHTML(){
   if(!top.length) return '';
   const rows=top.map(([k,n],idx)=>{ const i=k.indexOf(':'); const kind=k.slice(0,i), key=k.slice(i+1);
     let lbl=key, go='';
-    if(kind==='bill'){ const kb=ALLB_BY_ID[key]||K26B.find(b=>String(b.id)===key); lbl=kb?displayText(kb):'הצעת חוק'; go=`openBillIn(${billKn(key)||KN},'${key}')` }
+    if(kind==='bill'){ const kb=ALLB_BY_ID[key]||K26B.find(b=>String(b.id)===key);
+      // Most followed bills are K25, but the K25 archive is deliberately NOT
+      // loaded on the K26 Now page (see load(): ~16 MB deferred). Without it
+      // ALLB_BY_ID is empty, so these rows used to fall back to the bare word
+      // 'הצעת חוק' (shown as just 'חוק' under the kind label) and billKn()
+      // fell back to the current Knesset — a dead click into openBill26 for a
+      // K25 id. Never render a nameless/dead row: load the archive on demand
+      // (ensureK25Archive re-applies the route when it lands, repainting this
+      // pane with real names), and until then show an honest, non-clickable
+      // loading row. Slower (mobile) connections hit this window hardest.
+      if(kb){ lbl=displayText(kb); go=`openBillIn(${billKn(key)||KN},'${key}')` }
+      else { lbl='טוען את שם הצעת החוק…'; if(!K25_READY) ensureK25Archive(); return `<div class="row" style="cursor:default" aria-busy="true"><b style="color:var(--accent);width:1.6rem">${idx+1}</b><span class="flex wrap muted">${esc(lbl)}<br><span class="dim small">חוק</span></span>${starChip(kind,key)}</div>` } }
     else if(kind==='mk'){ lbl=disp(key); go=`openMk('${jsq(key)}')` }
-    else if(kind==='committee'){ const c=committeeById(key); lbl=c?c.name:'ועדה'; go=`openCommittee('${key}')` }
+    else if(kind==='committee'){ const c=committeeById(key);
+      if(c){ lbl=c.name; go=`openCommittee('${key}')` }
+      else { lbl='טוען את שם הוועדה…'; if(!K25_READY) ensureK25Archive(); return `<div class="row" style="cursor:default" aria-busy="true"><b style="color:var(--accent);width:1.6rem">${idx+1}</b><span class="flex wrap muted">${esc(lbl)}<br><span class="dim small">ועדה</span></span>${starChip(kind,key)}</div>` } }
     else if(kind==='faction'){ go=`openFaction('${jsq(key)}')` }
     const kindLbl={bill:'חוק',mk:'ח״כ',committee:'ועדה',faction:'סיעה',topic:'נושא'}[kind]||'';
     return `<div class="row" ${go?`onclick="${go}"`:''}><b style="color:var(--accent);width:1.6rem">${idx+1}</b><span class="flex wrap">${esc(lbl)}<br><span class="dim small">${esc(kindLbl)}</span></span>${starChip(kind,key)}</div>` }).join('');
