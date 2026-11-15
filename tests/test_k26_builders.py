@@ -229,6 +229,75 @@ class WebsiteVoteFallbackTest(unittest.TestCase):
         self.assertEqual(out, {"tally": None, "secret": None, "accepted": None})
 
 
+class EraSearchPathsTest(unittest.TestCase):
+    """Era corpora must never share files: a K25 rebuild (incl. --force,
+    which wipes its shard dir) must not be able to erase K26, and vice
+    versa. Regression test for K26 sittings 1–2 never reaching the site:
+    the plenum/committee search builders were K25-hardcoded."""
+
+    def test_plenum_paths_are_era_separate(self):
+        mod = load_module("build_plenum_search.py")
+        out25, dir25 = mod.paths_for(25)
+        out26, dir26 = mod.paths_for(26)
+        self.assertEqual(out25.name, "plenum_search.json")
+        self.assertEqual(out26.name, "k26_plenum_search.json")
+        self.assertNotEqual(dir25, dir26)
+
+    def test_committee_paths_are_era_separate(self):
+        mod = load_module("build_committee_search.py")
+        out25, dir25, _ = mod.paths_for(25)
+        out26, dir26, cmt26 = mod.paths_for(26)
+        self.assertEqual(out25.name, "protocol_search.json")
+        self.assertEqual(out26.name, "k26_protocol_search.json")
+        self.assertNotEqual(dir25, dir26)
+        self.assertEqual(cmt26.name, "k26_committees.json")
+
+
+class ProbePlenumVotesLayerTest(unittest.TestCase):
+    """A Knesset can publish a plenum vote before its first bill (K26
+    vote 46716 did). The probe must report that as its own layer so the
+    workflow can gate the vote builders on it, not only on bills."""
+
+    def test_vote_without_bills_is_a_published_layer(self):
+        mod = load_module("probe_knesset.py")
+        mod.count = lambda entity, filt: {"KNS_PlenumVote": 1}.get(entity, 0)
+        report = mod.probe(26)
+        self.assertFalse(report["layers"]["bills"])
+        self.assertTrue(report["layers"]["plenum_votes"])
+        self.assertTrue(report["any"])
+        self.assertFalse(report["ready"])  # ready still means bills
+
+
+class PlenumSearchK26BuildTest(unittest.TestCase):
+    def test_k26_sessions_index_into_k26_files_only(self):
+        import os
+        mod = load_module("build_plenum_search.py")
+        sessions = [{"Id": 2245487, "Number": 1, "StartDate": "2026-11-10"}]
+        docs = [{"PlenumSessionID": 2245487, "GroupTypeID": 28,
+                 "FilePath": "https://fs.knesset.gov.il/26/Plenum/x.doc"}]
+
+        def fake_paged(entity, params):
+            return sessions if entity == "KNS_PlenumSession" else docs
+
+        mod.paged = fake_paged
+        mod.docx_text = lambda url: "תקציב המדינה " * 40
+        with tempfile.TemporaryDirectory() as td:
+            (Path(td) / "data").mkdir()
+            old = os.getcwd()
+            os.chdir(td)
+            try:
+                sys.argv = ["build_plenum_search.py", "--knesset", "26"]
+                mod.main()
+            finally:
+                os.chdir(old)
+            out = json.loads((Path(td) / "data" / "k26_plenum_search.json")
+                             .read_text("utf-8"))
+            self.assertEqual(out["2245487"]["kn"], 26)
+            self.assertEqual(out["2245487"]["number"], 1)
+            self.assertTrue((Path(td) / "data" / "search_p26").exists())
+            self.assertFalse((Path(td) / "data" / "plenum_search.json").exists())
+
+
 class UnpublishedLayerNoOpTest(unittest.TestCase):
     """Builders run from a cwd with no K26 data must exit 0 and write nothing."""
 

@@ -103,18 +103,6 @@ def parse_text(session, text):
         header = " ".join(m.group(2).split()).rstrip(":").strip()
         body = text[m.end(): matches[i + 1].start() if i + 1 < len(matches) else len(text)]
         body = paras_of(re.sub(r"\s*<<\s*סיום\s*>>\s*$", "", body))  # a lone trailing end-marker has no pair to match
-        if role == "cont":
-            # << דובר_המשך >>: the same speaker continues — another
-            # paragraph of the previous turn, not a new turn. (The
-            # pre-fix marker set didn't know it, so continuations and
-            # the marker itself leaked into the previous turn's text.)
-            if turns and turns[-1]["role"] in ("speaker", "chair", "guest") and body:
-                turns[-1]["text"] += "\n\n" + body
-                prev = speakers.get(turns[-1]["speaker"])
-                if prev:
-                    prev["words"] += len(body.split())
-                continue
-            role = "speaker"  # a continuation with nothing before it
         if role == "topic":
             turns.append({"role": "topic", "speaker": "", "text": header or body})
             continue
@@ -130,6 +118,22 @@ def parse_text(session, text):
         if fm:
             header, faction = fm.group(1).strip(), fm.group(2).strip()
         speaker = re.sub(r"^היו[\"״]ר\s+", "", header).strip()
+        if role == "cont":
+            # << דובר_המשך >> usually means the same speaker continues —
+            # merge into the previous turn. But the header NAMES the
+            # speaker, and when someone else (typically the chair:
+            # "משפט לסיום") interjected in between, the previous turn is
+            # theirs; the resumed speech is a new turn of the named
+            # speaker. Merge only when the header is empty or names the
+            # previous speaker. (Mirror of parseTranscript in the
+            # Netlify protocol functions.)
+            if turns and turns[-1]["role"] in ("speaker", "chair", "guest") and body and (not speaker or speaker == turns[-1]["speaker"]):
+                turns[-1]["text"] += "\n\n" + body
+                prev = speakers.get(turns[-1]["speaker"])
+                if prev:
+                    prev["words"] += len(body.split())
+                continue
+            role = "speaker"  # continuation of a different speaker, or nothing before it
         if not speaker or not body:
             continue
         turns.append({"role": role, "speaker": speaker, "faction_hint": faction, "text": body})

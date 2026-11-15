@@ -59,6 +59,14 @@ def probe(knesset_num):
         "factions": ("KNS_Faction", kn_filter),
         "committees": ("KNS_Committee", kn_filter),
         "plenum_sessions": ("KNS_PlenumSession", kn_filter),
+        # Plenum votes carry no KnessetNum — count by era window instead.
+        # A Knesset can hold (and publish) a vote before its first bill
+        # exists (K26: vote 46716, 2026-11-11, bills still 0), so this
+        # layer must be probed independently of `bills`.
+        "plenum_votes": ("KNS_PlenumVote",
+                         "VoteDateTime gt 2026-10-01T00:00:00Z"
+                         if knesset_num == 26 else
+                         "VoteDateTime gt 2022-11-15T00:00:00Z"),
         "committee_sessions": ("KNS_CommitteeSession", kn_filter),
         "is_current_knesset": (
             "KNS_KnessetDates", f"{kn_filter} and IsCurrent eq true"
@@ -78,6 +86,7 @@ def probe(knesset_num):
         "committees": e["committees"] > 0,
         "committee_sessions": e["committee_sessions"] > 0,
         "plenum_sessions": e["plenum_sessions"] > 0,
+        "plenum_votes": e["plenum_votes"] > 0,
     }
     report["any"] = any(report["layers"].values())
     return report

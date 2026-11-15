@@ -22,10 +22,13 @@ Safety / incrementality:
     re-applied at another threshold) offline at any time.
   * --limit N indexes only the first N todo sessions (smoke tests).
 
-Output: data/search_c/*.json (merged), data/search_c/manifest.json,
-data/protocol_search.json ({sid: {committee, date}} merged).
-The shards are uploaded to R2 by upload_search_shards.py; the client
-reads R2 first and falls back to the committed shards.
+Output (per Knesset; session ids are globally unique, eras never mix
+shards): K25: data/search_c/ + data/protocol_search.json;
+K26: data/search_c26/ + data/k26_protocol_search.json
+({sid: {committee, date, kn}} merged).
+The K25 shards are uploaded to R2 by upload_search_shards.py; the client
+reads R2 first and falls back to the committed shards. K26 shards are
+committed-only until the R2 manifest learns the c26 corpus.
 """
 import json
 import sys
@@ -41,10 +44,21 @@ from build_protocols_search import (SEARCH_C_DIR, add_counts_to_shards,
 
 BASE = "https://knesset.gov.il/OdataV4/ParliamentInfo/"
 HDR = {"User-Agent": "Mozilla/5.0 mandat121-build", "Accept": "application/json"}
-OUT = Path("data/protocol_search.json")
-MANIFEST = SEARCH_C_DIR / "manifest.json"
 CHECKPOINT = 100
+
+
+def paths_for(kn):
+    """(metadata file, shard dir, committees file) for a Knesset."""
+    if kn == 25:
+        return (Path("data/protocol_search.json"), SEARCH_C_DIR,
+                Path("data/committees.json"))
+    return (Path(f"data/k{kn}_protocol_search.json"), Path(f"data/search_c{kn}"),
+            Path(f"data/k{kn}_committees.json"))
+
+
 KNESSET = 25
+OUT, SHARD_DIR, COMMITTEES_F = paths_for(KNESSET)
+MANIFEST = SHARD_DIR / "manifest.json"
 
 
 def get(path):
@@ -73,7 +87,7 @@ def paged(entity, params):
 def committee_names(sessions):
     names = {}
     try:
-        data = json.loads(Path("data/committees.json").read_text(encoding="utf-8"))
+        data = json.loads(COMMITTEES_F.read_text(encoding="utf-8"))
         names = {str(c["id"]): c.get("name", "") for c in data.get("committees", [])}
     except Exception:
         pass
@@ -97,6 +111,13 @@ def session_counts(sid, urls, committee, date):
 
 
 def main():
+    global KNESSET, OUT, SHARD_DIR, MANIFEST, COMMITTEES_F
+    if "--knesset" in sys.argv:
+        KNESSET = int(sys.argv[sys.argv.index("--knesset") + 1])
+        if KNESSET not in (25, 26):
+            raise SystemExit("--knesset must be 25 or 26")
+        OUT, SHARD_DIR, COMMITTEES_F = paths_for(KNESSET)
+        MANIFEST = SHARD_DIR / "manifest.json"
     limit = None
     if "--limit" in sys.argv:
         limit = int(sys.argv[sys.argv.index("--limit") + 1])
@@ -140,12 +161,12 @@ def main():
         committee = names.get(str(s["CommitteeID"]), "")
         date = (s.get("StartDate") or "")[:10]
         counts = session_counts(s["Id"], urls, committee, date)
-        return s, counts, {"committee": committee, "date": date}
+        return s, counts, {"committee": committee, "date": date, "kn": KNESSET}
 
     def checkpoint(cache, dirty):
-        flush_shards(SEARCH_C_DIR, cache, dirty)
+        flush_shards(SHARD_DIR, cache, dirty)
         OUT.write_text(json.dumps(search, ensure_ascii=False), encoding="utf-8")
-        SEARCH_C_DIR.mkdir(parents=True, exist_ok=True)
+        SHARD_DIR.mkdir(parents=True, exist_ok=True)
         MANIFEST.write_text(json.dumps(
             {"sessions": sorted(done_sids, key=int)}, ensure_ascii=False),
             encoding="utf-8")
@@ -159,7 +180,7 @@ def main():
             sid = futs[fut]
             try:
                 s, counts, entry = fut.result()
-                add_counts_to_shards(SEARCH_C_DIR, str(s["Id"]), counts,
+                add_counts_to_shards(SHARD_DIR, str(s["Id"]), counts,
                                      cache, dirty)
                 search[str(s["Id"])] = entry
                 done_sids.add(str(s["Id"]))
@@ -177,7 +198,7 @@ def main():
     checkpoint(cache, dirty)
     if failed:
         print(f"FAILED ({failed}): {failed_ids[:8]}", flush=True)
-    print(f"DONE {len(search)} committee protocols indexed -> {OUT} (+{SEARCH_C_DIR})")
+    print(f"DONE {len(search)} committee protocols indexed -> {OUT} (+{SHARD_DIR})")
 
 
 if __name__ == "__main__":

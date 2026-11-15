@@ -85,6 +85,25 @@ class ParseTextTests(unittest.TestCase):
         for t in self.doc["turns"]:
             self.assertNotIn("<<", t["text"])
 
+    def test_continuation_after_chair_interjection_is_own_turn(self):
+        # Sitting 2245727: the chair's "משפט לסיום" lands between an MK
+        # and their resumed closing sentence, marked << דובר_המשך >>
+        # with the MK's name. It must not merge into the chair's turn.
+        text = (
+            "<< דובר >> יצחק קרויזר (סיעת הדוגמה): << דובר >>\n"
+            "גוף הנאום של קרויזר.\n"
+            '<< יור >> היו"ר אמיר אוחנה: << יור >>\n'
+            "חבר הכנסת קרויזר, משפט לסיום.\n"
+            "<< דובר_המשך >> יצחק קרויזר (סיעת הדוגמה): << דובר_המשך >>\n"
+            "אז משפט לסיום. תודה רבה.\n"
+        )
+        doc = bp.parse_text(SESSION, text)
+        self.assertEqual(len(doc["turns"]), 3)
+        self.assertEqual(doc["turns"][1]["text"], "חבר הכנסת קרויזר, משפט לסיום.")
+        self.assertEqual(doc["turns"][2]["speaker"], "יצחק קרויזר")
+        self.assertEqual(doc["turns"][2]["role"], "speaker")
+        self.assertEqual(doc["speakers"]["יצחק קרויזר"]["turns"], 2)
+
     def test_continuation_without_previous_turn_becomes_a_turn(self):
         doc = bp.parse_text(SESSION, "<< דובר_המשך >> דנה כהן: << דובר_המשך >>\nפותחת בלי הקדמה.\n<< סיום >> << סיום >>\n")
         speech = [t for t in doc["turns"] if t["role"] == "speaker"]

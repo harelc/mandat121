@@ -11,15 +11,17 @@ Source: KNS_PlenumSession + KNS_DocumentPlenumSession (GroupTypeID=28,
 דברי הכנסת) from the Knesset OData v4 service; documents are '.doc'
 files that are really docx, same as committee protocols.
 
-Output:
-  data/plenum_search.json — {session_id: {number, date, doc}} metadata.
-  data/search_p/<c0>_<c1>.json — sharded inverted index
+Output (per Knesset; session ids are globally unique, eras never mix
+shards — a --force rebuild of one era must not wipe the other's):
+  K25: data/plenum_search.json + data/search_p/
+  K26: data/k26_plenum_search.json + data/search_p26/
+  {session_id: {number, date, doc, kn}} metadata + sharded inverted index
       {word: "sid:count,delta:count,…"} for EVERY content word (shared
       tokenizer/stopwords + shard writer with build_protocols_search.py),
       TOC/speaker-header lines excluded. Replaces the old top-120-words
       index, which made any rarer word unfindable.
 
-Incremental: sessions listed in data/search_p/manifest.json are skipped
+Incremental: sessions listed in the era's manifest.json are skipped
 (transcripts of past sessions are immutable), so the daily workflow only
 downloads new sessions. Pass --force to rebuild from scratch.
 """
@@ -38,9 +40,18 @@ from build_protocols_search import (SEARCH_P_DIR, add_counts_to_shards,
 
 BASE = "https://knesset.gov.il/OdataV4/ParliamentInfo/"
 HDR = {"User-Agent": "Mozilla/5.0 mandat121-build", "Accept": "application/json"}
-OUT = Path("data/plenum_search.json")
-MANIFEST = SEARCH_P_DIR / "manifest.json"
+
+
+def paths_for(kn):
+    """(metadata file, shard dir) for a Knesset's plenum search corpus."""
+    if kn == 25:
+        return Path("data/plenum_search.json"), SEARCH_P_DIR
+    return Path(f"data/k{kn}_plenum_search.json"), Path(f"data/search_p{kn}")
+
+
 KNESSET = 25
+OUT, SHARD_DIR = paths_for(KNESSET)
+MANIFEST = SHARD_DIR / "manifest.json"
 
 
 def get(path):
@@ -83,18 +94,26 @@ def session_words_text(text):
 
 
 def main():
+    global KNESSET, OUT, SHARD_DIR, MANIFEST
     force = "--force" in sys.argv
+    if "--knesset" in sys.argv:
+        KNESSET = int(sys.argv[sys.argv.index("--knesset") + 1])
+        if KNESSET not in (25, 26):
+            raise SystemExit("--knesset must be 25 or 26")
+        OUT, SHARD_DIR = paths_for(KNESSET)
+        MANIFEST = SHARD_DIR / "manifest.json"
     index, done_sids = {}, set()
     if force:
         import shutil
-        if SEARCH_P_DIR.exists():
-            shutil.rmtree(SEARCH_P_DIR)
+        if SHARD_DIR.exists():
+            shutil.rmtree(SHARD_DIR)
     else:
         if OUT.exists():
             index = json.loads(OUT.read_text(encoding="utf-8"))
             # Pre-shard files carry a truncated `words` map per session;
             # those sessions are NOT in the shards yet and must be redone.
-            index = {sid: {k: v for k, v in e.items() if k != "words"}
+            index = {sid: {**{k: v for k, v in e.items() if k != "words"},
+                           "kn": e.get("kn", KNESSET)}
                      for sid, e in index.items()}
         if MANIFEST.exists():
             done_sids = set(json.loads(
@@ -124,7 +143,7 @@ def main():
         # the same pass — the transcript is already in memory here, and
         # re-downloading it later just to score turns would double the
         # traffic. IDF = the shard corpus as indexed before this run.
-        hl_idf = idf_map(session_df(), len(sessions))
+        hl_idf = idf_map(session_df(SHARD_DIR), len(sessions))
 
         def work(job):
             s, urls = job
@@ -134,7 +153,7 @@ def main():
                 counts.update(session_words_text(text))
             entry = {"number": s["Number"],
                      "date": (s.get("StartDate") or "")[:10],
-                     "doc": urls[0]}
+                     "doc": urls[0], "kn": KNESSET}
             hl = None
             try:
                 hl = session_hl(merge_parts(str(s["Id"]), entry["date"], texts),
@@ -151,7 +170,7 @@ def main():
                 sid = futs[fut]
                 try:
                     s, counts, entry, hl = fut.result()
-                    add_counts_to_shards(SEARCH_P_DIR, str(s["Id"]), counts,
+                    add_counts_to_shards(SHARD_DIR, str(s["Id"]), counts,
                                          cache, dirty)
                     index[str(s["Id"])] = entry
                     done_sids.add(str(s["Id"]))
@@ -164,16 +183,16 @@ def main():
                 done += 1
                 if done % 40 == 0:
                     print(f"{done}/{len(jobs)} done, {len(failed)} failed", flush=True)
-        flush_shards(SEARCH_P_DIR, cache, dirty)
+        flush_shards(SHARD_DIR, cache, dirty)
         print(f"wrote {len(dirty)} shard files", flush=True)
         if failed:
             print(f"FAILED: {failed[:8]}", flush=True)
     OUT.write_text(json.dumps(index, ensure_ascii=False), encoding="utf-8")
-    SEARCH_P_DIR.mkdir(parents=True, exist_ok=True)
+    SHARD_DIR.mkdir(parents=True, exist_ok=True)
     MANIFEST.write_text(json.dumps(
         {"sessions": sorted(done_sids, key=int)}, ensure_ascii=False),
         encoding="utf-8")
-    print(f"DONE {len(index)} plenum sessions indexed -> {OUT} (+{SEARCH_P_DIR})")
+    print(f"DONE {len(index)} plenum sessions indexed -> {OUT} (+{SHARD_DIR})")
 
 
 if __name__ == "__main__":

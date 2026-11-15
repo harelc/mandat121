@@ -42,4 +42,29 @@ for (const f of ["committee-protocol", "plenum"]) {
   assert.equal(chairs[0].speaker, "משה גפני", `${f}: manager header unwrapped`); passed++;
   assert.ok(chairs[0].text.endsWith("הישיבה ננעלה בשעה 14:23."), `${f}: lone trailing end-marker stripped`); passed++;
 }
+// A continuation naming a DIFFERENT speaker than the previous turn is
+// that speaker's new turn — e.g. the chair's "משפט לסיום" interjection
+// between an MK and their resumed closing sentence (sitting 2245727
+// rendered Kreutzer's words as Ohana's). Same-speaker continuations
+// still merge (case above).
+const TEXT2 = [
+  "<< דובר >> יצחק קרויזר (סיעת הדוגמה): << דובר >>",
+  "גוף הנאום של קרויזר.",
+  '<< יור >> היו"ר אמיר אוחנה: << יור >>',
+  "חבר הכנסת קרויזר, משפט לסיום.",
+  "<< דובר_המשך >> יצחק קרויזר (סיעת הדוגמה): << דובר_המשך >>",
+  "אז משפט לסיום. תודה רבה.",
+  '<< יור >> היו"ר אמיר אוחנה: << יור >>',
+  "תודה רבה.",
+].join("\n");
+for (const f of ["committee-protocol", "plenum"]) {
+  const { parseTranscript } = await import(`../netlify/functions/${f}.mjs`);
+  const { turns, speakers } = parseTranscript(TEXT2);
+  assert.equal(turns.length, 4, `${f}: resumed speech is its own turn`); passed++;
+  assert.equal(turns[1].text, "חבר הכנסת קרויזר, משפט לסיום.", `${f}: chair turn stays the interjection only`); passed++;
+  assert.equal(turns[2].speaker, "יצחק קרויזר", `${f}: continuation attributed to its named speaker`); passed++;
+  assert.equal(turns[2].role, "speaker", `${f}: resumed turn is a speaker turn`); passed++;
+  assert.equal(speakers["יצחק קרויזר"].turns, 2, `${f}: speaker counted for both turns`); passed++;
+  assert.equal(speakers["אמיר אוחנה"].turns, 2, `${f}: chair counted for both of his turns`); passed++;
+}
 console.log(`protocol parse: ${passed} tests passed`);

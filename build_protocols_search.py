@@ -152,10 +152,22 @@ def main():
     except Exception:
         index = {}
     files = sorted(PROTO_DIR.glob("*.json"))
+    # data/protocols/ is shared across Knessets (session ids are unique).
+    # This builder owns the K25 corpus only — K26 parsed protocols belong
+    # to search_c26 (build_committee_search.py --knesset 26) and must not
+    # leak into the K25 shards/metadata when they start landing.
+    k26_sids = set()
+    try:
+        k26_sids = set(json.load(
+            open("data/k26_protocols_index.json", encoding="utf-8")))
+    except Exception:
+        pass
     counters = {}
     for f in files:
         doc = json.load(open(f, encoding="utf-8"))
         sid = str(doc["id"])
+        if sid in k26_sids:
+            continue
         counts = Counter()
         for t in doc["turns"]:
             if t["role"] in ("speaker", "chair", "guest"):

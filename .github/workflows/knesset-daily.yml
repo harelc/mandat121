@@ -149,12 +149,17 @@ jobs:
       # K26 layers, in dependency order. Each builder no-ops until its
       # OData layer exists, so this whole step is gated only on "anything
       # published at all" (probe k26_any) — not on bills specifically.
+      # Votes are gated on bills OR plenum_votes: a Knesset can publish a
+      # plenum vote before its first bill (K26 vote 46716, 2026-11-11,
+      # sat unpublished on the site for days because bills was still 0).
+      # build_knesset builds bills and vote headers together and is a
+      # clean no-op for whichever layer is still empty.
       - name: Build K26 core (bills + vote headers)
-        if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_bills == 'true' }}
+        if: ${{ inputs.target != 'k25-only' && (steps.probe.outputs.k26_bills == 'true' || steps.probe.outputs.k26_plenum_votes == 'true') }}
         run: python3 -u build_knesset.py --knesset 26
 
       - name: Harvest per-MK vote results (K26)
-        if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_bills == 'true' }}
+        if: ${{ inputs.target != 'k25-only' && (steps.probe.outputs.k26_bills == 'true' || steps.probe.outputs.k26_plenum_votes == 'true') }}
         run: python3 -u build_vote_results.py --knesset 26 # resumable; checkpoints to data/k26_vote_results.json
 
       - name: Build K26 people layers (tenure, list order, committee members)
@@ -174,7 +179,15 @@ jobs:
         run: |
           python3 -u build_committees.py --knesset 26 # -> data/k26_committees.json (never touches K25 committees.json)
           python3 -u build_protocols.py --knesset 26  # -> data/k26_protocols_index.json + shared data/protocols/
+          python3 -u build_committee_search.py --knesset 26 # -> data/k26_protocol_search.json + data/search_c26/ (incremental; no-op until protocol docs publish)
           if [ "${{ inputs.full }}" = "true" ] || [ $((10#$(date -u +%V) % 2)) -eq 0 ]; then python3 -u build_mk_highlights.py; else echo "mk_highlights skipped (biweekly layer)"; fi # shared protocol store; biweekly per Derived layers note
+
+      # Plenum sittings (דברי הכנסת) publish independently of bills and
+      # committee sessions — gate on their own probe layer, or the K26
+      # sittings never reach the site (happened to sittings 1–2, Nov 2026).
+      - name: Build K26 plenum search (דברי הכנסת)
+        if: ${{ inputs.target != 'k25-only' && steps.probe.outputs.k26_plenum_sessions == 'true' }}
+        run: python3 -u build_plenum_search.py --knesset 26 # -> data/k26_plenum_search.json + data/search_p26/ + data/plenum_hl/
 
       # Event stream: diff the fresh snapshot against yesterday's and
       # append dated status-change / new-bill / new-vote / new-session

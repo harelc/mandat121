@@ -78,8 +78,11 @@ LABELS = {
     "mk_highlights.json": "MK speech highlights (what each MK talks about)",
     "events.json": "Event stream (new bills / votes / sessions, status changes)",
     "protocol_search.json": "Committee protocol search index",
+    "k26_protocol_search.json": "Knesset 26 — committee protocol search index",
     "plenum_search.json": "Plenum speech (דברי הכנסת) search index",
+    "k26_plenum_search.json": "Knesset 26 — plenum speech (דברי הכנסת) search index",
     "protocols_index.json": "Committee protocol index",
+    "k26_protocols_index.json": "Knesset 26 — committee protocol index",
     "topics.json": "Topic taxonomy", "cmt_hl.json": "Committee speech highlights",
     "committee_attendance.json": "Committee attendance",
 }
@@ -93,7 +96,9 @@ KEY_LABELS = {
 # never one row per shard.
 GROUP_DIRS = {
     "search_c": "Committee protocol search shards",
+    "search_c26": "Knesset 26 — committee protocol search shards",
     "search_p": "Plenum speech search shards",
+    "search_p26": "Knesset 26 — plenum speech search shards",
     "plenum_hl": "Plenum highlight shards",
     "protocols": "Committee protocol full texts",
     "photos": "MK portraits",

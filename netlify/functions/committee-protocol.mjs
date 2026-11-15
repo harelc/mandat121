@@ -109,17 +109,6 @@ export function parseTranscript(text) {
     const body = parasOf(text.slice(m.index + m[0].length, i + 1 < matches.length ? matches[i + 1].index : undefined).replace(/\s*<<\s*סיום\s*>>\s*$/, "")); // a lone trailing end-marker has no pair to match
     if (role === "topic") { turns.push({ role: "topic", speaker: "", text: header || body }); continue; }
     if (role === "end") continue;
-    if (role === "cont") {
-      // << דובר_המשך >>: the same speaker continues — another paragraph
-      // of the previous turn, not a new turn of their own.
-      const prev = turns[turns.length - 1];
-      if (prev && ["speaker", "chair", "guest"].includes(prev.role) && body) {
-        prev.text += "\n\n" + body;
-        if (speakers[prev.speaker]) speakers[prev.speaker].words += body.split(/\s+/).length;
-        continue;
-      }
-      role = "speaker"; // a continuation with nothing before it
-    }
     let faction = "";
     if (header.startsWith("(") && header.endsWith(")")) {
       header = header.slice(1, -1).replace(/,\s*\d{1,2}:\d{2}\s*$/, "").trim(); // << מנהל >> wraps the whole name: (היו"ר שם, 14:08)
@@ -128,6 +117,23 @@ export function parseTranscript(text) {
       if (fm) { header = fm[1].trim(); faction = fm[2].trim(); }
     }
     const speaker = header.replace(/^היו["״]ר\s+/, "").trim();
+    if (role === "cont") {
+      // << דובר_המשך >> usually means the same speaker continues: merge
+      // into the previous turn. But the header NAMES the speaker, and
+      // when someone else (typically the chair: "משפט לסיום") interjected
+      // in between, the previous turn is theirs — the resumed speech is
+      // a new turn of the named speaker, not more words for the
+      // interjector. Sitting 2245727: Kreutzer's closing sentence was
+      // rendered as the chair's. Merge only when the header is empty
+      // or names the previous speaker.
+      const prev = turns[turns.length - 1];
+      if (prev && ["speaker", "chair", "guest"].includes(prev.role) && body && (!speaker || speaker === prev.speaker)) {
+        prev.text += "\n\n" + body;
+        if (speakers[prev.speaker]) speakers[prev.speaker].words += body.split(/\s+/).length;
+        continue;
+      }
+      role = "speaker"; // continuation of a different speaker, or nothing before it
+    }
     if (!speaker || !body) continue;
     turns.push({ role, speaker, faction_hint: faction, text: body });
     const s = speakers[speaker] ??= { turns: 0, words: 0, role, faction_hint: faction };
