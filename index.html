@@ -5335,21 +5335,26 @@ function renderMine(){
   if(fm.length&&!MK_HIGHLIGHTS) ensureMkHighlights().then(()=>{ if(view==='mine') renderMine() }).catch(()=>{});
   if(!EVENTS) ensureEvents().catch(()=>{});
   const feed=[]; const feedSeen=new Set();
-  const pushFeed=(date,icon,title,sub,go)=>{ if(!date) return; const k=icon+'|'+title+'|'+date; if(feedSeen.has(k)) return; feedSeen.add(k); feed.push({date,icon,title,sub,go}) };
+  // Dedup by logical identity when a caller passes `key` (session:<id>,
+  // vote:<id>): the same sitting/vote is reported by both the server event
+  // stream and the client snapshot below, with different titles — the old
+  // icon|title|date key let both through as near-duplicate rows. First
+  // push wins, and the event-stream loops run first on purpose.
+  const pushFeed=(date,icon,title,sub,go,key)=>{ if(!date) return; const k=(key&&!/:(undefined|null)$/.test(key))?key:icon+'|'+title+'|'+date; if(feedSeen.has(k)) return; feedSeen.add(k); feed.push({date,icon,title,sub,go}) };
   const fbIds=new Set(fb.map(b=>String(b.id)));
   // Server-proven transitions first: exact from→to status changes on
   // followed bills (the snapshot feed below cannot claim these).
   if(EVENTS) for(const e of EVENTS){
     if(e.type==='status_change'&&fbIds.has(String(e.bill_id))) pushFeed(e.date,'🔀',`חוק במעקב שינה שלב: ${e.name||''}`,`${e.from||'—'} ← ${e.to||''} · כנסת ${e.kn}`,`openBillPage('${e.bill_id}')`);
-    else if(e.type==='new_vote'&&e.item_id&&fbIds.has(String(e.item_id))) pushFeed(e.date,'🗳️',`הצבעה חדשה על חוק במעקב: ${(ALLB_BY_ID[e.item_id]&&displayText(ALLB_BY_ID[e.item_id]))||e.name||''}`,`${e.for??''}–${e.against??''}`,`openVote('${e.vote_id}')`);
-    else if(e.type==='new_session'&&(S.followCommittees||[]).map(String).includes(String(e.committee_id))) pushFeed(e.date,'🏛️',`ישיבה חדשה בוועדה במעקב: ${e.committee||cmtName(e.committee_id)}`,`ישיבת ועדה · כנסת ${e.kn}`,`openCommittee('${e.committee_id}')`);
+    else if(e.type==='new_vote'&&e.item_id&&fbIds.has(String(e.item_id))) pushFeed(e.date,'🗳️',`הצבעה חדשה על חוק במעקב: ${(ALLB_BY_ID[e.item_id]&&displayText(ALLB_BY_ID[e.item_id]))||e.name||''}`,`${e.for??''}–${e.against??''}`,`openVote('${e.vote_id}')`,`vote:${e.vote_id}`);
+    else if(e.type==='new_session'&&(S.followCommittees||[]).map(String).includes(String(e.committee_id))) pushFeed(e.date,'🏛️',`ישיבה חדשה בוועדה במעקב: ${e.committee||cmtName(e.committee_id)}`,`ישיבת ועדה · כנסת ${e.kn}`,`openCommittee('${e.committee_id}')`,`session:${e.session_id}`);
   }
   for(const b of fb){
     pushFeed(billActivityDate(b),'📜',`פעילות בחוק במעקב: ${displayText(b)}`,`${billActivityLabel(b)} · השלב כעת: ${statusBucket(b)}`,`openBillPage('${b.id}')`);
   }
   for(const v of VOTES_ALL){
-    if(v.item_id&&fbIds.has(String(v.item_id))){ const b=ALLB_BY_ID[v.item_id]; pushFeed(v.date,'🗳️',`הצבעה על חוק במעקב: ${b?displayText(b):''}`,`${v.for??''}–${v.against??''} · ${RL[v.reading]||v.kind_label||'הצבעת מליאה'}`,`openVote('${v.id}')`) }
-    if((S.followTopics||[]).length&&v.item_id&&ALLB_BY_ID[v.item_id]){ const ts=(ALLB_BY_ID[v.item_id].topics||[]).filter(t=>(S.followTopics||[]).includes(t)); if(ts.length) pushFeed(v.date,'🏷️',`הצבעה בנושא במעקב (${ts.join(', ')}): ${displayText(ALLB_BY_ID[v.item_id])}`,`${v.for??''}–${v.against??''}`,`openVote('${v.id}')`) }
+    if(v.item_id&&fbIds.has(String(v.item_id))){ const b=ALLB_BY_ID[v.item_id]; pushFeed(v.date,'🗳️',`הצבעה על חוק במעקב: ${b?displayText(b):''}`,`${v.for??''}–${v.against??''} · ${RL[v.reading]||v.kind_label||'הצבעת מליאה'}`,`openVote('${v.id}')`,`vote:${v.id}`) }
+    if((S.followTopics||[]).length&&v.item_id&&ALLB_BY_ID[v.item_id]){ const ts=(ALLB_BY_ID[v.item_id].topics||[]).filter(t=>(S.followTopics||[]).includes(t)); if(ts.length) pushFeed(v.date,'🏷️',`הצבעה בנושא במעקב (${ts.join(', ')}): ${displayText(ALLB_BY_ID[v.item_id])}`,`${v.for??''}–${v.against??''}`,`openVote('${v.id}')`,`vote:${v.id}`) }
   }
   const RV={1:'בעד',2:'נגד',3:'נמנע'};
   for(const m of fm){
@@ -5364,7 +5369,7 @@ function renderMine(){
     if(mineMk&&!fbIds.has(String(b.id))) pushFeed(billActivityDate(b),'✍️',`הצעת חוק של ${disp(mineMk.name)}: ${b.name}`,`${billActivityLabel(b)||statusBucket(b)} · השלב כעת: ${statusBucket(b)}`,`openBillPage('${b.id}')`);
   }
   const sessSrc=[...(CMT?.recent_sessions||[]),...(K26CMT?.recent_sessions||[])];
-  for(const s of sessSrc){ if((S.followCommittees||[]).map(String).includes(String(s.committee_id))) pushFeed((s.start||s.date||'').slice(0,10),'🏛️',`ישיבה של ועדה במעקב: ${cmtName(s.committee_id)}`,`${s.title||'ישיבת ועדה'}`,`openCommittee('${s.committee_id}')`) }
+  for(const s of sessSrc){ if((S.followCommittees||[]).map(String).includes(String(s.committee_id))) pushFeed((s.start||s.date||'').slice(0,10),'🏛️',`ישיבה של ועדה במעקב: ${cmtName(s.committee_id)}`,`${s.title||'ישיבת ועדה'}`,`openCommittee('${s.committee_id}')`,`session:${s.id}`) }
   if(ff.length){
     const memberNames=new Set();
     for(const f of ff){ const cf=currentFactions().find(x=>x.name===f||shortF(x.name)===f); if(cf) cf.members.forEach(n=>memberNames.add(n));
