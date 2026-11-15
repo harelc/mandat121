@@ -931,7 +931,12 @@ function starUid(){ try{ let u=localStorage.getItem('m121-uid'); if(!u){ u=(cryp
 function starCountOf(kind,key){ return STAR_COUNTS[kind+':'+key]||0 }
 const starChip=(kind,key)=>{ const n=starCountOf(kind,key); return `<span class="chip" data-starc-chip="${esc(kind)}:${esc(key)}" style="color:#8a660a;border-color:#c9a227;background:#f6ebc3;font-weight:800;${n?'':'display:none'}" title="עוקבים באתר">★ ${n?n.toLocaleString('he-IL'):''}</span>` };
 function paintStarCounts(){ document.querySelectorAll('[data-starc]').forEach(el=>{ const n=STAR_COUNTS[el.dataset.starc]||0; el.textContent=n? n.toLocaleString('he-IL'):''; el.style.display=n?'':'none' }); document.querySelectorAll('[data-starc-chip]').forEach(el=>{ const n=STAR_COUNTS[el.dataset.starcChip]||0; el.textContent=n?`★ ${n.toLocaleString('he-IL')}`:''; el.style.display=n?'':'none' }) }
-function loadStarCounts(){ fetch('/.netlify/functions/stars',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.counts){ STAR_COUNTS=j.counts; paintStarCounts() } }).catch(()=>{}); migrateLocalStars() }
+function loadStarCounts(){ fetch('/.netlify/functions/stars',{cache:'no-store'}).then(r=>r.ok?r.json():null).then(j=>{ if(j&&j.counts){ STAR_COUNTS=j.counts; paintStarCounts(); repaintTopStars() } }).catch(()=>{}); migrateLocalStars() }
+/* The most-followed pane exists on Now as an empty #topStarsBox placeholder
+   until STAR_COUNTS land (the /stars fetch races the first paint). Repaint
+   only that pane when they arrive — a full render() here would reset the
+   hero/agenda state the user may already be interacting with. */
+function repaintTopStars(){ const box=document.getElementById('topStarsBox'); if(box) box.outerHTML=siteTopStarsHTML() }
 /* One-time backfill: follows made before server counts existed live only
    in localStorage, so the server has never heard of them (they'd show 0
    followers and toggling would "unfollow" into a no-op). On first load
@@ -957,7 +962,7 @@ function migrateLocalStars(){
 }
 function syncStar(kind,key,on){ const uid=starUid(); if(!uid) return;
   fetch('/.netlify/functions/stars',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind,key,uid,on}),cache:'no-store'})
-    .then(r=>r.ok?r.json():null).then(j=>{ if(j&&typeof j.count==='number'){ STAR_COUNTS[kind+':'+key]=j.count; paintStarCounts() } }).catch(()=>{}) }
+    .then(r=>r.ok?r.json():null).then(j=>{ if(j&&typeof j.count==='number'){ STAR_COUNTS[kind+':'+key]=j.count; paintStarCounts(); repaintTopStars() } }).catch(()=>{}) }
 function toggleIn(arr,v){const i=arr.indexOf(v); i>=0?arr.splice(i,1):arr.push(v); save()}
 
 let MKP={}, K26=null, mkIndex={}, factionStats={};
@@ -5266,7 +5271,7 @@ function renderAbout(){
    rows resolving stored keys (bill:4290 is an internal id) to names. */
 function siteTopStarsHTML(){
   const top=Object.entries(STAR_COUNTS).sort((a,b)=>b[1]-a[1]).slice(0,8);
-  if(!top.length) return '';
+  if(!top.length) return '<div id="topStarsBox"></div>'; // placeholder: repaintTopStars() fills it when /stars lands — without it the pane only appeared after a full re-render (e.g. switching Knesset and back)
   const rows=top.map(([k,n],idx)=>{ const i=k.indexOf(':'); const kind=k.slice(0,i), key=k.slice(i+1);
     let lbl=key, go='';
     if(kind==='bill'){ const kb=ALLB_BY_ID[key]||K26B.find(b=>String(b.id)===key);
@@ -5288,7 +5293,7 @@ function siteTopStarsHTML(){
     else if(kind==='faction'){ go=`openFaction('${jsq(key)}')` }
     const kindLbl={bill:'חוק',mk:'ח״כ',committee:'ועדה',faction:'סיעה',topic:'נושא'}[kind]||'';
     return `<div class="row" ${go?`onclick="${go}"`:''}><b style="color:var(--accent);width:1.6rem">${idx+1}</b><span class="flex wrap">${esc(lbl)}<br><span class="dim small">${esc(kindLbl)}</span></span>${starChip(kind,key)}</div>` }).join('');
-  return `<div class="sec-title">★ הכי נעקבים באתר כרגע <small>מה כל המבקרים מסמנים במעקב — לחצו לשם</small></div><div class="card rows rise">${rows}</div>`;
+  return `<div id="topStarsBox"><div class="sec-title">★ הכי נעקבים באתר כרגע <small>מה כל המבקרים מסמנים במעקב — לחצו לשם</small></div><div class="card rows rise">${rows}</div></div>`;
 }
 function renderMine(){
   // Newest vote first: the list below is capped, so insertion order would
