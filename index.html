@@ -1211,7 +1211,7 @@ function voteModel26(id){
   const v=K26V_BY_ID[key]; if(!v) return null;
   const rows=VOTE_RES26.votes[key]||[];
   const m={id:key,bill_id:v.item_id||null,lite:null,name:v.title||'',title:v.title||'',sub:v.desc||'',
-    vote_date:v.date,kind:v.kind||null,kind_label:v.kind_label||'',method_id:v.method_id||null,secret:v.secret||null,
+    vote_date:v.date,session:v.session||null,kind:v.kind||null,kind_label:v.kind_label||'',method_id:v.method_id||null,secret:v.secret||null,
     has_tally:v.for!=null&&v.against!=null,bill_type:'',topics:[],doc_url:null,summary:null,synopsis:null,
     total_for:v.for||0,total_against:v.against||0,total_abstain:v.abstain||0,
     mk_votes:rows.map(([i,c])=>{const nm=VOTE_RES26.names[i]; const e=k26Entry(nm); return {mk_name:nm,result:c,faction:(e&&e.party&&e.party.name)||''}})};
@@ -1465,7 +1465,7 @@ function voteModel(id){
   const v=VOTE_BY_ID[key]; if(!v) return null;
   const lite=v.item_id?ALLB_BY_ID[v.item_id]:null;
   const m={id:key,bill_id:v.item_id||null,lite,name:v.title||'',title:v.title||'',sub:v.desc||'',
-    vote_date:v.date,kind:v.kind||null,kind_label:v.kind_label||'',
+    vote_date:v.date,session:v.session||null,kind:v.kind||null,kind_label:v.kind_label||'',
     method_id:v.method_id||null,secret:v.secret||null,
     has_tally:v.for!=null&&v.against!=null,
     bill_type:(lite&&lite.type)||'',topics:(lite&&lite.topics)||[],doc_url:(lite&&lite.doc_url)||null,
@@ -3814,6 +3814,7 @@ function exportFactionPNG(name){
   d.finish();
 }
 function renderVote26(){
+  ensurePlenumSearch(); // for the sitting link below; re-renders this page when it lands
   const app=$('#app'), b=viewArg?voteModel26(viewArg):null;
   if(!b){ if(!K25_READY){ ensureK25Archive(); routePending('ההצבעה') } else app.innerHTML=backBtnHTML('votes','› חזרה להצבעות')+'<div class="card empty" style="margin-top:.6rem"><div class="big">🗳️</div>ההצבעה לא נמצאה בכנסת ה־26.</div>'; return }
   const reb=rebels(b);
@@ -3846,6 +3847,7 @@ function renderVote26(){
     </div>
     <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:1rem">
       <a class="btn" href="https://knesset.gov.il/vote/heb/Vote_Res_Map.asp?vote_id_t=${b.id}" target="_blank" rel="noopener">דף ההצבעה הרשמי ↗</a>
+      ${(()=>{const ps=votePlenumSession(b,26); return ps?`<button class="btn" onclick="openPlenum('${ps.sid}')">📜 דברי הכנסת של הישיבה${ps.number?` (מס׳ ${ps.number})`:''} ←</button>`:''})()}
     </div>
   </article>
   ${b.mk_votes.length?`
@@ -3888,7 +3890,7 @@ function renderVote(){
   const byF={}; (b.mk_votes||[]).forEach(v=>{const f=shortF(v.faction); (byF[f]??={f:0,a:0,n:0,full:v.faction}); byF[f][v.result===1?'f':v.result===2?'a':'n']++});
   const frows=Object.entries(byF).sort((x,y)=>(y[1].f+y[1].a+y[1].n)-(x[1].f+x[1].a+x[1].n));
   const nouns=b.kind==='noconfidence'?['הצעת אי־האמון התקבלה','הצעת אי־האמון נדחתה']:b.kind==='reservation'?['ההסתייגות התקבלה','ההסתייגות נדחתה']:['ההצעה התקבלה','ההצעה נדחתה'];
-  const plnSess=plenumForDate(b.vote_date);
+  const plnSess=votePlenumSession(b,25);
   app.innerHTML=`
   ${backBtnHTML('votes','› חזרה להצבעות')}
   <div class="sec-title" style="margin-top:.4rem">הצבעה במליאה <small>דף הצבעה — מפת המליאה, פירוט לפי ח״כ ו״אני הייתי מצביע״ מתייחסים להצבעה הזאת בלבד</small></div>
@@ -4962,6 +4964,11 @@ function renderCommitteesKeep(inp){ keepSearchFocus(inp,renderCommittees) }
    on demand by the plenum function, not pre-shipped (see ROADMAP). */
 function plenumEntries(kn=KN){ return Object.entries(PLENUM_SEARCH).filter(([,p])=>(p.kn||25)===kn).map(([sid,p])=>({sid,...p})).sort((a,b)=>b.number-a.number) }
 function plenumForDate(date,kn=25){ const hit=Object.entries(PLENUM_SEARCH).find(([,p])=>p.date===date&&(p.kn||25)===kn); return hit?{sid:hit[0],...hit[1]}:null }
+/* A vote's sitting, for the "דברי הכנסת של הישיבה" link: the exact
+   SessionID when the builder carried it, else the sitting held that
+   day (unique on all but multi-sitting days). Only sittings present in
+   the search index — i.e. with a published transcript — are linked. */
+function votePlenumSession(b,kn){ const e=b.session?PLENUM_SEARCH[String(b.session)]:null; return e?{sid:String(b.session),...e}:plenumForDate(b.vote_date,kn) }
 const plenumKn=sid=>{ const p=PLENUM_SEARCH[String(sid)]; return p?(p.kn||25):null };
 const cmtSegHTML=()=>`<div class="chips" role="group" aria-label="ועדות או שדלנים" style="margin-bottom:.9rem"><button class="chip ${cmtSeg==='committees'?'on':''}" onclick="cmtSeg='committees';renderCommittees()">ועדות</button><button class="chip ${cmtSeg==='lobbyists'?'on':''}" onclick="cmtSeg='lobbyists';lobbyFilter.limit=40;renderCommittees()">🕴️ שדלנים · מרשם עדכני${EXTRAS?.lobbyists?` (${EXTRAS.lobbyists.length.toLocaleString('he-IL')})`:''}</button></div>`;
 /* Plenum-browser search also runs on the shards (async, cached per query);

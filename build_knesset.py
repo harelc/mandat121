@@ -389,6 +389,7 @@ def main():
                 t = web["tally"]
         rec = {
             "id": v["Id"], "date": (v.get("VoteDateTime") or "")[:10],
+            "session": v.get("SessionID"),  # exact plenum sitting — the vote page links to its דברי הכנסת
             "item_id": v.get("ItemID"),
             "in_bills": v.get("ItemID") in bill_set,
             "title": v.get("VoteTitle"), "desc": v.get("ForOptionDesc"),
