@@ -21,3 +21,6 @@ __search_test.html
 
 # Local API reference notes (kept on disk, not tracked)
 KNESSET_APIS.md
+
+# One-off example/asset experiments (kept on disk, not tracked)
+examples/
