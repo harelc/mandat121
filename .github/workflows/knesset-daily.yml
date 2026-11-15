@@ -252,7 +252,9 @@ jobs:
             echo
             echo "_Auto-closed: this issue is only an email notification + archive._"
           } > notify-body.md
-          title="data refresh $(git log -1 --format=%cs "$sha") — pushed to main"
+          # Title carries the headline (e.g. "2 new committee sessions, 1 new
+          # bill"), not just the date — it's all the email subject shows.
+          title=$(python3 summarize_commit.py "$sha" --title || echo "data refresh $(git log -1 --format=%cs "$sha") — pushed to main")
           url=$(gh issue create --title "$title" --body-file notify-body.md)
           echo "Notification issue: $url"
           gh issue close "$url" --comment "Data already on main — closing; this issue was the email notification." \
