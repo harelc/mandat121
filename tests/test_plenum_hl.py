@@ -7,6 +7,7 @@ substantive turns become candidates, at most PER_SPEAKER per speaker,
 and scores order them. Run: python3 -m unittest discover -s tests
 """
 import importlib.util
+import json
 import unittest
 from pathlib import Path
 
@@ -50,6 +51,19 @@ class SessionHlTest(unittest.TestCase):
         d["turns"][0] = turn("שמחה רוטמן", text="<< הצח >> " + TEXT)
         out = ph.session_hl(d, {"number": 7, "date": "2024-01-01"}, {}, 418)
         self.assertNotIn("<<", out["top"]["שמחה רוטמן"][0]["excerpt"])
+
+    def test_residue_stamped_and_committed_files_current(self):
+        # A parser-attribution fix must regenerate the residue in the
+        # same change: stale files silently credited continuations to
+        # whoever interjected before them (sitting 2245727: an MK's
+        # 293-word maiden speech counted as 3 words, the rest went to
+        # the chair). This fails until data/plenum_hl/* is regenerated.
+        out = ph.session_hl(self.doc(), {"number": 7, "date": "2024-01-01"}, {}, 418)
+        self.assertEqual(out["parser_version"], ph.PARSER_VERSION)
+        hl_dir = ROOT / "data" / "plenum_hl"
+        stale = [f.name for f in hl_dir.glob("*.json")
+                 if json.loads(f.read_text("utf-8")).get("parser_version") != ph.PARSER_VERSION]
+        self.assertEqual(stale, [], f"regenerate with build_plenum_hl.py: {stale[:5]}…")
 
     def test_session_df_counts_sittings_per_word(self):
         import json, tempfile

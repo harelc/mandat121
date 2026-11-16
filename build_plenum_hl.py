@@ -26,8 +26,9 @@ plenum scores directly (separate picks per source).
 Two callers:
   * build_plenum_search.py — writes the file for every NEW sitting it
     indexes (daily, incremental; this module's session_hl()).
-  * this script as __main__ — one-time backfill over all sittings in
-    data/plenum_search.json (skips sittings whose file exists).
+  * this script as __main__ — backfill over all sittings in the era
+    plenum_search indexes (skips sittings whose residue file exists AND
+    carries the current build_protocols.PARSER_VERSION).
 Stdlib only.
 """
 import json
@@ -39,7 +40,7 @@ from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
-from build_protocols import docx_text, parse_text
+from build_protocols import PARSER_VERSION, docx_text, parse_text
 from build_protocols_search import SEARCH_P_DIR, words_of
 
 try:  # keep only MK-resolved speakers: guests/officials are dropped here,
@@ -108,6 +109,7 @@ def session_hl(doc, meta, idf, n_sessions):
     top = {k: v for k, v in top.items() if is_mk_speaker(k)}
     return {"id": str(doc["id"]), "number": meta.get("number"),
             "date": meta.get("date", doc.get("date", "")),
+            "parser_version": PARSER_VERSION,
             "speakers": speakers, "top": top}
 
 
@@ -156,16 +158,40 @@ def merge_parts(sid, date, texts):
     return {"id": sid, "date": date, "turns": turns, "speakers": speakers}
 
 
+def stale(sid):
+    """Residue is stale if missing or parsed under older turn-attribution
+    semantics. Without this, the Nov-2026 parser fix (continuation after
+    an interjection credited to the interjector) never reached sittings
+    indexed before it — their speaker totals stayed wrong forever."""
+    f = HL_DIR / f"{sid}.json"
+    if not f.exists():
+        return True
+    try:
+        return json.loads(f.read_text("utf-8")).get("parser_version") != PARSER_VERSION
+    except Exception:
+        return True
+
+
 def main():
     import sys
     force = "--force" in sys.argv
-    index = json.loads(PLENUM_INDEX.read_text("utf-8"))
-    todo = [(sid, m) for sid, m in index.items()
-            if force or not (HL_DIR / f"{sid}.json").exists()]
-    print(f"{len(todo)} sittings to backfill ({len(index)} indexed)", flush=True)
+    # Both eras' indexes: sittings share one HL_DIR / numeric id space.
+    eras = [(PLENUM_INDEX, SEARCH_P_DIR)]
+    k26_index = Path("data/k26_plenum_search.json")
+    if k26_index.exists():
+        eras.append((k26_index, Path("data/search_p26")))
+    index, idf_of, total = {}, {}, 0
+    for idx_path, shard_dir in eras:
+        idx = json.loads(idx_path.read_text("utf-8"))
+        idf = idf_map(session_df(shard_dir), len(idx))
+        for sid, m in idx.items():
+            index[sid] = m
+            idf_of[sid] = (idf, len(idx))
+        total += len(idx)
+    todo = [(sid, m) for sid, m in index.items() if force or stale(sid)]
+    print(f"{len(todo)} sittings to backfill ({total} indexed)", flush=True)
     if not todo:
         return
-    idf = idf_map(session_df(), len(index))
     docs = {}
     ids = [int(s) for s, _ in todo]
     for i in range(0, len(ids), 25):
@@ -179,7 +205,8 @@ def main():
     def work(item):
         sid, meta = item
         texts = [docx_text(u) for u in docs[sid]]
-        return write_hl(merge_parts(sid, meta["date"], texts), meta, idf, len(index))
+        idf, n_sessions = idf_of[sid]
+        return write_hl(merge_parts(sid, meta["date"], texts), meta, idf, n_sessions)
 
     done, failed = 0, []
     with ThreadPoolExecutor(max_workers=6) as ex:

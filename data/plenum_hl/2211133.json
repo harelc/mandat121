@@ -1,1 +1,1 @@
-{"id": "2211133", "number": 112, "date": "2023-11-02", "speakers": {"אופיר כץ": {"turns": 1, "words": 29, "role": "speaker", "faction_hint": "יו\"ר ועדת הכנסת"}}, "top": {}}
+{"id": "2211133", "number": 112, "date": "2023-11-02", "parser_version": 2, "speakers": {"משה טור פז": {"turns": 2, "words": 42, "role": "chair", "faction_hint": ""}, "אופיר כץ": {"turns": 1, "words": 29, "role": "speaker", "faction_hint": "יו\"ר ועדת הכנסת"}}, "top": {}}

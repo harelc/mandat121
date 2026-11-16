@@ -95,6 +95,15 @@ def strip_lone_markers(text):
     out.append(text[last:])
     return "".join(out)
 
+# Turn-attribution semantics version. Bump whenever a change alters who
+# a turn/word is credited to (e.g. the 2026-11-15 fix: a << דובר_המשך >>
+# resumption after someone else's interjection is the named speaker's own
+# turn, not part of the interjector's). Derived stores that cache parse
+# output (data/plenum_hl/*.json) stamp this and must be regenerated when
+# it moves — see build_plenum_hl.py; tests/test_plenum_hl.py enforces it.
+PARSER_VERSION = 2
+
+
 def parse_text(session, text):
     turns, speakers = [], {}
     text = strip_lone_markers(text)
