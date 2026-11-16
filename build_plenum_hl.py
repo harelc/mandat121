@@ -54,6 +54,13 @@ except Exception:  # highlights builder unavailable — keep everyone
     def is_mk_speaker(name):
         return True
 
+# Speaker→MK resolution semantics (build_mk_highlights.resolve) filter
+# which speakers are stored at all; bump when resolve() learns new name
+# forms (titles, nicknames, two-token surnames) so stale() re-parses
+# shards that dropped real MKs under the old rules (sitting 2246403
+# lost its ministers and מהא כרכבי סבאח that way).
+RESOLVER_VERSION = 1
+
 HL_DIR = Path("data/plenum_hl")
 PLENUM_INDEX = Path("data/plenum_search.json")
 BASE = "https://knesset.gov.il/OdataV4/ParliamentInfo/"
@@ -109,7 +116,7 @@ def session_hl(doc, meta, idf, n_sessions):
     top = {k: v for k, v in top.items() if is_mk_speaker(k)}
     return {"id": str(doc["id"]), "number": meta.get("number"),
             "date": meta.get("date", doc.get("date", "")),
-            "parser_version": PARSER_VERSION,
+            "parser_version": PARSER_VERSION, "resolver_version": RESOLVER_VERSION,
             "speakers": speakers, "top": top}
 
 
@@ -167,7 +174,8 @@ def stale(sid):
     if not f.exists():
         return True
     try:
-        return json.loads(f.read_text("utf-8")).get("parser_version") != PARSER_VERSION
+        d = json.loads(f.read_text("utf-8"))
+        return d.get("parser_version") != PARSER_VERSION or d.get("resolver_version") != RESOLVER_VERSION
     except Exception:
         return True
 

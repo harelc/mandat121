@@ -75,6 +75,33 @@ class ResolveTest(unittest.TestCase):
         self.assertNotIn("גואטה  ששון ששי", universe)
         self.assertEqual(len(universe), len({mh.norm_key(n) for n in universe}))
 
+    def test_ministerial_title_stripped(self):
+        # Sitting 2246403's ministers were dropped from its plenum_hl
+        # shard entirely because the header carries the portfolio.
+        bd, bp = mh.speaker_map({"גמליאל גילה", "בן גביר איתמר", "כהן אלמוג",
+                                 "סטרוק אורית מלכה", "פינק יאיא (יאיר)",
+                                 "כרכבי סבאח מהא"})
+        self.assertEqual(mh.resolve("שרת החדשנות, המדע והטכנולוגיה גילה גמליאל", bd, bp),
+                         "גמליאל גילה")
+        self.assertEqual(mh.resolve("השר לביטחון לאומי איתמר בן גביר", bd, bp), "בן גביר איתמר")
+        self.assertEqual(mh.resolve("סגן שר במשרד ראש הממשלה אלמוג כהן", bd, bp), "כהן אלמוג")
+        self.assertEqual(mh.resolve("שרת ההתיישבות והמשימות הלאומיות אורית מלכה סטרוק", bd, bp),
+                         "סטרוק אורית מלכה")
+
+    def test_parenthesised_nickname(self):
+        bd, bp = mh.speaker_map({"פינק יאיא (יאיר)"})
+        self.assertEqual(mh.resolve("יאיא (יאיר) פינק", bd, bp), "פינק יאיא (יאיר)")
+        self.assertEqual(mh.resolve("יאיא פינק", bd, bp), "פינק יאיא (יאיר)")
+
+    def test_two_token_surname_token_set(self):
+        # כרכבי סבאח is one surname; the naive flip reads סבאח מהא כרכבי.
+        bd, bp = mh.speaker_map({"כרכבי סבאח מהא"})
+        self.assertEqual(mh.resolve("מהא כרכבי סבאח", bd, bp), "כרכבי סבאח מהא")
+
+    def test_official_with_title_still_none(self):
+        bd, bp = mh.speaker_map({"גמליאל גילה"})
+        self.assertIsNone(mh.resolve("מזכיר הכנסת דן מרזוק", bd, bp))
+
     def test_guest_resolves_to_none(self):
         self.assertIsNone(mh.resolve("יוסי שריד-לוי", BY_DISPLAY, BY_PAIR))
         self.assertIsNone(mh.resolve("", BY_DISPLAY, BY_PAIR))

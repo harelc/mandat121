@@ -107,6 +107,13 @@ GROUP_DIRS = {
     "docs": "Bill documents",
 }
 INTERNAL_SUFFIX = "_state.json"  # builder bookkeeping, not site data
+# Plenum-speech indexes are dicts keyed by sitting id ({sid: {number,
+# date, doc, kn}}), unlike the list layers item_highlights() diffs — a
+# brand-new sitting (with its full דברי הכנסת protocol behind it) shows
+# up as one new key and was invisible to the summary: the 2026-11-16
+# refresh that added K26 sitting 2246403 read "No new bills, votes or
+# sessions — a contents/metadata refresh" (issue #36).
+PLENUM_SEARCH_FILES = {"plenum_search.json", "k26_plenum_search.json"}
 
 
 def friendly_label(path):
@@ -227,7 +234,7 @@ def _change_note(old_item, new_item):
     return ""
 
 
-def semantic_detail(old_bytes, new_bytes):
+def semantic_detail(old_bytes, new_bytes, path=""):
     """Short fragments describing a JSON file's change ([] if unparsable)."""
     if old_bytes is None:
         return ["new file"]
@@ -237,6 +244,20 @@ def semantic_detail(old_bytes, new_bytes):
         old, new = json.loads(old_bytes), json.loads(new_bytes)
     except Exception:
         return []
+    if PurePosixPath(path).name in PLENUM_SEARCH_FILES and isinstance(old, dict) and isinstance(new, dict):
+        added = [k for k in new if k not in old]
+        removed = [k for k in old if k not in new]
+        parts = []
+        if added:
+            parts.append(f"+{len(added)} sitting(s): " + "; ".join(
+                f"{k} ({new[k].get('date', '?')})" if isinstance(new[k], dict) else str(k)
+                for k in added[:3]))
+        if removed:
+            parts.append(f"−{len(removed)} sitting(s): " + ", ".join(removed[:3]))
+        changed = [k for k in new if k in old and new[k] != old[k]]
+        if changed and not added and not removed:
+            parts.append(f"{len(changed)} sitting(s) updated")
+        return parts or ["contents changed"]
     parts = []
     if isinstance(old, list) and isinstance(new, list):
         added, removed, updated = _diff_items(old, new)
@@ -319,6 +340,38 @@ def event_highlights(ref, files):
             session_ids.add(str(e.get("session_id")))
             out.append(("session", f"🏛️ New committee session: {e.get('committee') or e.get('committee_id')} — {d}"))
     return out, session_ids
+
+
+def plenum_highlights(files):
+    """New sittings in the dict-keyed plenum-speech indexes.
+
+    A new key there is a whole sitting whose דברי הכנסת protocol the
+    site can now open (the plenum_hl shard and the search_p* shards in
+    the same commit are just its index by-products — not separate
+    news). A whole index file appearing at once is capped the same
+    way: four sittings named, the rest counted.
+    """
+    out = []
+    for _, path, old_b, new_b in files:
+        if PurePosixPath(path).name not in PLENUM_SEARCH_FILES or new_b is None:
+            continue
+        try:
+            old = json.loads(old_b) if old_b else {}
+            new = json.loads(new_b)
+        except Exception:
+            continue
+        if not isinstance(new, dict):
+            continue
+        added = sorted((k for k in new if k not in (old or {})), key=lambda k: str((new[k] or {}).get("date") or k))
+        for sid in added[:4]:
+            e = new[sid] if isinstance(new[sid], dict) else {}
+            kn = e.get("kn") or (26 if "k26" in PurePosixPath(path).name else 25)
+            num = f" #{e['number']}" if e.get("number") else ""
+            out.append(("plenum", f"🎙️ New plenum sitting (K{kn}){num} — {e.get('date') or ''} "
+                                  f"(sitting {sid}; דברי הכנסת protocol published)"))
+        if len(added) > 4:
+            out.append(("plenum", f"🎙️ …and {len(added) - 4} more new plenum sittings"))
+    return out
 
 
 def portrait_highlights(ref, files):
@@ -415,6 +468,12 @@ def shrink_warnings(files):
             continue
         if "agenda" in path or path.endswith("events.json"):
             continue  # windowed / capped layers: items leave by design, not by loss
+        if PurePosixPath(path).name in PLENUM_SEARCH_FILES and isinstance(old, dict) and isinstance(new, dict):
+            removed = [k for k in old if k not in new]
+            if removed:
+                out.append(f"- {friendly_label(path)}: −{len(removed)} sitting(s) "
+                           f"({', '.join(removed[:3])})")
+            continue
         pairs = [("", old, new)] if isinstance(old, list) else \
             [(k, old.get(k), new.get(k)) for k in (old or {})
              if isinstance(old, dict) and k not in VOLATILE_KEYS
@@ -434,7 +493,8 @@ def collect(ref):
     if parent is None:
         return None, [], [], []
     ev, sess_ids = event_highlights(ref, files)
-    highlights = ev + portrait_highlights(ref, files) + item_highlights(ref, files, sess_ids)
+    highlights = ev + portrait_highlights(ref, files) + plenum_highlights(files) \
+        + item_highlights(ref, files, sess_ids)
     seen, uniq = set(), []
     for kind, text in highlights:  # agenda + committees can both add a sitting
         k = re.sub(r"[^0-9A-Za-zא-ת ]", "", text)[:90]
@@ -480,7 +540,7 @@ def summarize(ref="HEAD"):
             g["delta"] += (len(new_b or b"") - len(old_b or b""))
             g["paths"].append(path)
             continue
-        detail = "; ".join(semantic_detail(old_b, new_b))[:220]
+        detail = "; ".join(semantic_detail(old_b, new_b, path))[:220]
         size = (f"{len(old_b or b''):,} → {len(new_b or b''):,} B ({len(new_b or b'') - len(old_b or b''):+,})"
                 if old_b is not None and new_b is not None else f"{len(new_b or old_b or b''):,} B")
         rows.append(f"| {friendly_label(path)} | `{path}` | {status} | {size} | {detail} |")
@@ -503,7 +563,7 @@ def title_for(ref="HEAD"):
     counts = {}
     for kind, text in highlights:
         label = {"bill": None, "vote": "new plenum vote(s)", "session": "new committee session(s)",
-                 "portrait": "portrait update(s)"}.get(kind)
+                 "plenum": "new plenum sitting(s)", "portrait": "portrait update(s)"}.get(kind)
         if label:
             counts[label] = counts.get(label, 0) + 1
         elif text.startswith("📜 New bill"):

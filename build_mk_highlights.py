@@ -35,10 +35,16 @@ own text (first 300 chars), verbatim from the official transcript.
 
 Speaker→MK matching: protocol speakers are given-first ("שמחה רוטמן"),
 our keys surname-first ("רוטמן שמחה"). The map is built by inverting
-index.html's disp() (incl. its FORWARD exceptions — keep in sync), with
-an unambiguous (surname, first-given-name) token fallback for speakers
-the transcript spells with a middle name ("מיכל מרים וולדיגר").
-Unmatched speakers (guests, officials) are simply not MKs — skipped.
+index.html's disp() (incl. its FORWARD exceptions — keep in sync), then
+resolved in layers, each unambiguous-only (mirrors protoSpeakerKey in
+index.html — keep the two in step): exact display form → title-stripped
+suffixes ("השר לביטחון לאומי איתמר בן גביר", "שרת החדשנות, המדע
+והטכנולוגיה גילה גמליאל") → same token set in any order ("מהא כרכבי
+סבאח") → token sets differing only in middle names ("מיכל מרים
+וולדיגר"), the last only when the (surname, first-given-name) pair is
+unambiguous. Parenthesised nicknames ("יאיא (יאיר) פינק") and hyphen
+spellings are normalised away on both sides. Unmatched speakers
+(guests, officials) are simply not MKs — skipped.
 Stdlib only.
 """
 import json
@@ -66,7 +72,8 @@ FORWARD = {"פרקש הכהן אורית": "אורית פרקש הכהן", "בן
            "להב הרצנו יוראי": "יוראי להב הרצנו", "סון הר מלך לימור": "לימור סון הר מלך",
            "צרפתי הרכבי מטי": "מטי צרפתי הרכבי", "רון בן משה יעל": "יעל רון בן משה",
            "רייטן מרום אפרת": "אפרת רייטן מרום", "שאשא ביטון יפעת": "יפעת שאשא-ביטון",
-           "שיר סגמן מיכל": "מיכל שיר סגמן", "תומא סלימאן עאידה": "עאידה תומא סלימאן"}
+           "שיר סגמן מיכל": "מיכל שיר סגמן", "תומא סלימאן עאידה": "עאידה תומא סלימאן",
+           "כרכבי סבאח מהא": "מהא כרכבי סבאח"}
 
 
 # index.html NAME_CANON (the alias half of normName) — keep in sync.
@@ -139,6 +146,13 @@ def mk_universe():
     return names
 
 
+def _norm_form(s):
+    """Comparison form for speaker/display strings: canonical spelling
+    (norm_key), parenthesised nicknames dropped, hyphens as spaces."""
+    s = re.sub(r"\([^)]*\)", " ", str(s or "")).replace("-", " ").replace("–", " ")
+    return " ".join(norm_key(s).split())
+
+
 def speaker_map(names):
     """given-first protocol speaker -> surname-first MK key."""
     by_display = {}
@@ -146,23 +160,72 @@ def speaker_map(names):
     # sorted order: if two surviving keys ever share a display form, the
     # winner is deterministic instead of set-iteration (hash) order.
     for n in sorted({norm_key(n) for n in names}):
-        by_display.setdefault(" ".join(disp(n).split()), n)
+        by_display.setdefault(_norm_form(disp(n)), n)
     # (surname token, first given token) fallback, unambiguous only.
     by_pair = {}
     for n in names:
-        d = disp(n).split()
+        d = _norm_form(disp(n)).split()
         if len(d) >= 2:
             by_pair.setdefault((d[-1], d[0]), set()).add(n)
     return by_display, {k: next(iter(v)) for k, v in by_pair.items() if len(v) == 1}
 
 
+def _candidates(s):
+    """Name strings to try, most complete first: the full string, what
+    follows the last comma (a ministerial title ends there), then
+    progressively shorter suffixes (title words in front)."""
+    out = []
+    for base in (s, s.split(",")[-1].strip()):
+        t = base.split()
+        for i in range(len(t) - 1):
+            c = " ".join(t[i:])
+            if c not in out:
+                out.append(c)
+    return out
+
+
+def _token_match(toks, by_display, by_pair):
+    T = set(toks)
+    if len(T) < 2:
+        return None
+    equal = {k for d, k in by_display.items() if set(d.split()) == T}
+    if len(equal) == 1:
+        return equal.pop()
+    if len(equal) > 1:
+        return None
+    # Middle names only — and only when the (surname, first given name)
+    # pair names exactly one MK, so an ambiguous pair never guesses.
+    pair = (toks[-1], toks[0])
+    if pair not in by_pair:
+        return None
+    best, best_diff = [], None
+    for d, k in by_display.items():
+        dt = d.split()
+        if dt[0] == toks[0] and dt[-1] == toks[-1] and (T < set(dt) or set(dt) < T):
+            diff = len(T ^ set(dt))
+            if best_diff is None or diff < best_diff:
+                best, best_diff = [k], diff
+            elif diff == best_diff:
+                best.append(k)
+    return best[0] if len(set(best)) == 1 and best[0] == by_pair[pair] else None
+
+
 def resolve(speaker, by_display, by_pair):
-    s = " ".join(str(speaker or "").split())
-    if s in by_display:
-        return by_display[s]
-    t = s.split()
-    if len(t) >= 2:
-        return by_pair.get((t[-1], t[0]))
+    s = _norm_form(speaker)
+    if not s:
+        return None
+    cands = _candidates(s)
+    for c in cands:
+        if c in by_display:
+            return by_display[c]
+    for c in cands:
+        hit = _token_match(c.split(), by_display, by_pair)
+        if hit:
+            return hit
+    for c in cands:
+        t = c.split()
+        if len(t) >= 2 and (t[-1], t[0]) in by_pair:
+            return by_pair[(t[-1], t[0])]
     return None
 
 

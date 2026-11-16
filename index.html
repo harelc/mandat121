@@ -1371,13 +1371,80 @@ let mkPipeSel={name:null,i:-1}; // MK page: pipeline-stage filter for that list
 function mkPipeFilter(i,name){ mkPipeSel={name,i:mkPipeSel.name===name&&mkPipeSel.i===i?-1:i}; mkBillsShowAll=false; renderMkDetail() }
 let mkPastCmtShowAll=false; // MK page: expand the past-committees list
 const GUEST_PALETTE=['#94a3b8','#a8a29e','#9ca3af','#b08968','#8d99ae','#a3b18a','#bc6c25','#6d6875'];
-function protoSpeakerKey(name){ // protocol names are given-first; our keys are surname-first
-  if(window._g2k===undefined){ window._g2k={}; for(const k of [...Object.keys(MKP),...Object.keys(mkIndex)]) window._g2k[disp(k)]=k }
-  return window._g2k[name]||null;
+/* Protocol speakers are given-first ("שמחה רוטמן"); our keys are
+   surname-first ("רוטמן שמחה"). The old map inverted disp() over the
+   K25 vote/photo files only and matched the raw speaker string exactly,
+   so on a K26 sitting most MKs never linked: K26-only members were not
+   in the map at all, and returning members failed whenever the
+   transcript spelled them differently — a ministerial title in front
+   ("השר לביטחון לאומי איתמר בן גביר", "שרת החדשנות, המדע והטכנולוגיה
+   גילה גמליאל"), a parenthesised nickname ("יאיא (יאיר) פינק"), a
+   middle name present on one side only, a hyphenated surname split
+   differently, or a two-token surname disp() flips naively
+   ("מהא כרכבי סבאח"). Resolve in layers, each unambiguous-only:
+   exact display form -> title-stripped suffixes -> same token set in
+   any order -> token sets differing only in middle tokens. Guests and
+   officials (מזכיר הכנסת, קריאות) match nobody and stay unlinked.
+   The universe is everyone with an MK card in either era: K25
+   photos/votes/contacts/tenure, K26 elected + serving tenure/contacts
+   + documented voters. The map is rebuilt whenever a source grows —
+   the K25 archive and the K26 roster land lazily, and a map frozen on
+   first use (the old window._g2k) kept the early, emptier universe. */
+let _g2k=null,_g2kSig='',_g2kEntries=[],_g2kCache=new Map();
+const _protoNorm=s=>normName(String(s||'')).replace(/\([^)]*\)/g,' ').replace(/[-–]/g,' ').replace(/\s+/g,' ').trim();
+function _protoUniverse(){
+  const names=[...Object.keys(MKP),...Object.keys(mkIndex),...Object.keys(CONTACTS),...Object.keys(TENURE),
+    ...Object.keys(CONTACTS26),...Object.keys(K26_TENURE),...Object.keys(IDX26)];
+  if(K26) for(const p of K26.parties||[]) names.push(...(p.elected||[])); // candidates without a seat have no card (k26Entry) — elected/serving only; serving replacements arrive via K26_TENURE
+  return dedupeNames(names);
+}
+function protoSpeakerKey(name){
+  const sig=[Object.keys(MKP).length,Object.keys(mkIndex).length,Object.keys(CONTACTS).length,Object.keys(TENURE).length,
+    Object.keys(CONTACTS26).length,Object.keys(K26_TENURE).length,Object.keys(IDX26).length,
+    K26?(K26.parties||[]).reduce((n,p)=>n+(p.elected||[]).length,0):0].join(':');
+  if(sig!==_g2kSig){ _g2kSig=sig; _g2k={}; _g2kEntries=[]; _g2kCache=new Map();
+    for(const k of _protoUniverse()){ const d=_protoNorm(disp(k)); if(!d) continue;
+      if(!(d in _g2k)) _g2k[d]=k; // first wins: universe order is roster-before-candidates, and collisions are spelling variants of one person after normName
+      _g2kEntries.push([k,new Set(d.split(' ')),d.split(' ')]);
+      const bare=_protoNorm(k); if(bare&&!(bare in _g2k)) _g2k[bare]=k; } }
+  if(_g2kCache.has(name)) return _g2kCache.get(name);
+  const key=_protoResolve(String(name||'')); _g2kCache.set(name,key); return key;
+}
+function _protoResolve(raw){
+  const clean=_protoNorm(raw); if(!clean) return null;
+  // Candidate name strings, most complete first: the full string, what
+  // follows the last comma (a ministerial title ends there: "שרת
+  // החדשנות, המדע והטכנולוגיה גילה גמליאל"), then progressively
+  // shorter suffixes (title words in front: השר/סגן שר/שרת …).
+  const cands=[], seen=new Set();
+  for(const base of [clean,clean.split(',').pop().trim()]){ const t=base.split(' ').filter(Boolean);
+    for(let i=0;i+2<=t.length;i++){ const c=t.slice(i).join(' '); if(!seen.has(c)){ seen.add(c); cands.push(c) } } }
+  for(const c of cands) if(_g2k[c]) return _g2k[c];
+  for(const c of cands){ const hit=_protoTokenMatch(c.split(' ')); if(hit) return hit }
+  return null;
+}
+function _protoTokenMatch(toks){
+  const T=new Set(toks); if(T.size<2) return null;
+  let equal=[],best=[],bestDiff=1e9;
+  for(const [k,set,dtoks] of _g2kEntries){
+    const diff=Math.abs(set.size-T.size)+[...T].filter(t=>!set.has(t)).length+[...set].filter(t=>!T.has(t)).length;
+    if(diff===0){ equal.push(k); continue }
+    // Middle names only: given-first order intact at both ends, one
+    // side's tokens a subset of the other's ("מיכל מרים וולדיגר").
+    if(dtoks[0]===toks[0]&&dtoks[dtoks.length-1]===toks[toks.length-1]
+      &&[...T].every(t=>set.has(t))!==[...set].every(t=>T.has(t))){
+      if(diff<bestDiff){ bestDiff=diff; best=[k] } else if(diff===bestDiff) best.push(k) }
+  }
+  if(equal.length) return [...new Set(equal)].length===1?equal[0]:null;
+  // An ambiguous (given, surname) pair never guesses — two MKs sharing
+  // it refuse the middle-name shortcut (same rule as the Python side).
+  const pairKeys=new Set(_g2kEntries.filter(([, ,dt])=>dt[0]===toks[0]&&dt[dt.length-1]===toks[toks.length-1]).map(([k])=>k));
+  if(pairKeys.size!==1) return null;
+  return [...new Set(best)].length===1?best[0]:null;
 }
 function protoColor(name,hint){
   const key=protoSpeakerKey(name);
-  if(key) return fcol((MKP[key]||mkIndex[key]||{}).faction||hint||'');
+  if(key) return fcol((MKP[key]||mkIndex[key]||IDX26[key]||{}).faction||hint||'');
   let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))>>>0;
   return GUEST_PALETTE[h%GUEST_PALETTE.length];
 }
@@ -1451,7 +1518,7 @@ function partyRank(faction,kn){ const order=(kn||KN)===26?ARC_ORDER_K26:ARC_ORDE
    naive "move first token to the end" flip mangles (בן צור יואב would read
    צור יואב בן). Ported from biapia/index.html DISPLAY_NAME_MAP; keep in
    sync with FORWARD in build_mk_highlights.py. */
-const FORWARD={'פרקש הכהן אורית':'אורית פרקש הכהן','בן גביר איתמר':'איתמר בן גביר','בן ארי מירב':'מירב בן ארי','בן ברק רם':'רם בן ברק','בן צור יואב':'יואב בן צור','בן סעיד סמיר':'סמיר בן סעיד','דיסטל אטבריאן גלית':'גלית דיסטל-אטבריאן',"ח'טיב יאסין אימאן":"אימאן ח'טיב יאסין",'טור פז משה':'משה טור פז','להב הרצנו יוראי':'יוראי להב הרצנו','סון הר מלך לימור':'לימור סון הר מלך','צרפתי הרכבי מטי':'מטי צרפתי הרכבי','רון בן משה יעל':'יעל רון בן משה','רייטן מרום אפרת':'אפרת רייטן מרום','שאשא ביטון יפעת':'יפעת שאשא-ביטון','שיר סגמן מיכל':'מיכל שיר סגמן','תומא סלימאן עאידה':'עאידה תומא סלימאן'};
+const FORWARD={'פרקש הכהן אורית':'אורית פרקש הכהן','בן גביר איתמר':'איתמר בן גביר','בן ארי מירב':'מירב בן ארי','בן ברק רם':'רם בן ברק','בן צור יואב':'יואב בן צור','בן סעיד סמיר':'סמיר בן סעיד','דיסטל אטבריאן גלית':'גלית דיסטל-אטבריאן',"ח'טיב יאסין אימאן":"אימאן ח'טיב יאסין",'טור פז משה':'משה טור פז','להב הרצנו יוראי':'יוראי להב הרצנו','סון הר מלך לימור':'לימור סון הר מלך','צרפתי הרכבי מטי':'מטי צרפתי הרכבי','רון בן משה יעל':'יעל רון בן משה','רייטן מרום אפרת':'אפרת רייטן מרום','שאשא ביטון יפעת':'יפעת שאשא-ביטון','שיר סגמן מיכל':'מיכל שיר סגמן','תומא סלימאן עאידה':'עאידה תומא סלימאן','כרכבי סבאח מהא':'מהא כרכבי סבאח'};
 function disp(name){name=String(name||'').replace(/\s+/g,' ').trim(); if(FORWARD[name])return FORWARD[name]; const p=name.split(' '); if(p.length>=3&&['בן','אבו','אל'].includes(p[0]))return p.slice(2).join(' ')+' '+p.slice(0,2).join(' '); return p.length>=2? p.slice(1).join(' ')+' '+p[0] : name}
 const NAME_CANON={'גנץ בני':'גנץ בנימין','סגלוביץ יואב':"סגלוביץ' יואב",'מלקו צגה צגנש':'מלקו צגה','סטרוק אורית':'סטרוק אורית מלכה','פינדרוס יצחק זאב':'פינדרוס יצחק',
  // K26 CEC lists use full legal names (middle names, nicknames spelled out,
@@ -2621,7 +2688,7 @@ function protoTurnsHTML(doc=PROTO_CUR, filter=protoFilter){
     if(t.role==='topic'){ const P=billLinksPrepare(t.text); return `<div class="proto-topic" data-turn="${ti}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M6.5 3.5h11V21L12 17.2 6.5 21z"/></svg> ${billLinksApply(hlText(P.text,HL),P.links)}</div>` }
     const col=protoColor(t.speaker,t.faction_hint); const key=protoSpeakerKey(t.speaker);
     const ini=t.speaker.split(/\s+/).map(w=>w[0]).slice(0,2).join('');
-    if(t.role==='interjection'){ const P=billLinksPrepare(t.text); return `<div class="proto-turn inter" data-turn="${ti}"><span class="small" style="color:${col};font-weight:700">${hlText(t.speaker,HL)}:</span><span class="small muted">${billLinksApply(hlText(P.text,HL),P.links)}</span></div>` }
+    if(t.role==='interjection'){ const P=billLinksPrepare(t.text); return `<div class="proto-turn inter" data-turn="${ti}">${key?`<a href="#" onclick="event.preventDefault();openMk('${jsq(key)}')" class="small" style="color:${col};font-weight:700">${hlText(t.speaker,HL)}</a>`:`<span class="small" style="color:${col};font-weight:700">${hlText(t.speaker,HL)}</span>`}<span class="small" style="color:${col};font-weight:700">:</span><span class="small muted">${billLinksApply(hlText(P.text,HL),P.links)}</span></div>` }
     return `<div class="proto-turn ${t.role==='chair'?'chair':''}" data-turn="${ti}">
       <div class="proto-av" style="background:${col}">${esc(ini)}</div>
       <div style="flex:1;min-width:0"><div style="display:flex;gap:.45rem;align-items:center;flex-wrap:wrap">

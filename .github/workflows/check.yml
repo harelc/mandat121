@@ -37,6 +37,9 @@ jobs:
       - name: Protocol parser tests (paragraphs/continuations, plain node)
         run: node tests/test_proto_parse.mjs
 
+      - name: Protocol speaker -> MK card resolution tests (plain node)
+        run: node tests/test_proto_speaker.mjs
+
       - name: data/*.json parses
         run: |
           python3 - <<'EOF'

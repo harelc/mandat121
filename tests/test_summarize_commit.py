@@ -53,5 +53,37 @@ class SemanticDetailTest(unittest.TestCase):
         self.assertEqual(mod.semantic_detail(b"a", b"b"), [])
 
 
+class PlenumSittingTest(unittest.TestCase):
+    """A new key in a plenum-search index is a whole new sitting (issue
+    #36: sitting 2246403 landed and the summary read 'contents refresh')."""
+
+    OLD = enc({"2245487": {"number": 1, "date": "2026-11-10", "kn": 26}})
+    NEW = enc({"2245487": {"number": 1, "date": "2026-11-10", "kn": 26},
+               "2246403": {"number": 3, "date": "2026-11-16", "kn": 26}})
+
+    def test_new_sitting_highlight(self):
+        out = mod.plenum_highlights([("M", "data/k26_plenum_search.json", self.OLD, self.NEW)])
+        self.assertEqual(len(out), 1)
+        kind, text = out[0]
+        self.assertEqual(kind, "plenum")
+        self.assertIn("2246403", text)
+        self.assertIn("2026-11-16", text)
+
+    def test_updated_sitting_is_not_new(self):
+        changed = enc({"2245487": {"number": 1, "date": "2026-11-10", "kn": 26, "doc": "x"}})
+        self.assertEqual(
+            mod.plenum_highlights([("M", "data/k26_plenum_search.json", self.OLD, changed)]), [])
+
+    def test_semantic_detail_names_the_sitting(self):
+        self.assertEqual(
+            mod.semantic_detail(self.OLD, self.NEW, "data/k26_plenum_search.json"),
+            ["+1 sitting(s): 2246403 (2026-11-16)"])
+
+    def test_removed_sitting_warns(self):
+        out = mod.shrink_warnings([("M", "data/k26_plenum_search.json", self.NEW, self.OLD)])
+        self.assertEqual(len(out), 1)
+        self.assertIn("2246403", out[0])
+
+
 if __name__ == "__main__":
     unittest.main()
