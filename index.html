@@ -5425,7 +5425,7 @@ function siteTopStarsHTML(){
       // (ensureK25Archive re-applies the route when it lands, repainting this
       // pane with real names), and until then show an honest, non-clickable
       // loading row. Slower (mobile) connections hit this window hardest.
-      if(kb){ lbl=displayText(kb); go=`openBillIn(${billKn(key)||KN},'${key}')` }
+      if(kb){ lbl=kb.name||displayText(kb); go=`openBillIn(${billKn(key)||KN},'${key}')` }
       else { lbl='טוען את שם הצעת החוק…'; if(!K25_READY) ensureK25Archive(); return `<div class="row" style="cursor:default" aria-busy="true"><b style="color:var(--accent);width:1.6rem">${idx+1}</b><span class="flex wrap muted">${esc(lbl)}<br><span class="dim small">חוק</span></span>${starChip(kind,key)}</div>` } }
     else if(kind==='mk'){ lbl=disp(key); go=`openMk('${jsq(key)}')` }
     else if(kind==='committee'){ const c=committeeById(key);
