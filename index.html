@@ -530,9 +530,11 @@ select,input[type=search]{background:var(--surface);border:1px solid var(--line)
 .empty .big{font-size:2.2rem;margin-bottom:.4rem}
 footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-size:.78rem;text-align:center}
 @media(min-width:900px){footer{padding-bottom:1.5rem}}
-.foot-links{margin-bottom:.55rem;font-size:.86rem;font-weight:700}
-.foot-links a{color:var(--accent);text-decoration:none}
-.foot-links a:hover{text-decoration:underline}
+.foot-links{margin-bottom:.7rem;font-size:.9rem;font-weight:700;display:flex;flex-wrap:wrap;gap:.45rem;justify-content:center;align-items:center}
+.foot-links a{color:var(--accent);text-decoration:none;border:1px solid var(--line);background:var(--surface);border-radius:999px;padding:.42rem .85rem}
+.foot-links a:hover{border-color:var(--accent);text-decoration:none}
+.foot-links a.foot-cta{color:#fdfbf6;background:var(--accent);border-color:var(--accent);box-shadow:0 4px 14px rgba(71,107,158,.3)}
+.foot-links a.foot-cta:hover{filter:brightness(1.08)}
 /* civic oversight intro — ONE uniform component on bill/vote/committee
    pages: a dismissible banner, and on first entry to each page type a
    modal with the same content. Dismissal is per type, localStorage. */
@@ -554,6 +556,17 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
 .about-card ul{padding-inline-start:1.15rem;margin:.2rem 0 .2rem}
 .about-card li{margin:.28rem 0}
 .about-card p+p{margin-top:.55rem}
+/* feedback / testimonial corner (#tab=feedback) */
+.fb-form{display:grid;gap:.7rem;margin-top:.7rem}
+.fb-form label{font-weight:700;font-size:.88rem;display:grid;gap:.3rem}
+.fb-form textarea,.fb-form input[type=text]{background:var(--surface);border:1px solid var(--line);color:var(--text);border-radius:12px;padding:.55rem .8rem;font-size:.9rem;font-family:inherit;width:100%}
+.fb-form textarea{min-height:7rem;resize:vertical;line-height:1.6}
+.fb-consent{flex-direction:row;display:flex;align-items:flex-start;gap:.45rem;font-weight:600}
+.fb-hp{position:absolute;left:-9999px;width:1px;height:1px;opacity:0}
+.testi-grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:.7rem;margin-top:.7rem}
+.testi{background:var(--surface);border:1px solid var(--line);border-radius:16px;padding:.85rem 1rem}
+.testi p{line-height:1.7;color:var(--mid);font-size:.92rem}
+.testi b{display:block;margin-top:.5rem;color:var(--text);font-size:.85rem}
 .about-en{direction:ltr;text-align:left}
 .about-en p{font-size:.86rem}
 .foot-meta{margin-top:.45rem}
@@ -711,7 +724,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
 <main id="app"><div class="empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg></div>טוען את נתוני הכנסת…</div></main>
 
 <footer>
-  <p class="foot-links"><a href="#intro" onclick="openIntro();return false">הסבר מצויר בפחות מדקה ▶</a> · <a href="#tab=about">אודות</a> · <a href="https://github.com/harelc/mandat121" target="_blank" rel="noopener">הקוד ב־GitHub ↗</a></p>
+  <p class="foot-links"><a href="#intro" onclick="openIntro();return false">הסבר מצויר בפחות מדקה ▶</a> <a href="#tab=about">אודות</a> <a class="foot-cta" href="#tab=feedback">💬 משוב, הצעות והמלצות</a> <a href="https://github.com/harelc/mandat121" target="_blank" rel="noopener">הקוד ב־GitHub ↗</a></p>
   <p>המנדט ה־121 — 120 נבחרו, ה־121 מפקח. מעקב אזרחי אחרי הכנסת. כל המידע מגיע מפרסומים רשמיים של הכנסת (חוקים, הצבעות המליאה, ועדות ודיונים של כנסת 26; כנסת 25 שמורה כאן במלואה). המעקב וההצבעות שלי נשמרים רק בדפדפן הזה.</p>
   <p class="foot-meta">&copy; הראל קין | <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener">CC BY-NC-SA 4.0</a></p>
   <div id="visit-line" hidden style="margin-top:.5rem"></div>
@@ -916,7 +929,7 @@ function routeEntityInKn(kn,h){
   if(h.get('faction')) return D.hasFaction(h.get('faction'));
   if(h.get('committee')) return D.hasCommittee(h.get('committee'));
   if(h.get('session')) return D.hasSession(h.get('session'));
-  if(h.get('plenum')){ const pk=plenumKn(h.get('plenum')); return pk?kn===pk:kn===ERAS[0].kn }
+  if(h.get('plenum')){ const pk=plenumPageKn(h.get('plenum')); return pk?kn===pk:kn===ERAS[0].kn }
   if(h.get('bill26')) return kn===CURRENT_KN;
   return false;
 }
@@ -1570,7 +1583,7 @@ function ensureAgenda(){ const kn=KN; if(AG_CACHE[kn]){ AGENDA=AG_CACHE[kn]; agR
     agRefreshToday(j); // file's today/this_week are build-time stamps — the viewer's clock is authoritative
     j._loaded=new Set(j.loaded_months||[]); j._loading=new Set();
     (j.committees||[]).forEach(x=>x.docs=x.docs||[]); AG_CACHE[kn]=j;
-    if(kn===KN){ AGENDA=j; if(view==='now') renderNow(); else if(view==='session') renderSessionDetail() } return j }).catch(()=>{ AG_MAIN_LOADING.delete(kn); return null }) }
+    if(kn===KN){ AGENDA=j; if(view==='now') renderNow(); else if(view==='session') renderSessionDetail(); else if(view==='plenumSession') renderPlenumSession() } return j }).catch(()=>{ AG_MAIN_LOADING.delete(kn); return null }) }
 function ensureProtoIdx(){ if(Object.keys(PROTO_IDX).length) return Promise.resolve(PROTO_IDX); return _lazyOnce('protoIdx',async()=>{ const parts=await Promise.all(ERAS.map(e=>_fetchJson(eraFile(e.kn,'protocols_index')))); if(parts.some(Boolean)){ PROTO_IDX={}; for(const j of parts) Object.assign(PROTO_IDX,j||{}); if(view==='session') renderSessionDetail() } return PROTO_IDX }) }
 function ensureCmem(){ return _lazyOnce('cmem',async()=>{ const j=await _fetchJson('data/k25_committee_members.json'); if(j){ CMEM=j; CMEM.by_mk=_normKeys(CMEM.by_mk); for(const arr of Object.values(CMEM.by_committee||{})) arr.forEach(m=>m.name=normName(m.name)); if(view==='mk') renderMkDetail(); else if(view==='committee') renderCommitteeDetail(); else if(view==='committees') renderCommittees() } return CMEM }) }
 function ensureAnalytics(){ if(ANALYTICS) return Promise.resolve(ANALYTICS); return _lazyOnce('analytics',async()=>{ const j=await _fetchJson('data/k25_analytics.json'); if(j){ ANALYTICS=j; if(view==='analysis') renderAnalysis(); else if(view==='mk') renderMkDetail() } return ANALYTICS }) }
@@ -2135,7 +2148,7 @@ function followCount(){return S.followBills.length+S.followMks.length+(S.followC
 function buildTabs(){const active=view==='vote'?'votes':(view==='billAll'||view==='bill26')?'bills':view==='mk'?'mks':view==='faction'?'factions':(view==='committee'||view==='session')?'committees':view==='plenumSession'?'plenum':view; $('#tabs').innerHTML=TABS.map(([v,ic,l])=>`<button class="tab ${active===v?'active':''}" onclick="go('${v}')"><span class="ic">${icon(ic)}</span>${l}${v==='mine'&&(myCount()||followCount())?`<span class="dot">${myCount()+followCount()}</span>`:''}</button>`).join('')}
 function updateTabsBadge(){buildTabs()}
 function go(v,arg=null){ navTo('tab='+v,()=>{view=v;viewArg=arg;buildTabs();render();window.scrollTo({top:0})}) }
-function render(){({now:renderNow,bills:renderBills,votes:renderVotes,plenum:renderPlenum,mks:renderMks,factions:renderFactions,committees:renderCommittees,protocols:renderProtocols,analysis:renderAnalysis,mine:renderMine,about:renderAbout}[view]||renderNow)(); paintStarCounts()}
+function render(){({now:renderNow,bills:renderBills,votes:renderVotes,plenum:renderPlenum,mks:renderMks,factions:renderFactions,committees:renderCommittees,protocols:renderProtocols,analysis:renderAnalysis,mine:renderMine,about:renderAbout,feedback:renderFeedback}[view]||renderNow)(); paintStarCounts()}
 /* Hash router: every navigation writes the hash, and `hashchange` renders.
    That is what makes the browser Back/Forward buttons work — previously the
    hash was written but never listened to, so Back changed the URL while the
@@ -2169,7 +2182,7 @@ function backLabelFor(hash){
   if(h.get('vote')) return '› חזרה להצבעה';
   if(h.get('session')) return '› חזרה לישיבת הוועדה';
   if(h.get('plenum')) return '› חזרה לישיבת המליאה';
-  return {now:'› חזרה לעכשיו',bills:'› חזרה לחוקים',votes:'› חזרה להצבעות',mks:'› חזרה לח״כים',factions:'› חזרה לסיעות',committees:'› חזרה לוועדות',plenum:'› חזרה לדברי הכנסת',analysis:'› חזרה לניתוח',mine:'› חזרה ל״שלי״',about:'› חזרה לאודות'}[h.get('tab')]||'› חזרה';
+  return {now:'› חזרה לעכשיו',bills:'› חזרה לחוקים',votes:'› חזרה להצבעות',mks:'› חזרה לח״כים',factions:'› חזרה לסיעות',committees:'› חזרה לוועדות',plenum:'› חזרה לדברי הכנסת',analysis:'› חזרה לניתוח',mine:'› חזרה ל״שלי״',about:'› חזרה לאודות',feedback:'› חזרה למשוב'}[h.get('tab')]||'› חזרה';
 }
 function backBtnHTML(fallback,label){ const prev=navBackHash(); return `<button class="btn ghost" onclick="goBack('${fallback}')">${prev?esc(backLabelFor(prev)):label}</button>` }
 function goBack(fallback){ if(navBackHash()!=null) history.back(); else go(fallback) }
@@ -2204,10 +2217,10 @@ function applyRoute(){
   else if(h.get('faction')){ const kn=factionKn(h.get('faction')); if(kn) setKN(kn); view='faction'; viewArg=h.get('faction'); buildTabs(); if(!kn&&!K25_READY) routePending('הסיעה'); else renderFactionDetail() }
   else if(h.get('committee')){ const kn=committeeKn(h.get('committee')); if(kn) setKN(kn); view='committee'; viewArg=h.get('committee'); buildTabs(); renderCommitteeDetail() }
   else if(h.get('session')){ const kn=sessionKn(h.get('session')); if(kn) setKN(kn); view='session'; viewArg=h.get('session'); buildTabs(); if(!kn&&!K25_READY) routePending('הישיבה'); else renderSessionDetail() }
-  else if(h.get('plenum')){ const pk=plenumKn(h.get('plenum')); if(pk) setKN(pk); view='plenumSession'; viewArg=h.get('plenum'); buildTabs(); renderPlenumSession() }
+  else if(h.get('plenum')){ const pk=plenumPageKn(h.get('plenum')); if(pk) setKN(pk); view='plenumSession'; viewArg=h.get('plenum'); buildTabs(); renderPlenumSession() }
   else if(h.get('bill26')){ setKN(26); view='bill26'; viewArg=h.get('bill26'); buildTabs(); renderBill26() }
   else if(h.get('vote')){ const kn=voteKn(h.get('vote')); if(kn) setKN(kn); view='vote'; viewArg=h.get('vote'); buildTabs(); if(!kn&&!K25_READY) routePending('ההצבעה'); else renderVote() }
-  else { view=['now','bills','votes','plenum','mks','factions','committees','protocols','analysis','mine','about'].includes(h.get('tab'))?h.get('tab'):'now'; viewArg=null; buildTabs(); render() }
+  else { view=['now','bills','votes','plenum','mks','factions','committees','protocols','analysis','mine','about','feedback'].includes(h.get('tab'))?h.get('tab'):'now'; viewArg=null; buildTabs(); render() }
   window.scrollTo({top:0});
 }
 window.addEventListener('hashchange',applyRoute);
@@ -2266,7 +2279,7 @@ function openPlenum(sid){
   if(view==='plenum'&&plenumHitsFor&&plenumHitsFor===KN+':'+plenumFilter.q.trim()&&plenumHits&&plenumHits[id]){ hl=plenumHits[id].hits.map(h=>h[0]); q=plenumFilter.q.trim() }
   else if(view==='protocols'&&protoResultsFor&&protoResultsFor===KN+':'+protoQuery.trim()&&PLENUM_HL_BY_SID[id]){ hl=PLENUM_HL_BY_SID[id]; q=protoQuery.trim() }
   PLENUM_HL=hl; PLENUM_HL_Q=q;
-  const kn=plenumKn(id); if(kn&&KN!==kn) switchKnesset(kn); // each sitting opens in its own Knesset's instance
+  const kn=plenumPageKn(id); if(kn&&KN!==kn) switchKnesset(kn); // each sitting opens in its own Knesset's instance
   navTo('plenum='+sid,()=>{viewArg=String(sid); view='plenumSession'; buildTabs(); renderPlenumSession(); window.scrollTo({top:0})})
 }
 
@@ -2955,7 +2968,7 @@ function renderNow26(){
    The knesset.gov.il agenda page, joined our way: plenum order of the day
    plenum agenda items + committee sittings for one
    Sunday–Saturday week, bill items deep-linked to their bill pages and
-   committee sittings to their in-app session pages. Source is build_agenda.py
+   plenum + committee sittings to their in-app session pages. Source is build_agenda.py
    (OData only). OData publishes session rows only once the Knesset releases
    them, so in recess weeks "this week" may have no rows at all — then we say
    so and show the nearest published week instead of an empty pretence. */
@@ -3038,7 +3051,7 @@ function agendaItemHTML(it){
   return `<li>${name}${it.item_type?` <span class="dim">· ${esc(it.item_type)}</span>`:''}${it.status?`<br><span class="dim">${esc(it.status)}</span>`:''}</li>`;
 }
 function agendaPlenumHTML(s,max=6){
-  return `<div class="agenda-sess"><div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap"><span class="chip acc"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> מליאה</span><b>${esc((s.start||'').slice(11,16))}</b><span class="small muted">ישיבה מס׳ ${s.number||''}${s.special?' · ישיבה מיוחדת':''}</span><span class="small dim">${s.items.length} פריטים על סדר היום</span></div>
+  return `<div class="agenda-sess"><div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap"><span class="chip acc"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> מליאה</span><b>${esc((s.start||'').slice(11,16))}</b><span class="small muted">ישיבה מס׳ ${s.number||''}${s.special?' · ישיבה מיוחדת':''}</span><span class="small dim">${s.items.length} פריטים על סדר היום</span><button class="btn ghost small" style="padding:.25rem .65rem;margin-inline-start:auto" onclick="openPlenum('${s.id}')">לישיבה ←</button></div>
   ${s.items.length?`<ol class="agenda-items">${s.items.slice(0,max).map(agendaItemHTML).join('')}${s.items.length>max?`<li class="dim">…ועוד ${s.items.length-max} פריטים</li>`:''}</ol>`:'<div class="small muted">סדר היום טרם פורסם</div>'}</div>`;
 }
 function agendaCmtHTML(s,max=4){
@@ -5063,6 +5076,12 @@ function plenumForDate(date,kn=KN){ const hit=Object.entries(PLENUM_SEARCH).find
    the search index — i.e. with a published transcript — are linked. */
 function votePlenumSession(b,kn){ const e=b.session?PLENUM_SEARCH[String(b.session)]:null; return e?{sid:String(b.session),...e}:plenumForDate(b.vote_date,kn) }
 const plenumKn=sid=>{ const p=PLENUM_SEARCH[String(sid)]; return p?(p.kn||25):null };
+/* A sitting as ADVERTISED on the schedule (build_agenda.py): every plenum
+   row OData has published — past, today or future — whether or not its
+   transcript (דברי הכנסת) exists yet. Searched across every era's loaded
+   agenda (the sitting's own page is era-agnostic, like openPlenum). */
+function agendaPlenum(sid){ const id=String(sid); for(const [kn,j] of Object.entries(AG_CACHE)){ const s=(j.plenum||[]).find(x=>String(x.id)===id); if(s) return {...s,kn:+kn} } if(AGENDA){ const s=(AGENDA.plenum||[]).find(x=>String(x.id)===id); if(s) return {...s,kn:KN} } return null }
+const plenumPageKn=sid=>plenumKn(sid)||(agendaPlenum(sid)||{}).kn||null; // era that owns this sitting's page: transcript index first, else the schedule
 const cmtSegHTML=()=>`<div class="chips" role="group" aria-label="ועדות או שדלנים" style="margin-bottom:.9rem"><button class="chip ${cmtSeg==='committees'?'on':''}" onclick="cmtSeg='committees';renderCommittees()">ועדות</button><button class="chip ${cmtSeg==='lobbyists'?'on':''}" onclick="cmtSeg='lobbyists';lobbyFilter.limit=40;renderCommittees()">🕴️ שדלנים · מרשם עדכני${EXTRAS?.lobbyists?` (${EXTRAS.lobbyists.length.toLocaleString('he-IL')})`:''}</button></div>`;
 /* Plenum-browser search also runs on the shards (async, cached per query);
    on completion it re-renders with focus restored to the search box. */
@@ -5106,33 +5125,52 @@ function renderPlenum(){
   $('#app').innerHTML=`<div class="sec-title">דברי הכנסת <small>מליאה · כל ישיבות כנסת ${KN} · ${n} ישיבות</small></div>${plenumBrowserHTML()}`;
 }
 function renderPlenumSession(){
-  ensurePlenumSearch();
-  const app=$('#app'), p=PLENUM_SEARCH[String(viewArg)];
-  if(!p){ app.innerHTML=backBtnHTML('plenum','› כל ישיבות המליאה')+'<div class="card empty" style="margin-top:.6rem"><div class="big">🗳️</div>הישיבה לא נמצאה באינדקס דברי הכנסת.</div>'; return }
-  const pkn=p.kn||25;
+  ensurePlenumSearch(); ensureAgenda();
+  const app=$('#app'), p=PLENUM_SEARCH[String(viewArg)], a=agendaPlenum(viewArg);
+  // One page per sitting, from whichever source knows it: the transcript
+  // index (דברי הכנסת, past sittings) and/or the schedule (build_agenda —
+  // every advertised sitting, incl. today's and future ones whose protocol
+  // does not exist yet). A schedule-only sitting gets the same page a
+  // committee sitting gets from renderSessionDetail: order of the day,
+  // linked bills, that day's votes — and the protocol joins it here once
+  // published, no new address needed (#plenum=<session id> throughout).
+  if(!p&&!a){
+    if(!PLENUM_SEARCH_LOADED||AG_MAIN_LOADING.size){ app.innerHTML=backBtnHTML('plenum','› כל ישיבות המליאה')+'<div class="card empty" style="margin-top:.6rem" aria-busy="true"><div class="spin" role="progressbar" aria-label="טוען"></div>טוען את הישיבה…</div>'; return }
+    app.innerHTML=backBtnHTML('plenum','› כל ישיבות המליאה')+'<div class="card empty" style="margin-top:.6rem"><div class="big">🗳️</div>הישיבה לא נמצאה — לא באינדקס דברי הכנסת ולא בסדר היום שפורסם.</div>'; return }
+  const pkn=p?(p.kn||25):a.kn;
   if(pkn!==KN) setKN(pkn); // a deep link lands in the sitting's own era
+  const date=p?p.date:(a.start||'').slice(0,10), number=p?p.number:a.number;
   const entries=plenumEntries(pkn), idx=entries.findIndex(e=>e.sid===String(viewArg));
-  const newer=entries[idx-1], older=entries[idx+1]; // entries sorted newest-first
-  const votes=(pkn===26?K26V:VOTES_ALL).filter(v=>v.date===p.date).sort((a,b)=>(a.id||0)-(b.id||0));
+  let newer=entries[idx-1], older=entries[idx+1]; // entries sorted newest-first
+  if(!p){ const sib=[...(((AG_CACHE[pkn]||{}).plenum)||(pkn===KN?(AGENDA||{}).plenum:null)||[])].sort((x,y)=>(x.start||'').localeCompare(y.start||'')), si=sib.findIndex(s=>String(s.id)===String(viewArg)); // schedule neighbours, chronological
+    older=si>0?{sid:String(sib[si-1].id),number:sib[si-1].number}:null; newer=si>=0&&si<sib.length-1?{sid:String(sib[si+1].id),number:sib[si+1].number}:null }
+  const votes=(pkn===26?K26V:VOTES_ALL).filter(v=>v.date===date).sort((a,b)=>(a.id||0)-(b.id||0));
+  const todayStr=agClientToday();
+  const statusChip=!a?'':date>todayStr?'<span class="chip">מתוכננת</span>':date===todayStr?'<span class="chip acc">היום</span>':'<span class="chip">התקיימה</span>';
+  const timeStr=a?`${(a.start||'').slice(11,16)}${a.finish?`–${String(a.finish).slice(11,16)}`:''}`:'';
+  const agendaSec=a?`<h3 style="margin-top:1rem">על סדר היום${date>=todayStr?' <small class="dim">כפי שפורסם מראש בסדר היום הרשמי</small>':''}</h3>${(a.items||[]).length?`<div class="rows" style="margin:.4rem -.9rem 0">${a.items.map(it=>{ const link=it.in_dataset&&billAny(it.item_id); return `<div class="row" ${link?`onclick="openBillPage('${it.item_id}')"`:'style="cursor:default"'}><span class="flex">${esc(it.name)}${it.item_type?`<br><span class="dim small">${esc(it.item_type)}</span>`:''}${it.status?`<br><span class="dim small">${esc(it.status)}</span>`:''}</span>${link?'<span class="chip acc">לחוק ←</span>':''}</div>` }).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">סדר היום טרם פורסם לישיבה זו.</p>'}`:'';
+  const protoNote=p?'':`<div class="small muted" style="margin-top:.8rem">${date>todayStr?'דברי הכנסת — הפרוטוקול הרשמי המלא — יתפרסמו אחרי הישיבה, ויופיעו בעמוד הזה עם חיפוש מלא.':date===todayStr?'הישיבה מתקיימת היום — דברי הכנסת יתפרסמו אחריה ויופיעו בעמוד הזה.':'לישיבה זו טרם פורסמו דברי כנסת במאגר הרשמי — כשיופיעו, ייפתח בעמוד הזה הפרוטוקול המלא.'}</div>`;
   app.innerHTML=`
   ${backBtnHTML('plenum','› כל ישיבות המליאה')}
   <article class="card pad rise" style="margin-top:.6rem">
-    <div class="card-top"><span class="chip acc">דברי הכנסת</span><span class="date">${fmtDate(p.date)}</span></div>
-    <h1 style="font-size:1.4rem;line-height:1.35">ישיבת מליאה מס׳ ${p.number}</h1>
-    <div class="bill-name">הפרוטוקול הרשמי המלא של הישיבה — כל הנאומים, ההצעות לסדר וההכרזות, כפי שנרשמו בדברי הכנסת.</div>
-    <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.9rem;align-items:center">
+    <div class="card-top"><span class="chip acc">מליאה</span>${p?'<span class="chip">דברי הכנסת</span>':''}${a&&a.special?'<span class="chip">ישיבה מיוחדת</span>':''}${statusChip}<span class="date">${fmtDate(date)}${timeStr?` · ${timeStr}`:''}</span></div>
+    <h1 style="font-size:1.4rem;line-height:1.35">ישיבת מליאה${number!=null?` מס׳ ${number}`:''}</h1>
+    <div class="bill-name">${p?'הפרוטוקול הרשמי המלא של הישיבה — כל הנאומים, ההצעות לסדר וההכרזות, כפי שנרשמו בדברי הכנסת.':'הישיבה כפי שפורסמה בסדר היום הרשמי של הכנסת — מה על סדר יומה, עם קישור לדף של כל חוק.'}</div>
+    ${p?`<div style="display:flex;gap:.5rem;flex-wrap:wrap;margin-top:.9rem;align-items:center">
       <button class="btn primary" id="plenumReadBtn" style="font-size:1.02rem;padding:.65rem 1.5rem" onclick="togglePlenumProtocol('${viewArg}')">${icon('plenum')} הצג את פרוטוקול הישיבה</button>
       <a class="btn" href="${esc(p.doc)}" target="_blank" rel="noopener">המסמך הרשמי ↗</a>
       ${older?`<button class="btn" onclick="openPlenum('${older.sid}')">› ישיבה ${older.number} (הקודמת)</button>`:''}
       ${newer?`<button class="btn" onclick="openPlenum('${newer.sid}')">ישיבה ${newer.number} (הבאה) ‹</button>`:''}
-    </div>
-    ${PLENUM_HL.length?`<div class="small" style="margin-top:.6rem"><span class="chip acc">מהחיפוש: «${esc(PLENUM_HL_Q)}»</span> <span class="dim">ההתאמות יודגשו בפרוטוקול המלא למטה</span></div>`:''}
-    <div id="plenumProtoBox" style="margin-top:.7rem"></div>
+    </div>`:''}
+    ${PLENUM_HL.length&&p?`<div class="small" style="margin-top:.6rem"><span class="chip acc">מהחיפוש: «${esc(PLENUM_HL_Q)}»</span> <span class="dim">ההתאמות יודגשו בפרוטוקול המלא למטה</span></div>`:''}
+    ${p?'<div id="plenumProtoBox" style="margin-top:.7rem"></div>':protoNote}
+    ${agendaSec}
   </article>
-  <div class="sec-title">🗳️ ההצבעות ביום הישיבה <small>${votes.length} הצבעות · ${fmtDate(p.date)}</small></div>
+  <div class="sec-title">🗳️ ההצבעות ביום הישיבה <small>${votes.length} הצבעות · ${fmtDate(date)}</small></div>
   ${votes.length?`<div class="card rows">${votes.map(v=>`<div class="row" onclick="openVote('${v.id}')"><span class="chip acc">${esc(v.kind_label||'')}</span><span class="flex">${esc(v.title||v.desc||'')}<br><span class="dim small">${v.for!=null?`${v.for}–${v.against} · ${v.for>v.against?'עברה':v.against>v.for?'נדחתה':'תיקו'}`:''}</span></span><span class="chip acc">להצבעה ←</span></div>`).join('')}</div>`
-  :'<div class="card pad"><p class="muted small">לא נערכו הצבעות מליאה בתאריך הזה (ישיבה חגיגית, או שההצבעות נרשמו אחרי חצות בתאריך הבא).</p></div>'}`;
+  :`<div class="card pad"><p class="muted small">${date>todayStr?'ההצבעות של יום הישיבה יופיעו כאן כשהישיבה תתקיים.':'לא נערכו הצבעות מליאה בתאריך הזה (ישיבה חגיגית, או שההצבעות נרשמו אחרי חצות בתאריך הבא).'}</p></div>`}`;
   window.scrollTo({top:0});
+  if(!p) return; // schedule-only sitting: nothing to auto-open yet — the protocol reader joins this page once דברי הכנסת are published
   // Arriving from a search: open the reader on the highlighted protocol
   // instead of making the user hunt for the button (and never toggle an
   // already-open reader shut — just re-apply the highlight).
@@ -5366,6 +5404,68 @@ function renderCommitteeDetail(){
 }
 
 /* ============ MINE ============ */
+/* ============ FEEDBACK / WISHLIST / TESTIMONIALS ============
+   Route #tab=feedback (footer + About, deliberately not a 10th tab).
+   Submissions go to netlify/functions/feedback.mjs and stay private
+   ("pending") in Netlify Blobs; only testimonials the submitter agreed
+   to publish AND the owner approved in /admin appear on the wall below.
+   All user text is rendered through esc() — never as raw HTML. */
+let TESTIMONIALS=null;
+function renderFeedback(){
+  $('#app').innerHTML=`
+  <div class="sec-title">משוב והצעות <small>באגים, בקשות, תיקוני נתון — והמלצות שאפשר לפרסם</small></div>
+  <div class="grid c2" style="align-items:start">
+    <section class="card pad rise">
+      <h3>💬 ספרו לנו</h3>
+      <p class="muted small" style="line-height:1.7;margin-top:.35rem">המשוב מגיע רק למפעיל האתר ואינו מתפרסם. אין צורך בשם או במייל. המלצה שתרצו לפרסם תופיע בקיר ההמלצות רק אחרי אישור שלכם כאן ואישור המפעיל.</p>
+      <form class="fb-form" onsubmit="return submitFeedback(event)">
+        <label>סוג הפנייה
+          <select id="fbType" onchange="document.getElementById('fbConsentRow').style.display=this.value==='testimonial'?'flex':'none'">
+            <option value="testimonial">⭐ המלצה על האתר</option>
+            <option value="idea">💡 רעיון / בקשת תכונה (wishlist)</option>
+            <option value="bug">🐞 דיווח על באג</option>
+            <option value="correction">✏️ תיקון נתון</option>
+          </select>
+        </label>
+        <label>הפנייה <textarea id="fbText" required minlength="3" maxlength="800" placeholder="מה חסר? מה נשבר? מה עבד לכם טוב?"></textarea></label>
+        <label>שם לפרסום (רק להמלצות, לא חובה) <input type="text" id="fbName" maxlength="60" placeholder="למשל: דנה, מורה לאזרחות"></label>
+        <label class="fb-consent" id="fbConsentRow"><input type="checkbox" id="fbConsent"> <span>אפשר לפרסם את ההמלצה הזו בקיר ההמלצות, בשם שכתבתי (הפרסום בפועל רק אחרי אישור המפעיל)</span></label>
+        <input class="fb-hp" type="text" id="fbHp" tabindex="-1" autocomplete="off" aria-hidden="true">
+        <div><button class="btn primary" type="submit" id="fbSubmit">שליחה</button> <span class="dim small" id="fbStatus" role="status"></span></div>
+      </form>
+      <p class="dim small" style="margin-top:.6rem">מעדיפים בפומבי? אפשר גם ב־<a href="https://github.com/harelc/mandat121/issues" target="_blank" rel="noopener">GitHub Issues ↗</a>.</p>
+    </section>
+    <section class="card pad rise">
+      <h3>⭐ קיר המלצות</h3>
+      <div id="testiWall"><p class="muted small" style="margin-top:.5rem">טוען המלצות…</p></div>
+    </section>
+  </div>`;
+  loadTestimonials();
+}
+function loadTestimonials(){
+  if(TESTIMONIALS){ paintTestimonials(); return }
+  fetch('/.netlify/functions/feedback',{cache:'no-store'}).then(r=>r.ok?r.json():null)
+    .then(j=>{ TESTIMONIALS=(j&&Array.isArray(j.items))?j.items:[]; paintTestimonials() })
+    .catch(()=>{ TESTIMONIALS=[]; paintTestimonials() });
+}
+function paintTestimonials(){
+  const box=document.getElementById('testiWall'); if(!box) return;
+  if(!TESTIMONIALS||!TESTIMONIALS.length){ box.innerHTML='<p class="muted small" style="margin-top:.5rem">עדיין אין המלצות מאושרות. הראשונה יכולה להיות שלכם — בחרו ״המלצה על האתר״ בטופס.</p>'; return }
+  box.innerHTML=`<div class="testi-grid">${TESTIMONIALS.map(t=>`<div class="testi"><p>“${esc(t.text)}”</p><b>${esc(t.name||'מבקר/ת באתר')}</b></div>`).join('')}</div>`;
+}
+function submitFeedback(ev){
+  ev.preventDefault();
+  const btn=document.getElementById('fbSubmit'), st=document.getElementById('fbStatus');
+  const payload={type:document.getElementById('fbType').value,text:document.getElementById('fbText').value,name:document.getElementById('fbName').value,consent:document.getElementById('fbConsent').checked,hp:document.getElementById('fbHp').value,uid:starUid()};
+  btn.disabled=true; st.textContent='שולח…';
+  fetch('/.netlify/functions/feedback',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify(payload)})
+    .then(r=>{ if(!r.ok) throw new Error('bad'); return r.json() })
+    .then(()=>{ st.textContent=''; toast(payload.type==='testimonial'?'תודה! ההמלצה ממתינה לאישור המפעיל':'תודה! המשוב התקבל'); document.getElementById('fbText').value=''; TESTIMONIALS=null })
+    .catch(()=>{ st.textContent='השליחה נכשלה — נסו שוב או דרך GitHub Issues.' })
+    .finally(()=>{ btn.disabled=false });
+  return false;
+}
+
 /* ============ ABOUT / IMPRESSUM ============
    Static page (route #tab=about, linked from the footer — deliberately
    not a 9th tab: the tab bar is full). No postal address or personal
@@ -5426,6 +5526,7 @@ function renderAbout(){
       <ul>
         <li><b>אין חשבונות ואין הרשמה.</b> ההצבעות והמעקבים שלכם (״שלי״) נשמרים רק ב־<span dir="ltr">localStorage</span> של הדפדפן הזה, לא נשלחים לשום שרת ולא נמכרים ולא מועברים לאף צד. מחיקת נתוני הדפדפן מוחקת אותם סופית.</li>
         <li><b>ספירת המבקרים</b> היא מונה פנימי של האתר בלבד (בלי עוגיות ובלי שירות צד־שלישי): כתובות IP אינן נשמרות כמות שהן, אלא רק כגיבוב (hash) מקוצר עם מלח שמתחלף מדי יום, כך שאי־אפשר לקשר מבקר בין ימים. פרטי ח״כים המוצגים הם ערוצים רשמיים שהכנסת עצמה מפרסמת — לעולם לא פרטים אישיים.</li>
+        <li><b>משוב:</b> מה שנשלח ב<a href="#tab=feedback">טופס המשוב</a> נשמר בשרת האתר וגלוי רק למפעיל. המלצות מתפרסמות רק אם סימנתם הסכמה לפרסום וגם המפעיל אישר אותן.</li>
         <li>גופנים נטענים מ־Google Fonts ומסמכים ותמונות מקישורים רשמיים של הכנסת, כך שהדפדפן פונה גם אל אותם שירותים; מעבר לכך האתר לא מטמיע רכיבי מעקב חיצוניים.</li>
         <li>המידע מובא כמות שהוא, לצורכי עיון אזרחי. ייתכנו שגיאות, חוסרים או עיכוב מול המקור — ובכל מקרה של סתירה, <b>הפרסום הרשמי של הכנסת גובר</b>. מצאתם טעות? <a href="https://github.com/harelc/mandat121/issues" target="_blank" rel="noopener">דווחו ↗</a> ונתקן.</li>
       </ul>
@@ -5435,7 +5536,7 @@ function renderAbout(){
   <div class="card pad about-card rise" style="margin-top:.85rem">
     <h3>${icon('book')} רישיון וקרדיטים</h3>
     <p>תוכן האתר © הראל קין, ברישיון <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener">CC BY-NC-SA 4.0</a> — מותר לשתף ולהתאים לשימוש לא־מסחרי, עם קרדיט ובאותו רישיון. קוד המקור של האתר ושל בוני־הנתונים פתוח ב־<a href="https://github.com/harelc/mandat121" target="_blank" rel="noopener">GitHub ↗</a>. נתוני הכנסת הם פרסומים רשמיים של הכנסת; תקצירי ויקיפדיה © תורמי ויקיפדיה, CC BY-SA, עם קישור וייחוס בכל דף; נתוני ויקינתונים CC0. תודה לכנסת על פרסום הנתונים הגולמיים, ולתורמי ויקיפדיה וויקינתונים.</p>
-    <p style="margin-top:.6rem"><button class="btn primary" onclick="go('now')">חזרה לעכשיו ←</button> <button class="btn ghost" onclick="go('mine')">ל״שלי״</button></p>
+    <p style="margin-top:.6rem"><button class="btn primary" onclick="go('now')">חזרה לעכשיו ←</button> <button class="btn ghost" onclick="go('mine')">ל״שלי״</button> <button class="btn primary" onclick="go('feedback')">💬 משוב, הצעות והמלצות</button></p>
   </div>`;
 }
 

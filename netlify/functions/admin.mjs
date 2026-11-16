@@ -52,6 +52,11 @@ fetch(location.pathname + '?data=1', { headers: { 'x-hit-token': tok }, cache: '
      + j.stars.top.map(function(s){ return '<tr><td>' + entLink(s.kind, s.key) + '</td><td>' + esc(s.kind) + '</td><td>' + N(s.count) + '</td></tr>' }).join('') + '</table></div>';
    h += '<div class="card"><h3>יומן פעולות ★ (אחרונות ' + j.star_log.length + ')</h3><table><tr><th>זמן</th><th>פעולה</th><th>ישות</th><th>סוג</th><th>סה״כ אחרי</th><th>מבקר</th></tr>'
      + j.star_log.slice().reverse().map(function(e){ return '<tr><td>' + esc(e.t.replace('T',' ').slice(0,19)) + '</td><td>' + (e.action==='follow'?'★ follow':'☆ unfollow') + '</td><td>' + entLink(e.kind, e.key) + '</td><td>' + esc(e.kind) + '</td><td>' + N(e.count) + '</td><td><code>' + esc(e.uid) + '</code></td></tr>' }).join('') + '</table></div>';
+   window.fbAct = function(id, action){ fetch('/.netlify/functions/feedback', { method:'POST', headers:{ 'Content-Type':'application/json', 'x-hit-token': tok }, body: JSON.stringify({ action: action, id: id }) }).then(function(r){ if(!r.ok) throw 0; location.reload() }).catch(function(){ alert('הפעולה נכשלה') }) };
+   var fb = j.feedback || [];
+   var fbLabel = { bug:'באג', idea:'רעיון', correction:'תיקון', testimonial:'המלצה' };
+   h += '<div class="card"><h3>💬 משוב והמלצות (' + fb.length + ')</h3>' + (fb.length ? '<table><tr><th>זמן</th><th>סוג</th><th>טקסט</th><th>שם</th><th>פרסום?</th><th>סטטוס</th><th></th></tr>'
+     + fb.map(function(f){ return '<tr><td>' + esc(String(f.ts||'').replace('T',' ').slice(0,16)) + '</td><td>' + esc(fbLabel[f.type]||f.type) + '</td><td>' + esc(f.text) + '</td><td>' + esc(f.name||'') + '</td><td>' + (f.type==='testimonial' ? (f.consent?'הסכים/ה':'לא הסכים/ה') : '—') + '</td><td>' + esc(f.status) + '</td><td>' + (f.status!=='approved' ? '<button onclick="fbAct(\\'' + esc(f.id) + '\\',\\'approve\\')">אישור</button> ' : '') + (f.status!=='rejected' ? '<button onclick="fbAct(\\'' + esc(f.id) + '\\',\\'reject\\')">דחייה</button>' : '') + '</td></tr>' }).join('') + '</table>' : '<div class="muted">אין פניות עדיין.</div>') + '</div>';
    h += '<div class="card"><h3>תנועה לפי שעה (אחרונות 24)</h3><table><tr><th>שעה</th><th>צפיות</th><th>ייחודיים</th></tr>'
      + j.traffic.hours.slice(0,24).map(function(x){ return '<tr><td>' + esc(x.hour) + '</td><td>' + N(x.pageviews) + '</td><td>' + N(x.unique_ips) + '</td></tr>' }).join('') + '</table></div>';
    h += '<p class="muted">נוצר ' + esc(j.generated) + ' · הנתונים הם אגרגטים + מזהי מבקר חתוכים ומגובבים בלבד — אין IP גולמי ואין מזהים מלאים.</p>';
@@ -132,5 +137,14 @@ export default async function handler(request) {
     },
     stars: { total_entities: top.length, top: top.slice(0, 50) },
     star_log: starLog.slice(-200),
+    feedback: await (async () => {
+      try {
+        const fs = getStore("feedback");
+        const { blobs: fb } = await fs.list({ prefix: "f:" });
+        const items = [];
+        for (const { key } of fb) { const d = await fs.get(key, { type: "json" }).catch(() => null); if (d) items.push(d); }
+        return items.sort((a, b) => String(b.ts || "").localeCompare(String(a.ts || ""))).slice(0, 100);
+      } catch { return []; }
+    })(),
   }, { headers: { "Cache-Control": "no-store" } });
 }
