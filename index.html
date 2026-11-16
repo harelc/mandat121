@@ -1102,9 +1102,22 @@ const PTV_PLAN_API='https://knesset.gov.il/WebSiteApi/knessetapi/KnessetMainLobb
 const PTV_CFG_API='https://knesset.gov.il/WebSiteApi/knessetapi/GlobalResources/GetResourceValues?LanguageId=1&Keys=knsgroup_broadcastLobby';
 const PTV_FALLBACK='https://knesetn.gostreaming.tv/Knesset/index.m3u8';
 const PTV_HOSTS=new Set(['knesetn.gostreaming.tv','w1.013.gostreaming.tv','video.knesset.gov.il']);
-let PLENUM_TV={at:0,tryAt:0,data:null,liveUrl:null,hls:null,src:null,timer:null,lastOnAirAt:0,closed:false,force:false};
-function ptvClose(){ PLENUM_TV.closed=!!(PLENUM_TV.data&&PLENUM_TV.data.onAir); PLENUM_TV.force=false; ptvDestroy(); renderPlenumTv() } // closed is remembered only for a live plenum player; closing a forced-open off-air player just exits it, so the plenum can still auto-open when the sitting resumes
-function ptvOpen(){ PLENUM_TV.closed=false; PLENUM_TV.force=true; renderPlenumTv() }
+let PLENUM_TV={at:0,tryAt:0,data:null,liveUrl:null,hls:null,src:null,timer:null,lastOnAirAt:0,closed:false,force:false,cmtSig:''};
+function ptvClose(){ PLENUM_TV.closed=!!(PLENUM_TV.data&&PLENUM_TV.data.onAir); if(!PLENUM_TV.closed){ const c=committeeNow(); if(c.length) PLENUM_TV.cmtSig=cmtNowSig(c) } PLENUM_TV.force=false; ptvDestroy(); renderPlenumTv() } // closed is remembered only for a live plenum player (or the current committee-sitting set); closing a forced-open off-air player just exits it, so the plenum can still auto-open when the sitting resumes
+function ptvOpen(){ PLENUM_TV.closed=false; PLENUM_TV.cmtSig=''; PLENUM_TV.force=true; renderPlenumTv() }
+/* Planned committee work, right now: the agenda feed gives committee
+   sittings a start but no finish, so a sitting counts as in progress
+   for two hours from its start. Live era only — a closed era's agenda
+   is history, not a schedule. During committee hours the Knesset
+   Channel airs committee sittings while the plenum is dark, so the
+   player opens for committees too, labelled as such below it. */
+const CMT_NOW_WINDOW_MS=2*60*60*1000;
+function committeeNow(){
+  if(KN!==CURRENT_KN||!AGENDA) return [];
+  const now=Date.now();
+  return (AGENDA.committees||[]).filter(x=>{ const t=Date.parse(x.start||''); return t&&t<=now&&now<t+CMT_NOW_WINDOW_MS });
+}
+const cmtNowSig=list=>list.map(x=>String(x.id)).sort().join(',');
 const ptvUrl=u=>{ try{ const x=new URL(u); return x.protocol==='https:'&&PTV_HOSTS.has(x.host)?x.href:null }catch(e){ return null } };
 function ptvDestroy(){ if(PLENUM_TV.hls){ try{PLENUM_TV.hls.destroy()}catch(e){} PLENUM_TV.hls=null } PLENUM_TV.src=null; const v=document.getElementById('plenumTvVideo'); if(v){ v.dataset.ptvSrc=''; v.pause(); v.removeAttribute('src'); v.load() } }
 function ensurePlenumTv(){
@@ -1175,6 +1188,14 @@ function renderPlenumTv(){
   if(!box){ ptvDestroy(); return }
   const d=PLENUM_TV.data;
   if(!d) return; // unknown yet — stay invisible rather than flicker
+  const cmts=d.onAir?[]:committeeNow(), cmtSig=cmtNowSig(cmts), cmtMode=cmts.length>0;
+  if(cmtMode&&!PLENUM_TV.force&&PLENUM_TV.cmtSig===cmtSig){
+    if(box.querySelector('video')) ptvDestroy();
+    const names=[...new Set(cmts.map(x=>x.committee))];
+    box.innerHTML=`<div class="sec-title">שידור חי · ערוץ הכנסת <small>ישיבות ועדות</small></div>
+    <section class="card ptv-off rise"><span class="chip acc">הנגן סגור</span><span class="small muted">לפי סדר היום מתקיימות כעת ישיבות ועדה (${esc(names.join(' · '))}) — הנגן סגור. אפשר לפתוח אותו מחדש בכל רגע.</span><span style="margin-inline-start:auto"><button class="btn ghost small" onclick="ptvOpen()">הצגת השידור ←</button></span></section>`;
+    return;
+  }
   if(PLENUM_TV.closed&&d.onAir){
     // A manual close only collapses a player that was showing the plenum.
     // Off air there is nothing to collapse into: closing a forced-open
@@ -1185,21 +1206,30 @@ function renderPlenumTv(){
     <section class="card ptv-off rise"><span class="chip acc">הנגן סגור</span><span class="small muted">המליאה משודרת כעת בשידור חי — הנגן סגור. אפשר לפתוח אותו מחדש בכל רגע.</span><span style="margin-inline-start:auto"><button class="btn ghost small" onclick="ptvOpen()">הצגת השידור ←</button></span></section>`;
     return;
   }
-  if(d.onAir||PLENUM_TV.force){
+  if(d.onAir||PLENUM_TV.force||cmtMode){
     const spk=d.speaker||{};
     const who=spk.SPK1_Name?`${spk.SPK1_Gender?'הנואם':'הנואמת'} כעת: ${spk.SPK1_Name}`:'';
     const subj=spk.Curr_Subject||(d.agenda&&d.agenda.Name)||'';
     const next=spk.SPK2_Name?` · הבא/ה: ${spk.SPK2_Name}`:'';
     if(!box.querySelector('video')){ // first paint of this sitting — later polls only update the text below
-      box.innerHTML=`<div class="sec-title">שידור חי מהמליאה <small>ערוץ הכנסת · מתוך אתר הכנסת</small></div>
+      box.innerHTML=`<div class="sec-title" id="ptvTitle"></div>
       <section class="card ptv rise"><div class="ptv-frame"><video id="plenumTvVideo" controls playsinline muted poster="" aria-label="שידור חי ממליאת הכנסת"></video><button type="button" class="ptv-close" onclick="ptvClose()" title="סגירת השידור" aria-label="סגירת השידור החי">✕</button></div>
       <div class="ptv-meta"><span class="ptv-live" id="ptvBadge"><i></i>חי עכשיו</span> <span class="now" id="ptvNow"></span><div class="small muted" id="ptvSubj" style="margin-top:.3rem"></div></div></section>`;
     }
+    const tt=document.getElementById('ptvTitle');
+    if(tt) tt.innerHTML=d.onAir?'שידור חי מהמליאה <small>ערוץ הכנסת · מתוך אתר הכנסת</small>':'שידור חי · ערוץ הכנסת <small>מתוך אתר הכנסת</small>';
     const b=document.getElementById('ptvBadge');
-    if(b) b.innerHTML=d.onAir?'<i></i>חי עכשיו':'<i></i>ערוץ הכנסת · נפתח ידנית';
+    if(b) b.innerHTML=d.onAir?'<i></i>חי עכשיו':cmtMode?'<i></i>ערוץ הכנסת · זמן ועדות':'<i></i>ערוץ הכנסת · נפתח ידנית';
     const n=document.getElementById('ptvNow'), s=document.getElementById('ptvSubj');
-    if(n) n.textContent=d.onAir?who+next:'המליאה אינה משודרת כעת';
-    if(s) s.textContent=d.onAir?(subj?`על סדר היום: ${subj}`:''):'מוצג שידור ערוץ הכנסת — השידור מהמליאה יחזור לכאן כשהדיון יתחדש.';
+    if(cmtMode){
+      const names=[...new Set(cmts.map(x=>x.committee))];
+      const topics=[...new Set(cmts.flatMap(x=>(x.items||[]).slice(0,1).map(i=>i.name)).filter(Boolean))].slice(0,2);
+      if(n) n.textContent=`כעת זמן ועדות: ${names.join(' · ')} בישיבה לפי סדר היום`;
+      if(s) s.textContent=`${topics.length?`על סדר היום: ${topics.join(' · ')}. `:''}המליאה אינה בישיבה כעת — בשעות אלה ערוץ הכנסת משדר ישיבות ועדות.`;
+    } else {
+      if(n) n.textContent=d.onAir?who+next:'המליאה אינה משודרת כעת';
+      if(s) s.textContent=d.onAir?(subj?`על סדר היום: ${subj}`:''):'מוצג שידור ערוץ הכנסת — השידור מהמליאה יחזור לכאן כשהדיון יתחדש.';
+    }
     ptvInitPlayer(PLENUM_TV.liveUrl||PTV_FALLBACK);
   } else if(d.active) {
     // Sitting day, but the channel is not showing the chamber right now
