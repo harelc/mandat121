@@ -483,6 +483,7 @@ a.bill-ref:hover{background:#dbe7f5}
 .arrival-card summary .chev{margin-inline-start:auto;color:var(--dim);transition:transform .15s}
 .arrival-card[open ] summary .chev{transform:rotate(90deg)}
 .arrival-rank{width:1.7rem;text-align:center;color:var(--accent);font-weight:800;flex:none}
+.arrival-rows{max-height:24rem;overflow-y:auto;overscroll-behavior:contain;scrollbar-width:thin}
 /* Presence matrix (120 MK columns x day/week rows): canvas, not DOM —
    daily rows grow ~250/year, so cells are drawn and hit-tested by
    coordinates; nothing in the DOM scales with the number of days. */
@@ -2775,7 +2776,7 @@ function presenceArrivalsHTML(seats){
   return `<details class="card pad arrival-card rise" ${isToday?'open':''}>
   <summary>סדר ההגעה למשכן · ${fmtDate(sel)} <span class="chip ${isToday?'acc':''}">${arrivals.length} הגיעו${isToday?' עד כה':''}</span><span class="small dim" style="font-weight:400">ראשון–חמישי · מתעדכן כל 5 דקות</span><span class="chev">‹</span></summary>
   <div style="display:flex;gap:.5rem;flex-wrap:wrap;margin:.7rem 0 .4rem;align-items:center"><span class="small dim">יום:</span><select onchange="presenceDaySel=this.value;renderNow26()" aria-label="בחירת יום">${days.map(d=>`<option value="${d}" ${d===sel?'selected':''}>${fmtDate(d)} (${(PRESENCE26.days[d].arrivals||[]).length} הגיעו)</option>`).join('')}</select></div>
-  ${arrivals.length?`<div class="rows" style="margin:.3rem -.9rem 0">${arrivals.map((a,i)=>{const s=seatBy[normName(a.name)]; return `<div class="row" onclick="openMk('${jsq(a.name)}')"><b class="arrival-rank">${i+1}</b>${avatar(a.name,s?.faction||'',32)}<span class="flex">${esc(disp(a.name))}<br><span class="dim small">${esc(shortF(s?.faction||''))}</span></span>${a.at_first_poll?'<span class="chip">כבר במשכן כשהמעקב נפתח</span>':''}<span class="chip acc">נראה/תה לראשונה ${esc((a.first_seen||'').slice(11,16))}</span></div>`}).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">ביום זה לא נרשמה הגעה של אף ח״כ בשעות המעקב.</p>'}
+  ${arrivals.length?`<div class="rows arrival-rows" style="margin:.3rem -.9rem 0">${arrivals.map((a,i)=>{const s=seatBy[normName(a.name)]; return `<div class="row" onclick="openMk('${jsq(a.name)}')"><b class="arrival-rank">${i+1}</b>${avatar(a.name,s?.faction||'',32)}<span class="flex">${esc(disp(a.name))}<br><span class="dim small">${esc(shortF(s?.faction||''))}</span></span>${a.at_first_poll?'<span class="chip">כבר במשכן כשהמעקב נפתח</span>':''}<span class="chip acc">נראה/תה לראשונה ${esc((a.first_seen||'').slice(11,16))}</span></div>`}).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">ביום זה לא נרשמה הגעה של אף ח״כ בשעות המעקב.</p>'}
   <p class="small dim" style="margin-top:.6rem">המעקב החל ב־${fmtDate(PRESENCE26._meta?.tracking_since||'')} · ״נראה/תה לראשונה״ = קריאת הלובי הראשונה שראתה את הח״כ (נדגם כל 5 דקות).</p>
   </details>`;
 }
