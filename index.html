@@ -2634,7 +2634,7 @@ function protoJump(scope,ti){
   document.querySelectorAll(`#${scope}Toc .proto-toc-i`).forEach(b=>b.classList.toggle('on',+b.dataset.ti===ti));
 }
 function protoHitBarHTML(scope){
-  return `<div class="hitbar" id="${scope}HitBar" style="display:none"><button class="btn" onclick="protoMarkNav('${scope}',-1)">› הקודם</button><span id="${scope}HitPos" class="small" style="min-width:3.2rem;text-align:center"></span><button class="btn primary" onclick="protoMarkNav('${scope}',1)">הבא ‹</button><button class="btn ghost" onclick="document.querySelector('#${scope}HitBar').style.display='none'" aria-label="סגירת סרגל התוצאות">✕</button></div>`;
+  return `<div class="hitbar" id="${scope}HitBar" style="display:none"><button class="btn" onclick="protoMarkNav('${scope}',-1)">→ הקודם</button><span id="${scope}HitPos" class="small" style="min-width:3.2rem;text-align:center"></span><button class="btn primary" onclick="protoMarkNav('${scope}',1)">הבא ←</button><button class="btn ghost" onclick="document.querySelector('#${scope}HitBar').style.display='none'" aria-label="סגירת סרגל התוצאות">✕</button></div>`;
 }
 function protoSyncHitBar(scope){
   const has=!!document.querySelector(`#${scope}Turns mark`);
