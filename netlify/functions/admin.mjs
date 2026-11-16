@@ -48,14 +48,14 @@ h1{font-size:1.45rem;margin:.2rem 0 1rem}h3{margin:.1rem 0 .6rem;font-size:1.02r
 .kpi b{display:block;color:#476b9e;font-size:1.7rem;line-height:1.1;font-variant-numeric:tabular-nums}
 .kpi span{color:#857c66;font-size:.8rem}
 .grid2{display:grid;grid-template-columns:1fr;gap:1rem}@media(min-width:820px){.grid2{grid-template-columns:1fr 1fr}.grid2>.card{margin-bottom:0}}
-.chart{display:flex;align-items:flex-end;gap:2px;height:150px;border-bottom:2px solid #ddd2ba;padding-top:.4rem;direction:ltr}
+.chart{display:flex;align-items:flex-end;gap:2px;height:150px;border-bottom:2px solid #ddd2ba;padding-top:.4rem}
 .chart .col{flex:1;display:flex;flex-direction:column;justify-content:flex-end;height:100%;min-width:0}
 .chart .bar{background:linear-gradient(180deg,#6d8cb5,#476b9e);border-radius:4px 4px 0 0;min-height:2px}
 .chart .bar.today{background:linear-gradient(180deg,#d3ab3e,#b98f1f)}
-.xlabels{display:flex;gap:2px;direction:ltr;color:#857c66;font-size:.62rem}
+.xlabels{display:flex;gap:2px;color:#857c66;font-size:.62rem}
 .xlabels span{flex:1;text-align:center;overflow:hidden;white-space:nowrap;min-width:0}
 .hbar{display:grid;grid-template-columns:minmax(90px,1.2fr) 2fr 3rem;gap:.5rem;align-items:center;padding:.28rem 0;font-size:.85rem;border-bottom:1px dashed #e6dcc2}
-.hbar:last-child{border-bottom:0}.hbar .tr{background:#efe7d0;border-radius:99px;height:.85rem;overflow:hidden;direction:ltr}
+.hbar:last-child{border-bottom:0}.hbar .tr{background:#efe7d0;border-radius:99px;height:.85rem;overflow:hidden}
 .hbar .fl{height:100%;background:linear-gradient(90deg,#b98f1f,#d3ab3e);border-radius:99px}
 .hbar .n{text-align:left;font-weight:800;font-variant-numeric:tabular-nums;color:#8a660a}
 .hbar a{color:#476b9e;text-decoration:none}.hbar a:hover{text-decoration:underline}
@@ -110,30 +110,30 @@ fetch(location.pathname + '?data=1', { headers: { 'x-hit-token': tok }, cache: '
      + '<div class="kpi"><b>' + N(j.stars.total_entities) + '</b><span>ישויות עם עוקבים</span></div>'
      + '<div class="kpi"><b>' + N(pending) + '</b><span>פניות משוב ממתינות</span></div></div>';
    var hoursAsc = (j.traffic.hours||[]).slice(0,24).slice().reverse();
-   h += '<div class="card"><h3>📈 צפיות לפי שעה — אחרונות 24 שעות</h3>'
+   h += '<div class="card"><h3>📈 צפיות לפי שעה — 24 השעות האחרונות</h3>'
      + vchart(hoursAsc.map(function(x){ return { label: x.hour, short: x.hour.slice(11), value: x.pageviews } }))
      + '<div class="muted">ריחוף מעל עמודה מציג שעה ומספר מדויק. סך הכול בחלון: ' + N(hoursAsc.reduce(function(a,x){return a+x.pageviews},0)) + ' צפיות.</div></div>';
-   h += '<div class="card"><h3>📊 צפיות לפי יום — אחרונים 14 ימים</h3>'
+   h += '<div class="card"><h3>📊 צפיות לפי יום — 14 הימים האחרונים</h3>'
      + vchart((j.traffic.days||[]).map(function(x,i,arr){ return { label: x.day, short: x.day.slice(5), value: x.pageviews, cls: i===arr.length-1?'today':'' } })) + '</div>';
    h += '<div class="grid2"><div class="card"><h3>★ הכי נעקבים (' + N(j.stars.total_entities) + ' ישויות)</h3>'
-     + hbars(j.stars.top.slice(0,15).map(function(s){ return { label: entLink(s.kind, s.key) + ' <span class="pill">' + esc(s.kind) + '</span>', value: s.count } })) + '</div>'
+     + hbars(j.stars.top.slice(0,15).map(function(s){ var kl = { mk:'ח״כ', bill:'חוק', committee:'ועדה', faction:'סיעה', topic:'נושא' }[s.kind] || s.kind; return { label: entLink(s.kind, s.key) + ' <span class="pill">' + esc(kl) + '</span>', value: s.count } })) + '</div>'
      + '<div class="card"><h3>🔥 דפים מובילים היום</h3>'
      + hbars((j.traffic.top_pages||[]).map(function(p){ return { label: '<span dir="ltr">' + esc(p.path||'/') + '</span>', value: p.pageviews } })) + '</div></div>';
    // Follow/unfollow activity per day, from the audit log
    var byDay = {};
    (j.star_log||[]).forEach(function(e){ var d = String(e.t||'').slice(0,10); if(!d) return; byDay[d] = byDay[d] || {f:0,u:0}; if(e.action==='follow') byDay[d].f++; else byDay[d].u++ });
    var days = Object.keys(byDay).sort();
-   h += '<div class="card" style="margin-top:1rem"><h3>★ פעילות מעקב לפי יום (follow, 7 ימים אחרונים ביומן)</h3>'
-     + vchart(days.map(function(d){ return { label: d + ' · follow ' + byDay[d].f + ' · unfollow ' + byDay[d].u, short: d.slice(5), value: byDay[d].f } }))
+   h += '<div class="card" style="margin-top:1rem"><h3>★ פעילות מעקב לפי יום — 7 הימים האחרונים ביומן</h3>'
+     + vchart(days.map(function(d){ return { label: d + ' · נוספו למעקב ' + byDay[d].f + ' · הוסרו ממעקב ' + byDay[d].u, short: d.slice(5), value: byDay[d].f } }))
      + '<details><summary>יומן אחרון (' + Math.min(30,(j.star_log||[]).length) + ' מתוך ' + (j.star_log||[]).length + ')</summary><table><tr><th>זמן</th><th>פעולה</th><th>ישות</th><th>סה״כ</th></tr>'
-     + (j.star_log||[]).slice(-30).reverse().map(function(e){ return '<tr><td>' + esc(String(e.t||'').replace('T',' ').slice(5,19)) + '</td><td>' + (e.action==='follow'?'★':'☆') + '</td><td>' + entLink(e.kind, e.key) + '</td><td>' + N(e.count) + '</td></tr>' }).join('') + '</table></details></div>';
+     + (j.star_log||[]).slice(-30).reverse().map(function(e){ return '<tr><td><bdi dir="ltr">' + esc(String(e.t||'').replace('T',' ').slice(5,19)) + '</bdi></td><td>' + (e.action==='follow'?'★':'☆') + '</td><td>' + entLink(e.kind, e.key) + '</td><td>' + N(e.count) + '</td></tr>' }).join('') + '</table></details></div>';
    window.fbAct = function(id, action){ fetch('/.netlify/functions/feedback', { method:'POST', headers:{ 'Content-Type':'application/json', 'x-hit-token': tok }, body: JSON.stringify({ action: action, id: id }) }).then(function(r){ if(!r.ok) throw 0; location.reload() }).catch(function(){ alert('הפעולה נכשלה') }) };
    var fbLabel = { bug:'באג', idea:'רעיון', correction:'תיקון', testimonial:'המלצה' };
    var order = { pending:0, approved:1, rejected:2 };
    var fbSorted = fb.slice().sort(function(a,b){ return (order[a.status]-order[b.status]) || String(b.ts).localeCompare(String(a.ts)) });
-   h += '<div class="card"><h3>💬 משוב והמלצות (' + fb.length + ', מתוכן ' + pending + ' ממתינות)</h3>' + (fb.length ? '<table><tr><th>זמן</th><th>סוג</th><th>טקסט</th><th>שם</th><th>פרסום?</th><th>סטטוס</th><th></th></tr>'
-     + fbSorted.map(function(f){ return '<tr><td style="white-space:nowrap">' + esc(String(f.ts||'').replace('T',' ').slice(5,16)) + '</td><td>' + esc(fbLabel[f.type]||f.type) + '</td><td>' + esc(f.text) + '</td><td>' + esc(f.name||'') + '</td><td>' + (f.type==='testimonial' ? (f.consent?'הסכים/ה':'לא הסכים/ה') : '—') + '</td><td><span class="pill ' + esc(f.status) + '">' + esc(f.status) + '</span></td><td style="white-space:nowrap">' + (f.status!=='approved' ? '<button onclick="fbAct(\\'' + esc(f.id) + '\\',\\'approve\\')">אישור</button> ' : '') + (f.status!=='rejected' ? '<button onclick="fbAct(\\'' + esc(f.id) + '\\',\\'reject\\')">דחייה</button>' : '') + '</td></tr>' }).join('') + '</table>' : '<div class="muted">אין פניות עדיין.</div>') + '</div>';
-   h += '<p class="muted">נוצר ' + esc(j.generated) + ' · חלון נתונים: 14 ימים אחרונים · הנתונים הם אגרגטים + מזהי מבקר חתוכים ומגובבים בלבד — אין IP גולמי ואין מזהים מלאים.</p>';
+   h += '<div class="card"><h3>💬 משוב והמלצות (' + (fb.length===1?'פנייה אחת':fb.length + ' פניות') + ', ' + pending + ' ' + (pending===1?'ממתינה':'ממתינות') + ')</h3>' + (fb.length ? '<table><tr><th>זמן</th><th>סוג</th><th>טקסט</th><th>שם</th><th>פרסום?</th><th>סטטוס</th><th></th></tr>'
+     + fbSorted.map(function(f){ return '<tr><td style="white-space:nowrap"><bdi dir="ltr">' + esc(String(f.ts||'').replace('T',' ').slice(5,16)) + '</bdi></td><td>' + esc(fbLabel[f.type]||f.type) + '</td><td>' + esc(f.text) + '</td><td>' + esc(f.name||'') + '</td><td>' + (f.type==='testimonial' ? (f.consent?'הסכים/ה':'לא הסכים/ה') : '—') + '</td><td><span class="pill ' + esc(f.status) + '">' + esc({ pending:'ממתינה', approved:'אושרה', rejected:'נדחתה' }[f.status] || f.status) + '</span></td><td style="white-space:nowrap">' + (f.status!=='approved' ? '<button onclick="fbAct(\\'' + esc(f.id) + '\\',\\'approve\\')">אישור</button> ' : '') + (f.status!=='rejected' ? '<button onclick="fbAct(\\'' + esc(f.id) + '\\',\\'reject\\')">דחייה</button>' : '') + '</td></tr>' }).join('') + '</table>' : '<div class="muted">אין פניות עדיין.</div>') + '</div>';
+   h += '<p class="muted">נוצר <bdi dir="ltr">' + esc(String(j.generated||'').replace('T',' ').slice(0,19)) + '</bdi> · חלון נתונים: 14 הימים האחרונים · הנתונים הם אגרגטים + מזהי מבקר חתוכים ומגובבים בלבד — אין IP גולמי ואין מזהים מלאים.</p>';
    document.getElementById('app').innerHTML = h;
  })
  .catch(function(){ document.getElementById('app').textContent = '⛔ אין גישה — טוקן שגוי או שלא הוגדר HIT_READ_TOKEN באתר.' });
