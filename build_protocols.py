@@ -17,6 +17,7 @@ Usage: python3 build_protocols.py [--knesset 25|26]  (default 25; input is
 committees.json for K25, data/k26_committees.json for K26. Missing input
 or no protocol documents = exit 0, no write.)
 """
+from era_registry import knesset_type
 import argparse, json, re, sys, time, urllib.request, zipfile
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from io import BytesIO
@@ -145,7 +146,7 @@ def parse_text(session, text):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
+    ap.add_argument("--knesset", type=knesset_type, required=True)
     kn = ap.parse_args().knesset
     src = Path("data/committees.json" if kn == 25 else f"data/k{kn}_committees.json")
     if not src.exists():

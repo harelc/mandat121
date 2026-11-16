@@ -13,6 +13,7 @@ Output: data/k{N}_roles.json {"by_mk": {surname-first name: [role…]}}.
 No roles published for N yet = exit 0, no write (safe daily-build no-op).
 Name matching follows build_k25_tenure.py (surname-first UI names).
 """
+from era_registry import knesset_type
 import argparse, json, sys, urllib.parse, urllib.request
 from pathlib import Path
 
@@ -98,7 +99,7 @@ def wanted_names(kn):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
+    ap.add_argument("--knesset", type=knesset_type, required=True)
     kn = ap.parse_args().knesset
 
     pos_desc = {p["Id"]: p["Description"]

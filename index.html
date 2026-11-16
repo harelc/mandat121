@@ -702,10 +702,7 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
 <header>
   <div class="header-in">
     <div class="logo" onclick="go('now')">המנדט <em>ה־121</em></div>
-    <div class="kswitch" role="tablist" aria-label="בחירת כנסת">
-      <button id="ksw25" onclick="switchKnesset(25)">כנסת 25</button>
-      <button id="ksw26" class="on" onclick="switchKnesset(26)">כנסת 26 <span class="kdot" title="הכנסת הנוכחית"></span></button>
-    </div>
+    <div class="kswitch" id="kswitch" role="tablist" aria-label="בחירת כנסת"></div>
     <div class="search"><span class="mag" aria-hidden="true"><svg class="icn" viewBox="0 0 24 24"><circle cx="11" cy="11" r="7"/><path d="m20.5 20.5-4.8-4.8"/></svg></span><input id="globalSearch" type="search" placeholder="חיפוש חוק, הצבעה, ח״כ, סיעה, ועדה, נושא…" aria-label="חיפוש" autocomplete="off"><div id="searchDrop" class="search-drop" role="listbox" aria-label="תוצאות חיפוש" hidden></div></div>
   </div>
 </header>
@@ -868,27 +865,42 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
 'use strict';
 /* ============ state ============ */
 const LS='mandat121.v2';
-let KN=26; // active Knesset instance: 26 = current (official roster published 2026-11-10), 25 = full-coverage archive
+/* ============ era registry ============
+   The ONLY place the client names its Knessets. Design rule: "which
+   Knesset" is data, never a code path — supporting Knesset 27, or
+   backfilling an earlier one, means adding ONE entry here (plus the
+   builders' --knesset run and the workflow's CURRENT_KNESSET), never
+   a new era branch. `files` overrides exist only where an era's
+   published filenames predate the data/k{kn}_{kind}.json convention
+   (K25's original names are live URLs — renaming them would break
+   deployed links, so the registry absorbs the difference). */
+const ERAS=[
+  {kn:25,current:false,files:{plenum_search:'data/plenum_search.json',protocol_search:'data/protocol_search.json',protocols_index:'data/protocols_index.json'}},
+  {kn:26,current:true},
+];
+const CURRENT_KN=(ERAS.find(e=>e.current)||ERAS[ERAS.length-1]).kn;
+const eraFile=(kn,kind)=>{ const e=ERAS.find(x=>x.kn===kn); return (e&&e.files&&e.files[kind])||`data/k${kn}_${kind}.json` };
+let KN=CURRENT_KN; // active Knesset instance (see ERAS)
 const freshState=()=>({myVotes:{},followBills:[],followMks:[],followTopics:[],followCommittees:[],followFactions:[],lastSeen:null});
-let STORE={'25':freshState(),'26':freshState()};
+let STORE={}; for(const e of ERAS) STORE[e.kn]=freshState();
 try{ const raw=JSON.parse(localStorage.getItem(LS)||localStorage.getItem('openknesset25.v1')||'{}');
   if(raw.myVotes) STORE['25']=Object.assign(freshState(),raw); // migrate v1 (K25-only)
-  else for(const k of ['25','26']) if(raw[k]) STORE[k]=Object.assign(freshState(),raw[k]);
+  else for(const k of Object.keys(raw)) if(/^\d+$/.test(k)&&raw[k]) STORE[k]=Object.assign(freshState(),raw[k]);
 }catch(e){}
 // MK follows are shared across Knessets: you follow the person, not the
 // term — matching the server star entity (mk:<name>, no Knesset qualifier).
 // Union any per-era lists saved before this change, and keep both eras'
 // arrays identical from here on (toggleFollow mirrors every MK toggle).
-{ const u=[...new Set([...(STORE['25'].followMks||[]),...(STORE['26'].followMks||[])])];
-  STORE['25'].followMks=[...u]; STORE['26'].followMks=[...u]; }
+{ const u=[...new Set(ERAS.flatMap(e=>STORE[e.kn].followMks||[]))];
+  for(const e of ERAS) STORE[e.kn].followMks=[...u]; }
 // Bill follows are shared across Knessets too: bill ids are globally unique
 // (a K25 bill id never recurs in K26), and a K25 bill's page is reachable
 // while KN=26 (deep link #bill=…, global search) — its star used to land in
 // STORE['26'].followBills, where renderBillLite (KN=25) and the Mine page's
 // K25 list (STORE['25']) never looked, so the star silently vanished.
-{ const u=[...new Set([...(STORE['25'].followBills||[]),...(STORE['26'].followBills||[])].map(String))];
-  STORE['25'].followBills=[...u]; STORE['26'].followBills=[...u]; }
-let S=STORE['26'];
+{ const u=[...new Set(ERAS.flatMap(e=>STORE[e.kn].followBills||[]).map(String))];
+  for(const e of ERAS) STORE[e.kn].followBills=[...u]; }
+let S=STORE[CURRENT_KN];
 let prevSeen=S.lastSeen;
 function save(){S.lastSeen=new Date().toISOString().slice(0,10);localStorage.setItem(LS,JSON.stringify(STORE))}
 function setKN(n){ if(KN===n) return; KN=n; S=STORE[String(n)]; prevSeen=S.lastSeen; AGENDA=AG_CACHE[n]||null; agendaAnchor=null; agendaLastBody=''; save(); renderKSwitch(); buildTabs(); if(n===25) ensureK25Archive() }
@@ -916,8 +928,8 @@ function switchKnesset(n){ setKN(n);
   const h=new URLSearchParams(location.hash.slice(1));
   const detail=['bill','vote','mk','faction','committee','session','plenum','bill26','voterec'].some(k=>h.get(k));
   if(detail&&(routeEntityInKn(n,h)||(n===25&&!K25_READY))) applyRoute(); else render();
-  window.scrollTo({top:0}); toast(n===26?'כנסת 26 — הכנסת הנוכחית':'כנסת 25 — כיסוי מלא') }
-function renderKSwitch(){ const a=$('#ksw25'),b=$('#ksw26'); if(a)a.classList.toggle('on',KN===25); if(b)b.classList.toggle('on',KN===26) }
+  window.scrollTo({top:0}); toast(n===CURRENT_KN?`כנסת ${n} — הכנסת הנוכחית`:`כנסת ${n} — כיסוי ארכיוני`) }
+function renderKSwitch(){ const el=$('#kswitch'); if(el) el.innerHTML=ERAS.map(e=>`<button id="ksw${e.kn}" class="${KN===e.kn?'on':''}" onclick="switchKnesset(${e.kn})">כנסת ${e.kn}${e.current?' <span class="kdot" title="הכנסת הנוכחית"></span>':''}</button>`).join('') }
 const followedBill=id=>S.followBills.includes(String(id));
 const followedMk=n=>S.followMks.includes(n);
 const followedCommittee=id=>S.followCommittees.includes(String(id));
@@ -951,7 +963,7 @@ function migrateLocalStars(){
   const push=(kind,key)=>{ const id=kind+':'+key; if(seen.has(id)) return; seen.add(id);
     jobs.push(fetch('/.netlify/functions/stars',{method:'POST',headers:{'Content-Type':'application/json'},body:JSON.stringify({kind,key,uid,on:true}),cache:'no-store'})
       .then(r=>r.ok?r.json():null).then(j=>{ if(j) STAR_COUNTS[id]=j.count }).catch(()=>{})) };
-  for(const st of [STORE['25'],STORE['26']]){
+  for(const st of ERAS.map(e=>STORE[e.kn])){
     (st.followBills||[]).forEach(id=>push('bill',String(id)));
     (st.followMks||[]).forEach(n=>push('mk',n));
     (st.followCommittees||[]).forEach(id=>push('committee',String(id)));
@@ -1527,15 +1539,15 @@ function ensureAgenda(){ const kn=KN; if(AG_CACHE[kn]){ AGENDA=AG_CACHE[kn]; agR
     j._loaded=new Set(j.loaded_months||[]); j._loading=new Set();
     (j.committees||[]).forEach(x=>x.docs=x.docs||[]); AG_CACHE[kn]=j;
     if(kn===KN){ AGENDA=j; if(view==='now') renderNow(); else if(view==='session') renderSessionDetail() } return j }).catch(()=>{ AG_MAIN_LOADING.delete(kn); return null }) }
-function ensureProtoIdx(){ if(Object.keys(PROTO_IDX).length) return Promise.resolve(PROTO_IDX); return _lazyOnce('protoIdx',async()=>{ const [a,b]=await Promise.all([_fetchJson('data/protocols_index.json'),_fetchJson('data/k26_protocols_index.json')]); if(a||b){ PROTO_IDX={...(a||{}),...(b||{})}; if(view==='session') renderSessionDetail() } return PROTO_IDX }) }
+function ensureProtoIdx(){ if(Object.keys(PROTO_IDX).length) return Promise.resolve(PROTO_IDX); return _lazyOnce('protoIdx',async()=>{ const parts=await Promise.all(ERAS.map(e=>_fetchJson(eraFile(e.kn,'protocols_index')))); if(parts.some(Boolean)){ PROTO_IDX={}; for(const j of parts) Object.assign(PROTO_IDX,j||{}); if(view==='session') renderSessionDetail() } return PROTO_IDX }) }
 function ensureCmem(){ return _lazyOnce('cmem',async()=>{ const j=await _fetchJson('data/k25_committee_members.json'); if(j){ CMEM=j; CMEM.by_mk=_normKeys(CMEM.by_mk); for(const arr of Object.values(CMEM.by_committee||{})) arr.forEach(m=>m.name=normName(m.name)); if(view==='mk') renderMkDetail(); else if(view==='committee') renderCommitteeDetail(); else if(view==='committees') renderCommittees() } return CMEM }) }
 function ensureAnalytics(){ if(ANALYTICS) return Promise.resolve(ANALYTICS); return _lazyOnce('analytics',async()=>{ const j=await _fetchJson('data/k25_analytics.json'); if(j){ ANALYTICS=j; if(view==='analysis') renderAnalysis(); else if(view==='mk') renderMkDetail() } return ANALYTICS }) }
-function ensureProtoSearch(){ return _lazyOnce('protoSearch',async()=>{ const [a,b]=await Promise.all([_fetchJson('data/protocol_search.json'),_fetchJson('data/k26_protocol_search.json')]); if(a||b){ PROTO_SEARCH={}; for(const [sid,e] of Object.entries(a||{})) PROTO_SEARCH[sid]={kn:25,...e}; for(const [sid,e] of Object.entries(b||{})) PROTO_SEARCH[sid]={kn:26,...e}; if(view==='protocols') renderProtocols(); else if(view==='session') renderSessionDetail(); else if(view==='now'&&KN===26) renderNow26() } return PROTO_SEARCH }) }
+function ensureProtoSearch(){ return _lazyOnce('protoSearch',async()=>{ const parts=await Promise.all(ERAS.map(async e=>[e.kn,await _fetchJson(eraFile(e.kn,'protocol_search'))])); if(parts.some(([,j])=>j)){ PROTO_SEARCH={}; for(const [kn,j] of parts) for(const [sid,e] of Object.entries(j||{})) PROTO_SEARCH[sid]={kn,...e}; if(view==='protocols') renderProtocols(); else if(view==='session') renderSessionDetail(); else if(view==='now'&&KN===CURRENT_KN) renderNow26() } return PROTO_SEARCH }) }
 /* Both eras' plenum indexes are merged into PLENUM_SEARCH (session ids
    are globally unique; every entry carries its kn, legacy K25 entries
    default to 25). Era views filter by kn — see plenumEntries(). */
 let PLENUM_SEARCH_LOADED=false;
-function ensurePlenumSearch(){ return _lazyOnce('plenumSearch',async()=>{ const [a,b]=await Promise.all([_fetchJson('data/plenum_search.json'),_fetchJson('data/k26_plenum_search.json')]); PLENUM_SEARCH={}; for(const [sid,e] of Object.entries(a||{})) PLENUM_SEARCH[sid]={kn:25,...e}; for(const [sid,e] of Object.entries(b||{})) PLENUM_SEARCH[sid]={kn:26,...e}; PLENUM_SEARCH_LOADED=true; if(view==='plenum') renderPlenum(); else if(view==='protocols') renderProtocols(); else if(view==='vote') renderVote(); else if(view==='plenumSession') renderPlenumSession(); else if(view==='now'&&KN===26) renderNow26(); return PLENUM_SEARCH }) }
+function ensurePlenumSearch(){ return _lazyOnce('plenumSearch',async()=>{ const parts=await Promise.all(ERAS.map(async e=>[e.kn,await _fetchJson(eraFile(e.kn,'plenum_search'))])); PLENUM_SEARCH={}; for(const [kn,j] of parts) for(const [sid,e] of Object.entries(j||{})) PLENUM_SEARCH[sid]={kn,...e}; PLENUM_SEARCH_LOADED=true; if(view==='plenum') renderPlenum(); else if(view==='protocols') renderProtocols(); else if(view==='vote') renderVote(); else if(view==='plenumSession') renderPlenumSession(); else if(view==='now'&&KN===CURRENT_KN) renderNow26(); return PLENUM_SEARCH }) }
 function ensureWiki(){ return _lazyOnce('wiki',async()=>{ const j=await _fetchJson('data/mk_wiki_abstracts.json'); if(j){ WIKI=_normKeys(j.by_name); WIKI_META=j._meta||{}; if(view==='mk') renderMkDetail() } return WIKI }) }
 function ensureExtras(){ if(EXTRAS) return Promise.resolve(EXTRAS); return _lazyOnce('extras',async()=>{ const j=await _fetchJson('data/k25_extras.json'); if(j){ j.queries_by_mk=_normKeys(j.queries_by_mk); j.agendas_by_mk=_normKeys(j.agendas_by_mk); EXTRAS=j; if(view==='mk') renderMkDetail(); else if(view==='billAll') renderBillLite(); else if(view==='committee') renderCommitteeDetail(); else if(view==='session') renderSessionDetail(); else if(view==='committees') renderCommittees() } return EXTRAS }) }
 function ensureBillDocs(){ if(BILL_DOCS) return Promise.resolve(BILL_DOCS); return _lazyOnce('billDocs',async()=>{ const j=await _fetchJson(`data/k${KN}_bill_docs.json`); if(j){ BILL_DOCS=j; if(view==='billAll') renderBillLite(); else if(view==='vote') renderVote() } return BILL_DOCS }) }
@@ -1893,7 +1905,7 @@ function starBtn(kind,key,label=''){
   return `<button class="star ${on?'on':''}" title="${on?'במעקב שלך — לחצו להסרה':'מעקב אחרי זה'}" aria-label="מעקב ${esc(label)}" aria-pressed="${on}" onclick="event.stopPropagation();toggleFollow('${kind}','${jsq(key)}',this)"><span class="star-ic">${on?'★':'☆'}</span><span class="star-n" data-starc="${esc(kind)}:${esc(key)}" ${n?'':'style="display:none"'}>${n?n.toLocaleString('he-IL'):''}</span></button>`;
 }
 function toggleFollow(kind,key,el){
-  if(kind==='bill'){ toggleIn(S.followBills,String(key)); STORE['25'].followBills=[...S.followBills]; STORE['26'].followBills=[...S.followBills]; save(); } else if(kind==='mk'){ toggleIn(S.followMks,key); STORE['25'].followMks=[...S.followMks]; STORE['26'].followMks=[...S.followMks]; save(); } else if(kind==='committee')toggleIn(S.followCommittees,String(key)); else if(kind==='faction')toggleIn(S.followFactions||(S.followFactions=[]),key); else toggleIn(S.followTopics,key);
+  if(kind==='bill'){ toggleIn(S.followBills,String(key)); for(const e of ERAS) STORE[e.kn].followBills=[...S.followBills]; save(); } else if(kind==='mk'){ toggleIn(S.followMks,key); for(const e of ERAS) STORE[e.kn].followMks=[...S.followMks]; save(); } else if(kind==='committee')toggleIn(S.followCommittees,String(key)); else if(kind==='faction')toggleIn(S.followFactions||(S.followFactions=[]),key); else toggleIn(S.followTopics,key);
   const on=el.classList.toggle('on'); el.setAttribute('aria-pressed',on); const ic=el.querySelector('.star-ic'); if(ic) ic.textContent=on?'★':'☆'; else el.textContent=on?'★':'☆';
   syncStar(kind,kind==='bill'||kind==='committee'?String(key):key,on);
   const cap=el.parentElement&&el.parentElement.querySelector('.star-cap'); if(cap) cap.textContent=on?'במעקב ★':'מעקב';
@@ -3262,6 +3274,8 @@ function openBillAll(id){ if(KN!==25) switchKnesset(25); navTo('bill='+id,()=>{v
    unique); null when neither dataset has it. Shared lookups must use
    this — an ALLB_BY_ID-only check silently misses every K26 bill. */
 function billAny(id){ return ALLB_BY_ID[id]||ALLB_BY_ID[String(id)]||K26B.find(b=>String(b.id)===String(id))||null }
+const eraBills=kn=>kn===25?ALLB:kn===26?K26B:[];
+const eraVotes=kn=>kn===25?VOTES_ALL:kn===26?K26V:[];
 function openBillPage(billId){
   if(K26B.some(b=>String(b.id)===String(billId))) openBill26(billId);
   else if(ALLB_BY_ID[billId]) openBillAll(billId);
@@ -5402,14 +5416,13 @@ function renderMine(){
   // By-party agreement is grouped per Knesset and never mixed: one group
   // for the current Knesset (K26 runs on voteModel26 the same way).
   const partyGroups=[{kn:KN,rows:fr}];
-  const newSince=prevSeen? VOTES_ALL.filter(v=>(v.date||'')>prevSeen):[];
+  const newSince=prevSeen? eraVotes(KN).filter(v=>(v.date||'')>prevSeen):[];
   // Followed bills are grouped by Knesset and never mixed (same rule as
   // partyGroups below): bills are era-specific, unlike followed MKs who
   // are shared across eras. Both groups show in Mine — it's the personal
   // command center — but each is tagged with its Knesset.
-  const fb25=ALLB.filter(b=>(STORE['25'].followBills||[]).includes(String(b.id)));
-  const fb26=(typeof K26B!=='undefined'&&K26B?K26B:[]).filter(b=>(STORE['26'].followBills||[]).includes(String(b.id)));
-  const fb=[...fb25,...fb26]; const fm=S.followMks.map(n=>mkIndex[n]||{name:n,faction:(k26Entry(n)||{}).party?.name||'',votes:[]});
+  const fbByEra=ERAS.map(e=>({kn:e.kn,bills:eraBills(e.kn).filter(b=>(STORE[e.kn].followBills||[]).includes(String(b.id)))}));
+  const fb=fbByEra.flatMap(g=>g.bills); const fm=S.followMks.map(n=>mkIndex[n]||{name:n,faction:(k26Entry(n)||{}).party?.name||'',votes:[]});
   const fc=(S.followCommittees||[]).map(id=>committeeById(id)).filter(Boolean); // followed committees may belong to either Knesset
   const ff=(S.followFactions||[]);
   const topMk=rank[0], topFac=fr[0];
@@ -5482,7 +5495,7 @@ function renderMine(){
   <section class="cc-hero rise"><div style="display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap"><h2>⭐ מרכז המעקב שלי</h2><span class="small muted">המנדט ה־121 שלך — הצבעות, מעקב ומי מצביע כמוך מבין כל הח״כים · נשמר מקומית בדפדפן זה בלבד</span></div>
   <div class="cc-tiles">
     <div class="cc-tile"><b>${mineBills.length.toLocaleString('he-IL')}</b><span>הצבעות שסימנתי “אני הייתי מצביע/ה”</span></div>
-    <div class="cc-tile gold"><b>${followCount().toLocaleString('he-IL')}</b><span>במעקב שלי ★ — ${fb.length} חוקים (${fb25.length} מכנסת 25 · ${fb26.length} מכנסת 26) · ${fm.length} ח״כים · ${fc.length} ועדות · ${ff.length} סיעות${(S.followTopics||[]).length?` · ${S.followTopics.length} נושאים`:''}</span></div>
+    <div class="cc-tile gold"><b>${followCount().toLocaleString('he-IL')}</b><span>במעקב שלי ★ — ${fb.length} חוקים (${fbByEra.map(g=>`${g.bills.length} מכנסת ${g.kn}`).join(' · ')}) · ${fm.length} ח״כים · ${fc.length} ועדות · ${ff.length} סיעות${(S.followTopics||[]).length?` · ${S.followTopics.length} נושאים`:''}</span></div>
     <div class="cc-tile"><b>${newSince.length.toLocaleString('he-IL')}</b><span>הצבעות מליאה חדשות מאז הביקור הקודם</span></div>
     <div class="cc-tile green"><b>${topMk?topMk.pct+'%':'—'}</b><span>${topMk?'הכי כמוני: '+esc(disp(topMk.n))+' ('+topMk.t+' משותפות)':'הכי כמוני — אחרי 2–3 סימונים'}</span></div>
     <div class="cc-tile green"><b>${topFac?topFac.pct+'%':'—'}</b><span>${topFac?'הסיעה הקרובה אליי: '+esc(topFac.f):'הסיעה הקרובה אליי'}</span></div>
@@ -5500,8 +5513,7 @@ function renderMine(){
     </div>
     <div class="card pad"><h3>★ במעקב שלי (${followCount()})</h3>
       ${followCount()?`
-        ${fb25.length?`<div class="small dim" style="margin-top:.5rem">חוקים · <span class="chip acc" style="font-size:.68rem">כנסת 25</span></div>${fb25.slice(0,6).map(b=>`<div class="row" style="margin:0 -.9rem" onclick="openBillPage('${b.id}')"><span class="flex">${esc(displayText(b))}</span><span class="dim small">${esc(statusBucket(b))}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}</span>${starChip('bill',b.id)}</div>`).join('')}`:''}
-        ${fb26.length?`<div class="small dim" style="margin-top:.5rem">חוקים · <span class="chip acc" style="font-size:.68rem">כנסת 26</span></div>${fb26.slice(0,6).map(b=>`<div class="row" style="margin:0 -.9rem" onclick="if(KN!==26)switchKnesset(26);go('bills')"><span class="flex">${esc(b.name||'')}</span><span class="dim small">${esc(b.status||'')}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}</span>${starChip('bill',b.id)}</div>`).join('')}`:''}
+        ${fbByEra.map(g=>g.bills.length?`<div class="small dim" style="margin-top:.5rem">חוקים · <span class="chip acc" style="font-size:.68rem">כנסת ${g.kn}</span></div>${g.bills.slice(0,6).map(b=>`<div class="row" style="margin:0 -.9rem" onclick="openBillPage('${b.id}')"><span class="flex">${esc(displayText(b)||b.name||'')}</span><span class="dim small">${esc(statusBucket(b)||b.status||'')}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}</span>${starChip('bill',b.id)}</div>`).join('')}`:'').join('')}
         ${fm.length?`<div class="small dim" style="margin-top:.5rem">ח״כים</div>${fm.slice(0,6).map(m=>{const sc=scores[m.name]; const pct=sc&&sc.t>=2?Math.round(sc.s/sc.t*100):null; return `<div class="row" style="margin:0 -.9rem" onclick="openMk('${jsq(m.name)}')">${avatar(m.name,m.faction,30)}<span class="flex">${esc(disp(m.name))}<br><span class="dim small">${esc(shortF(m.faction||''))}</span></span>${pct!=null?`<b style="color:${pct>=50?'var(--for)':'var(--against)'}">${pct}% <span class="dim small" style="font-weight:600">כמוני</span></b>`:''}${starChip('mk',m.name)}</div>`}).join('')}`:''}
         ${fc.length?`<div class="small dim" style="margin-top:.5rem">ועדות במעקב</div>${fc.slice(0,6).map(c=>`<div class="row" style="margin:0 -.9rem" onclick="openCommittee('${c.id}')"><span class="flex">${esc(c.name)}<br><span class="dim small">ישיבה אחרונה: ${c.last_session?fmtDate(c.last_session):'—'} · ${c.dataset_bills||0} חוקים מהמאגר</span></span>${starChip('committee',c.id)}<span class="chip acc">לוועדה ←</span></div>`).join('')}`:''}
         ${ff.length?`<div class="small dim" style="margin-top:.5rem">סיעות במעקב</div>${ff.slice(0,6).map(f=>`<div class="row" style="margin:0 -.9rem" onclick="openFaction('${jsq(f)}')"><span class="flex" style="color:${fcol(f)};font-weight:700">${esc(f)}</span>${starChip('faction',f)}<span class="chip acc">לסיעה ←</span></div>`).join('')}`:''}

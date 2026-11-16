@@ -12,6 +12,7 @@ for N yet = exit 0, no write (safe no-op in the daily K26 step).
   {"by_mk": {name: [{committee_id, committee, role, from, to}]},
    "by_committee": {committee_id: [{name, role, from, to}]}}
 """
+from era_registry import knesset_type
 import argparse, json, sys, urllib.parse, urllib.request
 from pathlib import Path
 
@@ -66,7 +67,7 @@ def norm(s):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
+    ap.add_argument("--knesset", type=knesset_type, required=True)
     kn = ap.parse_args().knesset
     pos = [r for r in get("KNS_PersonToPosition", f"KnessetNum eq {kn}")
            if r.get("PositionID") in ROLES and r.get("CommitteeID")]

@@ -3,12 +3,11 @@
 Knesset OData v4 readiness probe.
 
 Answers two questions, read-only, using only the official OData v4 feed:
-  1. Has a given Knesset (default: 26) started publishing data yet?
+  1. Has a given Knesset started publishing data yet?
   2. What is the freshest activity in the current Knesset?
 
 Usage:
-    python3 probe_knesset.py            # probe Knesset 26 + latest K25 activity
-    python3 probe_knesset.py --knesset 26
+    python3 probe_knesset.py --knesset 26   # probe one Knesset (any number)
     python3 probe_knesset.py --json     # machine-readable output
 
 Exit code: 0 if the probed Knesset has data, 2 if not yet, 1 on API error.
@@ -16,6 +15,7 @@ Stdlib only. No auth, no secrets.
 """
 
 import argparse
+from era_registry import era_window_utc, knesset_type
 import json
 import sys
 import urllib.parse
@@ -49,6 +49,14 @@ def latest(entity, filt, orderby, select, top=1):
 
 def probe(knesset_num):
     kn_filter = f"KnessetNum eq {knesset_num}"
+    # Era window from the feed itself (KNS_KnessetDates.PlenumStart);
+    # registry fallback for known eras. Unknown + unpublished = the
+    # era has not started: probe votes from the feed's earliest data
+    # would overcount the previous era, so use a far-future window
+    # (count 0) until the era exists.
+    _dates = latest("KNS_KnessetDates", kn_filter, "Assembly asc", "PlenumStart")
+    probe_window = era_window_utc(
+        knesset_num, _dates[0]["PlenumStart"] if _dates else None) or "2999-01-01T00:00:00Z"
     report = {"knesset": knesset_num, "ready": False, "entities": {}}
     checks = {
         "bills": ("KNS_Bill", kn_filter),
@@ -64,9 +72,7 @@ def probe(knesset_num):
         # exists (K26: vote 46716, 2026-11-11, bills still 0), so this
         # layer must be probed independently of `bills`.
         "plenum_votes": ("KNS_PlenumVote",
-                         "VoteDateTime gt 2026-10-01T00:00:00Z"
-                         if knesset_num == 26 else
-                         "VoteDateTime gt 2022-11-15T00:00:00Z"),
+                         f"VoteDateTime gt {probe_window}"),
         "committee_sessions": ("KNS_CommitteeSession", kn_filter),
         "is_current_knesset": (
             "KNS_KnessetDates", f"{kn_filter} and IsCurrent eq true"
@@ -120,7 +126,7 @@ def latest_activity():
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, default=26)
+    ap.add_argument("--knesset", type=knesset_type, required=True)
     ap.add_argument("--json", action="store_true")
     args = ap.parse_args()
 

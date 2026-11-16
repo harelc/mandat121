@@ -19,6 +19,7 @@ order from the original joint list (e.g. הציונות הדתית+עוצמה י
 as one list in 2022; each splinter faction keeps its members' relative order).
 MKs not found in the table get rank null and are listed in _unmatched.
 """
+from era_registry import knesset_type
 import argparse, json, re, sys, urllib.request
 from pathlib import Path
 
@@ -97,7 +98,7 @@ ALIASES = {}
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
+    ap.add_argument("--knesset", type=knesset_type, required=True)
     if ap.parse_args().knesset == 26:
         main_k26()
         return

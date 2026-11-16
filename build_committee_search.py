@@ -30,6 +30,7 @@ The K25 shards are uploaded to R2 by upload_search_shards.py; the client
 reads R2 first and falls back to the committed shards. K26 shards are
 committed-only until the R2 manifest learns the c26 corpus.
 """
+from era_registry import knesset_type
 import json
 import sys
 import time
@@ -113,11 +114,12 @@ def session_counts(sid, urls, committee, date):
 def main():
     global KNESSET, OUT, SHARD_DIR, MANIFEST, COMMITTEES_F
     if "--knesset" not in sys.argv:
-        raise SystemExit(f"usage: {sys.argv[0]} --knesset {{25,26}} — the era is required, never defaulted")
+        raise SystemExit(f"usage: {sys.argv[0]} --knesset <N> — the era is required, never defaulted")
     if "--knesset" in sys.argv:
-        KNESSET = int(sys.argv[sys.argv.index("--knesset") + 1])
-        if KNESSET not in (25, 26):
-            raise SystemExit("--knesset must be 25 or 26")
+        try:
+            KNESSET = knesset_type(sys.argv[sys.argv.index("--knesset") + 1])
+        except Exception:
+            raise SystemExit("--knesset must be a Knesset number (>= 1)")
         OUT, SHARD_DIR, COMMITTEES_F = paths_for(KNESSET)
         MANIFEST = SHARD_DIR / "manifest.json"
     limit = None

@@ -18,6 +18,7 @@ the service caps pages at 100 rows and has no aggregation, so this pools
 ResultDesc mapping: בעד=1, נגד=2, נמנע=3 (other descs are non-votes, skipped).
 Names are surname-first exactly as bills.json mk_votes (LastName + FirstName).
 """
+from era_registry import knesset_type
 import argparse, json, time, urllib.parse, urllib.request
 from collections import Counter
 from concurrent.futures import ThreadPoolExecutor, as_completed
@@ -74,7 +75,7 @@ def compute_tallies(per_vote):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
+    ap.add_argument("--knesset", type=knesset_type, required=True)
     kn = ap.parse_args().knesset
     votes_path = Path(f"data/k{kn}_votes.json")
     if not votes_path.exists():

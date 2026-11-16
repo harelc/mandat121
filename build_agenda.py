@@ -3,6 +3,7 @@
 Build data/agenda.json — "what's on this week's agenda" for המנדט ה־121.
 
 The official knesset.gov.il agenda page joins two things, and so do we —
+from era_registry import knesset_type
 from the official OData v4 feed only (main.knesset.gov.il is Radware-walled
 to scripts; see KNESSET_APIS.md / ROADMAP working rules):
 
@@ -134,7 +135,7 @@ def load_existing(main_path, shard_dir):
 def main():
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
+    ap.add_argument("--knesset", type=knesset_type, required=True)
     ap.add_argument("--full", action="store_true",
                     help="rebuild the whole term from OData (default: "
                          "incremental — refetch only the recent window and "

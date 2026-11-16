@@ -417,6 +417,45 @@ reservation votes and many bills are voted on repeatedly — most of the
 the single list of all plenum votes, sortable by newest / closest /
 most voters.
 
+## Era contract — "which Knesset" is data, never a code path
+
+The site must support any number of Knessets: K27 when it is sworn in,
+and backfills of K24 and earlier. Adding an era is exactly three acts,
+none of them a code change:
+
+1. **Registry**: one entry in `ERAS` in `index.html` (era number +
+   `current:true` moved to it). Per-era state stores, the era
+   switcher, and the search/index loaders derive from it. Era data
+   files follow `data/k{kn}_{kind}.json`; `files` overrides exist only
+   for K25's pre-convention published filenames (live URLs — the
+   registry absorbs the difference so nothing else has to know).
+2. **Builders**: every era-parameterized builder takes a mandatory
+   `--knesset <any number>` (validated by `era_registry.knesset_type`);
+   era windows come from the feed itself (`KNS_KnessetDates.PlenumStart`
+   via `era_registry.era_window_utc`, offline fallback map for known
+   eras only). Outputs are `data/k{kn}_*` by the same convention.
+3. **Workflow**: `CURRENT_KNESSET` at the top of `knesset-daily.yml`
+   names the live era once; every step uses it.
+
+Enforcement: `tests/test_era_guard.py` (in CI) fails on builder era
+defaults, workflow invocations that don't name an era, a shard
+uploader missing a corpus, and — the freeze — any increase in the
+count of era-literal comparisons (`KN===<number>` etc.) in
+`index.html` over the Phase-1 baseline. A justified new era branch
+bumps that baseline in the same commit, with the justification
+written here. That bump is the reviewable act; a silent one fails CI.
+
+Phase 2 (tracked debt, the remaining baseline): the per-era dataset
+globals (`ALLB`/`VOTES_ALL` vs `K26B`/`K26V`…) and paired renderers
+(`renderVote`/`renderVote26`, the two Now pages, `ensureK25Archive`)
+converge into `ERAS[kn].data` with era-parameterized renderers. They
+exist because the eras' datasets genuinely differ in coverage today
+(K25 is a closed full archive; K26 is live and partial) — as K26's
+coverage equalizes, pages merge one by one and the baseline only
+shrinks. Shared lookups already go through the era accessors
+(`billAny`, `eraBills`, `eraVotes`, `voteKn`, `openBillPage`,
+`migrateMyVotes`) — new shared code must too, never a raw global.
+
 ## Working rules
 - Static site, builders in Python (stdlib), JSON snapshots in `data/`.
 - Every derived claim labels its coverage (harvested vs total).

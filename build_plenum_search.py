@@ -25,6 +25,7 @@ Incremental: sessions listed in the era's manifest.json are skipped
 (transcripts of past sessions are immutable), so the daily workflow only
 downloads new sessions. Pass --force to rebuild from scratch.
 """
+from era_registry import knesset_type
 import json
 import sys
 import time
@@ -97,11 +98,12 @@ def main():
     global KNESSET, OUT, SHARD_DIR, MANIFEST
     force = "--force" in sys.argv
     if "--knesset" not in sys.argv:
-        raise SystemExit(f"usage: {sys.argv[0]} --knesset {{25,26}} — the era is required, never defaulted")
+        raise SystemExit(f"usage: {sys.argv[0]} --knesset <N> — the era is required, never defaulted")
     if "--knesset" in sys.argv:
-        KNESSET = int(sys.argv[sys.argv.index("--knesset") + 1])
-        if KNESSET not in (25, 26):
-            raise SystemExit("--knesset must be 25 or 26")
+        try:
+            KNESSET = knesset_type(sys.argv[sys.argv.index("--knesset") + 1])
+        except Exception:
+            raise SystemExit("--knesset must be a Knesset number (>= 1)")
         OUT, SHARD_DIR = paths_for(KNESSET)
         MANIFEST = SHARD_DIR / "manifest.json"
     index, done_sids = {}, set()

@@ -23,12 +23,14 @@ Output: data/k{N}_contacts.json keyed by surname-first name (our MK key),
 plus `_meta`. Only official, Knesset-published channels are kept.
 Stdlib only. No auth, no secrets.
 
-The feed always returns the *current* roster — since 2026-11-10 that is
-Knesset 26. data/mk_contacts.json (no number) is the frozen final-K25
-snapshot and is never written by this builder again; --knesset 25 is
-refused so the K25 roster can never be silently overwritten with K26
-names (the UI derives its "current K25 roster" from that file).
+The feed always returns the *current* roster, whichever Knesset that
+is. data/mk_contacts.json (no number) is the frozen final-K25
+snapshot and is never written by this builder again; any --knesset
+other than the current era (read from KNS_KnessetDates at runtime)
+is refused, so a past roster file can never be silently overwritten
+with today's names.
 """
+from era_registry import knesset_type
 import argparse
 import json
 import sys
@@ -42,12 +44,27 @@ HEADERS = {"Accept": "application/json", "User-Agent": "Mozilla/5.0 mandat121-bu
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
+    ap.add_argument("--knesset", type=knesset_type, required=True)
     kn = ap.parse_args().knesset
-    if kn == 25:
-        print("REFUSED: the MK-lobby feed now serves the Knesset-26 roster; "
-              "data/mk_contacts.json stays the frozen final-K25 snapshot. "
-              "Run with --knesset 26.", file=sys.stderr)
+    # The lobby feed serves ONLY the current Knesset's roster, whichever
+    # era that is — so this builder may only ever write the current
+    # era's file. Any other --knesset would silently stamp today's
+    # roster with a wrong era's number (and for 25 would overwrite the
+    # frozen final snapshot the UI derives its roster from). Current
+    # era is read from the feed of record, not hardcoded.
+    try:
+        req = urllib.request.Request(
+            "https://knesset.gov.il/OdataV4/ParliamentInfo/KNS_KnessetDates"
+            "?$filter=IsCurrent%20eq%20true&$select=KnessetNum",
+            headers=HEADERS)
+        with urllib.request.urlopen(req, timeout=60) as r:
+            rows = json.loads(r.read().decode("utf-8")).get("value", [])
+        current = rows[0]["KnessetNum"] if rows else None
+    except Exception:
+        current = None
+    if current is None or kn != current:
+        print(f"REFUSED: --knesset {kn}, but the MK-lobby feed serves the "
+              f"current Knesset ({current}) only.", file=sys.stderr)
         return 1
     out_path = Path(f"data/k{kn}_contacts.json")
     req = urllib.request.Request(URL, headers=HEADERS)

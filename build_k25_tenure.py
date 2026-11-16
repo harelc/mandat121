@@ -15,6 +15,7 @@ Names are matched by LastName+FirstName against the names our datasets use
 For K26 the name pool is the CEC preview roster (data/k26_preview.json
 elected) plus any harvested K26 vote-result names.
 """
+from era_registry import knesset_type
 import argparse, json, sys, urllib.parse, urllib.request
 from pathlib import Path
 
@@ -91,7 +92,7 @@ def wanted_names(kn):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
+    ap.add_argument("--knesset", type=knesset_type, required=True)
     kn = ap.parse_args().knesset
     # PositionID 43 = חבר הכנסת, 61 = חברת הכנסת (gendered position titles)
     pos = get("KNS_PersonToPosition", f"KnessetNum eq {kn} and (PositionID eq 43 or PositionID eq 61)")

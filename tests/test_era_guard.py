@@ -47,9 +47,9 @@ class KnessetArgRequiredTest(unittest.TestCase):
                     src, r'add_argument\("--knesset"[^)]*default=',
                     f"{name} defaults --knesset — the era must be named")
                 self.assertTrue(
-                    'add_argument("--knesset", type=int, required=True' in src
+                    'add_argument("--knesset", type=knesset_type, required=True' in src
                     or "the era is required" in src,
-                    f"{name} must require --knesset explicitly")
+                    f"{name} must require --knesset explicitly (era_registry.knesset_type)")
 
     def test_workflows_name_the_era(self):
         pat = re.compile(r"python3?\s+(?:-u\s+)?(" + "|".join(ERA_BUILDERS) + r")\b")
@@ -91,6 +91,41 @@ class FrontendEraHelpersTest(unittest.TestCase):
 
     def test_plenum_for_date_defaults_to_current_era(self):
         self.assertIn("function plenumForDate(date,kn=KN)", self.html)
+
+
+class EraLiteralFreezeTest(unittest.TestCase):
+    """No NEW era-dependent code paths. The count of KN/kn === <number>
+    comparisons in index.html is frozen at the Phase-1 baseline (the
+    per-era renderers/dataset globals documented as Phase 2 in
+    ROADMAP's era contract). Adding an era branch anywhere else is how
+    the K26 divergences happened; if one is truly justified, bump the
+    baseline IN THE SAME COMMIT with the justification in ROADMAP —
+    that bump is the reviewable act, never a silent edit."""
+
+    BASELINE = 92
+
+    def test_era_literal_count_frozen(self):
+        html = (ROOT / "index.html").read_text("utf-8")
+        n = len(re.findall(r"\b(?:KN|kn)\s*[!=]={1,3}\s*\d{2}\b", html))
+        self.assertLessEqual(
+            n, self.BASELINE,
+            f"{n} era-literal comparisons in index.html > frozen baseline "
+            f"{self.BASELINE}: route through ERAS/eraBills/eraVotes/billAny "
+            "or justify + bump the baseline (see ROADMAP era contract)")
+
+    def test_registry_has_exactly_one_current_era(self):
+        html = (ROOT / "index.html").read_text("utf-8")
+        m = re.search(r"const ERAS=\[(.*?)\];", html, re.S)
+        self.assertIsNotNone(m, "index.html must define the ERAS registry")
+        self.assertEqual(m.group(1).count("current:true"), 1)
+        kns = re.findall(r"\{kn:(\d+),", m.group(1))
+        self.assertEqual(len(kns), len(set(kns)), "era numbers unique in ERAS")
+
+    def test_no_builder_restricts_to_two_eras(self):
+        for p in sorted(ROOT.glob("build_*.py")) + [ROOT / "probe_knesset.py"]:
+            with self.subTest(builder=p.name):
+                self.assertNotIn("choices=(25, 26)", p.read_text("utf-8"),
+                                 f"{p.name} hardcodes the era set — any Knesset number must work")
 
 
 if __name__ == "__main__":

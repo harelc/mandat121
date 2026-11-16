@@ -33,6 +33,7 @@ which bumps LastUpdatedDate), so a changed-only merge cannot lose one;
 --full (or a missing watermark/output) rebuilds everything as before.
 Stdlib only. Explicit $skip/$top pagination throughout.
 """
+from era_registry import era_window_utc, knesset_type
 import argparse
 import json
 import re
@@ -47,10 +48,6 @@ WEBSITE_API = "https://www.knesset.gov.il/WebSiteApi/knessetapi"
 HEADERS = {"Accept": "application/json", "User-Agent": "Mozilla/5.0 mandat121-build"}
 DATA = Path(__file__).parent / "data"
 DELAY = 0.1
-# Era start per Knesset (plenum votes carry no KnessetNum; bills do, and
-# votes are additionally kept only when their ItemID is a bill of this
-# Knesset OR the vote is a non-bill motion inside the era window).
-ERA_START = {25: "2022-11-15T00:00:00Z", 26: "2026-10-01T00:00:00Z"}
 
 
 def get(entity, params):
@@ -239,7 +236,7 @@ def classify(desc, title=""):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
+    ap.add_argument("--knesset", type=knesset_type, required=True)
     ap.add_argument("--full", action="store_true")
     args = ap.parse_args()
     kn = args.knesset
@@ -259,6 +256,17 @@ def main():
             old_bills, old_docs, old_votes, meta = {}, {}, [], {}
     incremental = bool(old_bills and meta.get("bills_watermark"))
     print(f"=== {'Incremental' if incremental else 'Full'} build, Knesset {kn} ===", flush=True)
+
+    # Era window from the feed itself (KNS_KnessetDates.PlenumStart —
+    # plenum votes carry no KnessetNum, so they are scoped by window);
+    # the registry fallback covers only eras already known offline.
+    _dates = fetch_all("KNS_KnessetDates", {
+        "$filter": f"KnessetNum eq {kn}", "$orderby": "Assembly asc",
+        "$select": "PlenumStart"}, label="knesset dates")
+    era_start = era_window_utc(kn, _dates[0]["PlenumStart"] if _dates else None)
+    if not era_start:
+        print(f"Knesset {kn}: no era window known (not started?) — nothing to build.")
+        return
 
     print("statuses + committees...", flush=True)
     smap = {s["Id"]: s["Desc"] for s in fetch_all(
@@ -354,7 +362,7 @@ def main():
         from datetime import datetime, timedelta
         last_date = max((v.get("date") or "" for v in old_votes), default="")
         since = (datetime.fromisoformat(last_date) - timedelta(days=7)
-                 ).strftime("%Y-%m-%dT00:00:00Z") if last_date else ERA_START[kn]
+                 ).strftime("%Y-%m-%dT00:00:00Z") if last_date else era_start
         print(f"plenum votes since {since} (merge over {len(old_votes)} existing)...", flush=True)
         votes = fetch_all("KNS_PlenumVote", {
             "$filter": f"VoteDateTime gt {since}",
@@ -364,7 +372,7 @@ def main():
     else:
         print("all plenum votes of the era...", flush=True)
         votes = fetch_all("KNS_PlenumVote", {
-            "$filter": f"VoteDateTime gt {ERA_START[kn]}",
+            "$filter": f"VoteDateTime gt {era_start}",
             "$select": "Id,VoteDateTime,ItemID,VoteTitle,ForOptionDesc,IsNoConfidenceInGov,SessionID,VoteMethodID,VoteMethodDesc",
             "$orderby": "VoteDateTime",
         }, label="votes")

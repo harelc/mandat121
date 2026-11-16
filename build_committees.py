@@ -27,6 +27,7 @@ Output: data/committees.json for K25 (the file index.html loads today),
 data/k26_committees.json for K26 — never clobber the K25 file. No
 committees published for N yet = exit 0, no write.
 """
+from era_registry import knesset_type
 import argparse
 import json
 import time
@@ -279,7 +280,7 @@ def incremental_main(kn, recent_since, bill_ids, bill_id_set, cmap, smap, prev, 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
+    ap.add_argument("--knesset", type=knesset_type, required=True)
     ap.add_argument("--full", action="store_true",
                     help="ignore previous output/state and rebuild from scratch")
     args = ap.parse_args()
