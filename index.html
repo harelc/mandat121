@@ -2008,7 +2008,7 @@ function hemiCardHTML(s,ctx){
   const facN=ctx.seats.filter(x=>(x.faction||'')===(s.faction||'')).length;
   const rec=IDX25[s.name];
   const rows=[];
-  if(ctx.mode==='k26'&&s.rank) rows.push(['מקום ברשימה',s.listN?`${s.rank} מתוך ${s.listN}`:`${s.rank}`]);
+  if(ctx.mode==='k26'&&s.rank) rows.push(['מקום ברשימה',`${s.rank}`]); // no "מתוך N": candidate lists are scraped with a 30-name cap, so the list length we hold is our scrape limit, not the real list size
   else if(RANK25[s.name]) rows.push([fac&&fac!=='סיעת יחיד'&&fac!=='ללא סיעה'?`מקום ברשימת ${fac} לכנסת ה־25`:'מקום ברשימה לכנסת ה־25',RANK25[s.name]]);
   if(ctx.mode==='k26'&&s.serving) rows.push(['סטטוס','מכהן/ת בפועל']);
   if(ctx.mode==='k26'&&s.present!==undefined) rows.push(['כעת במשכן הכנסת',s.present?'כן':'לא']);
@@ -2724,7 +2724,7 @@ function k26ServingSeats(){
   // no preview list (Norwegian-law replacements resolve via candidates,
   // so this is rare).
   return names.map(n=>{ const hit=partyOf(n); const faction=hit?.party.name||K26_FACTIONS[n]||'';
-    return {name:n,faction,result:0,color:hit?.party.color||fcol(faction),rank:hit?.rank,listN:hit?.party.candidates.length,serving:true} })
+    return {name:n,faction,result:0,color:hit?.party.color||fcol(faction),rank:hit?.rank,serving:true} })
     .sort((a,b)=>partyRank(a.faction,26)-partyRank(b.faction,26)||(a.rank??999)-(b.rank??999)||disp(a.name).localeCompare(disp(b.name),'he'));
 }
 /* Collapsible per-workday arrival order, under the K26 hemicycle.
@@ -2884,7 +2884,7 @@ function renderNow26(){
   ensurePlenumSearch(); ensureProtoSearch(); // recent-protocols section; re-renders Now when they land
   const parties=K26?K26.parties.filter(p=>p.seats>0):[];
   const serving=k26ServingSeats();
-  const seats=serving||[]; if(!serving&&K26){ const arc=[...K26.parties].sort((a,b)=>partyRank(a.name,26)-partyRank(b.name,26)); for(const p of arc) p.elected.forEach(name=>seats.push({name,faction:p.name,color:p.color,result:0,rank:(p.candidates||[]).indexOf(name)+1,listN:p.candidates.length})) }
+  const seats=serving||[]; if(!serving&&K26){ const arc=[...K26.parties].sort((a,b)=>partyRank(a.name,26)-partyRank(b.name,26)); for(const p of arc) p.elected.forEach(name=>seats.push({name,faction:p.name,color:p.color,result:0,rank:(p.candidates||[]).indexOf(name)+1})) }
   // Live presence overlay — official serving roster only (see
   // LIVE_PRESENCE), and only when the feed actually covers this map.
   const presenceKnown=!!(serving&&LIVE_PRESENCE.map&&seats.filter(s=>s.name in LIVE_PRESENCE.map).length>=Math.max(60,seats.length*0.5));
