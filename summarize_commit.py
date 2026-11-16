@@ -113,7 +113,18 @@ INTERNAL_SUFFIX = "_state.json"  # builder bookkeeping, not site data
 # up as one new key and was invisible to the summary: the 2026-11-16
 # refresh that added K26 sitting 2246403 read "No new bills, votes or
 # sessions — a contents/metadata refresh" (issue #36).
-PLENUM_SEARCH_FILES = {"plenum_search.json", "k26_plenum_search.json"}
+_PLENUM_SEARCH_RE = re.compile(r"^(?:k(\d+)_)?plenum_search\.json$")
+
+
+def is_plenum_search(path):
+    return bool(_PLENUM_SEARCH_RE.match(PurePosixPath(path).name))
+
+
+def _plenum_search_kn(path, entry=None):
+    if isinstance(entry, dict) and entry.get("kn"):
+        return entry["kn"]
+    m = _PLENUM_SEARCH_RE.match(PurePosixPath(path).name)
+    return int(m.group(1)) if m and m.group(1) else 25
 
 
 def friendly_label(path):
@@ -244,7 +255,7 @@ def semantic_detail(old_bytes, new_bytes, path=""):
         old, new = json.loads(old_bytes), json.loads(new_bytes)
     except Exception:
         return []
-    if PurePosixPath(path).name in PLENUM_SEARCH_FILES and isinstance(old, dict) and isinstance(new, dict):
+    if is_plenum_search(path) and isinstance(old, dict) and isinstance(new, dict):
         added = [k for k in new if k not in old]
         removed = [k for k in old if k not in new]
         parts = []
@@ -353,7 +364,7 @@ def plenum_highlights(files):
     """
     out = []
     for _, path, old_b, new_b in files:
-        if PurePosixPath(path).name not in PLENUM_SEARCH_FILES or new_b is None:
+        if not is_plenum_search(path) or new_b is None:
             continue
         try:
             old = json.loads(old_b) if old_b else {}
@@ -365,7 +376,7 @@ def plenum_highlights(files):
         added = sorted((k for k in new if k not in (old or {})), key=lambda k: str((new[k] or {}).get("date") or k))
         for sid in added[:4]:
             e = new[sid] if isinstance(new[sid], dict) else {}
-            kn = e.get("kn") or (26 if "k26" in PurePosixPath(path).name else 25)
+            kn = _plenum_search_kn(path, e)
             num = f" #{e['number']}" if e.get("number") else ""
             out.append(("plenum", f"🎙️ New plenum sitting (K{kn}){num} — {e.get('date') or ''} "
                                   f"(sitting {sid}; דברי הכנסת protocol published)"))
@@ -468,7 +479,7 @@ def shrink_warnings(files):
             continue
         if "agenda" in path or path.endswith("events.json"):
             continue  # windowed / capped layers: items leave by design, not by loss
-        if PurePosixPath(path).name in PLENUM_SEARCH_FILES and isinstance(old, dict) and isinstance(new, dict):
+        if is_plenum_search(path) and isinstance(old, dict) and isinstance(new, dict):
             removed = [k for k in old if k not in new]
             if removed:
                 out.append(f"- {friendly_label(path)}: −{len(removed)} sitting(s) "

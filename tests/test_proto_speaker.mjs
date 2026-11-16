@@ -42,9 +42,9 @@ const run = new Function("J", "normKeys", `
   const IDX26 = {};
   const K26 = J("k26_preview.json");
   for (const p of K26.parties || []) { p.elected = (p.elected || []).map(normName); p.candidates = (p.candidates || []).map(normName); }
-  return { protoSpeakerKey, disp, normName };
+  return { protoSpeakerKey, _speakerMatch, disp, normName };
 `);
-const { protoSpeakerKey } = run(J, normKeys);
+const { protoSpeakerKey, _speakerMatch } = run(J, normKeys);
 const eq = (name, key) => { assert.equal(protoSpeakerKey(name), key, `${name} -> ${key}`); passed++ };
 const no = (name) => { assert.equal(protoSpeakerKey(name), null, `${name} must not link`); passed++ };
 
@@ -72,6 +72,16 @@ eq("נעמה מרים לזימי", "לזימי נעמה"); // middle name only i
 // K25 regression: plain given-first speakers of the old era still link.
 eq("שמחה רוטמן", "רוטמן שמחה");
 eq("אורית מלכה סטרוק", "סטרוק אורית מלכה");
+
+// MK -> protocol direction: a card sets the filter to the plain display
+// (or canonical) name; transcript headers carrying titles/nicknames must
+// still match, or the jump lands on an empty reader.
+const TITLED = "שרת החדשנות, המדע והטכנולוגיה גילה גמליאל";
+assert.ok(_speakerMatch("גילה גמליאל", TITLED), "display-name filter matches titled header"); passed++;
+assert.ok(_speakerMatch("גמליאל גילה", TITLED), "canonical-key filter matches titled header"); passed++;
+assert.ok(_speakerMatch(TITLED, TITLED), "raw header filter matches itself"); passed++;
+assert.ok(!_speakerMatch("גילה גמליאל", "נעמה לזימי"), "different MK does not match"); passed++;
+assert.ok(!_speakerMatch("גילה גמליאל", "מזכיר הכנסת דן מרזוק"), "official does not match"); passed++;
 
 // Not MKs — must stay plain text.
 no("מזכיר הכנסת דן מרזוק"); // Knesset secretary, even after title-stripping

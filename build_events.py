@@ -17,6 +17,7 @@ First run only seeds the baseline (no event flood for history).
 Events are capped at the newest 800. Dates are Asia/Jerusalem.
 """
 import json
+import re
 from datetime import datetime
 from pathlib import Path
 from zoneinfo import ZoneInfo
@@ -35,13 +36,13 @@ def load(p, default):
 
 
 def bills(kn):
-    f = DATA / ("k25_bills.json" if kn == 25 else "k26_bills.json")
+    f = DATA / f"k{kn}_bills.json"
     rows = load(f, [])
     return {str(b["id"]): b for b in rows if b.get("id") is not None}
 
 
 def votes(kn):
-    f = DATA / ("k25_votes.json" if kn == 25 else "k26_votes.json")
+    f = DATA / f"k{kn}_votes.json"
     rows = load(f, [])
     if isinstance(rows, dict):
         rows = rows.get("votes", [])
@@ -49,7 +50,7 @@ def votes(kn):
 
 
 def sessions(kn):
-    f = DATA / ("committees.json" if kn == 25 else "k26_committees.json")
+    f = DATA / ("committees.json" if kn == 25 else f"k{kn}_committees.json")
     d = load(f, {})
     out = {}
     for s in d.get("recent_sessions", []) if isinstance(d, dict) else []:
@@ -65,7 +66,15 @@ def main():
     new_events = []
 
     new_state = {"bills": {}, "votes": {}, "sessions": {}}
-    for kn in (25, 26):
+    # Eras on disk, not a frozen (25, 26) tuple: a new era's files
+    # appearing is enough for its events to start flowing (state is
+    # keyed per era, so a new era seeds cleanly without touching others).
+    eras = {25}
+    for f in DATA.glob("k*_bills.json"):
+        m = re.match(r"k(\d+)_bills\.json", f.name)
+        if m:
+            eras.add(int(m.group(1)))
+    for kn in sorted(eras):
         bs = bills(kn)
         new_state["bills"][str(kn)] = {i: {"s": b.get("status_id"), "t": b.get("status")} for i, b in bs.items()}
         vs = votes(kn)

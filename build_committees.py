@@ -42,6 +42,19 @@ DATA = Path(__file__).parent / "data"
 # "Recent" window per Knesset: K25 = bills.json vote cutoff; K26 = era start
 # (build_knesset.ERA_START) so every K26 session counts as recent at first.
 RECENT_SINCE = {25: "2026-06-24T00:00:00Z", 26: "2026-10-01T00:00:00Z"}
+
+
+def recent_since_for(kn):
+    """Recent-window start for an era: the tuned cutoffs above, else the
+    era's own start from the registry. Direct dict indexing KeyErrored
+    any era the map didn't know yet (K27) before the builder
+    could even discover the era hasn't started."""
+    from era_registry import era_window_utc
+    since = RECENT_SINCE.get(kn) or era_window_utc(kn)
+    if not since:
+        raise SystemExit(f"--knesset {kn}: era start unknown (no RECENT_SINCE entry, "
+                         "feed window unavailable) — refusing to guess a window")
+    return since
 DELAY = 0.12
 
 
@@ -135,7 +148,7 @@ def incremental_main(kn, recent_since, bill_ids, bill_id_set, cmap, smap, prev, 
     """
     idx = state["sessions"]  # str id -> [committee_id, start, type, status, location]
     watermark = state.get("watermark") or ""
-    since = minus_days(watermark, 14) if watermark else RECENT_SINCE[kn]
+    since = minus_days(watermark, 14) if watermark else recent_since_for(kn)
     print(f"incremental: sessions since {since[:10]} (watermark {watermark[:10]})...")
     window = fetch_all("KNS_CommitteeSession", {
         "$filter": f"KnessetNum eq {kn} and StartDate gt {since}",
@@ -285,7 +298,7 @@ def main():
                     help="ignore previous output/state and rebuild from scratch")
     args = ap.parse_args()
     kn = args.knesset
-    recent_since = RECENT_SINCE[kn]
+    recent_since = recent_since_for(kn)
     bill_ids = bill_ids_for(kn)
     bill_id_set = set(bill_ids)
     print(f"bills in dataset: {len(bill_ids)}")

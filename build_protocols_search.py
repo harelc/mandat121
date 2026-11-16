@@ -156,12 +156,17 @@ def main():
     # This builder owns the K25 corpus only — K26 parsed protocols belong
     # to search_c26 (build_committee_search.py --knesset 26) and must not
     # leak into the K25 shards/metadata when they start landing.
+    # Exclude every NON-K25 era's sittings, not just K26's: a future
+    # era's protocols in the shared store would otherwise leak into the
+    # K25 corpus/index the same way K26's once could.
     k26_sids = set()
-    try:
-        k26_sids = set(json.load(
-            open("data/k26_protocols_index.json", encoding="utf-8")))
-    except Exception:
-        pass
+    for idx_path in sorted(Path("data").glob("k*_protocols_index.json")):
+        if idx_path.name == "k25_protocols_index.json":
+            continue
+        try:
+            k26_sids |= set(json.load(open(idx_path, encoding="utf-8")))
+        except Exception:
+            pass
     counters = {}
     for f in files:
         doc = json.load(open(f, encoding="utf-8"))

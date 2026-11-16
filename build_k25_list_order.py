@@ -99,9 +99,15 @@ ALIASES = {}
 def main():
     ap = argparse.ArgumentParser()
     ap.add_argument("--knesset", type=knesset_type, required=True)
-    if ap.parse_args().knesset == 26:
+    kn = ap.parse_args().knesset
+    if kn == 26:
         main_k26()
         return
+    if kn != 25:
+        # Any other era fell through to the K25 Wikipedia scrape and
+        # overwrote the frozen data/k25_list_order.json — refuse instead.
+        raise SystemExit(f"--knesset {kn}: no list-order source for this era; "
+                         "refusing to overwrite data/k25_list_order.json")
     mkp = json.load(open("data/mk_photos.json", encoding="utf-8"))
     wiki_disp = json.load(open("data/mk_wiki.json", encoding="utf-8"))  # surname-first -> display (given-first)
     disp_to_key = {v: k for k, v in wiki_disp.items()}

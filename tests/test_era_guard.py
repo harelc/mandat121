@@ -144,5 +144,53 @@ class EraLiteralFreezeTest(unittest.TestCase):
                                  f"{p.name} hardcodes the era set — any Knesset number must work")
 
 
+class AuditFollowupTest(unittest.TestCase):
+    """Pins for the Nov-2026 K25-only audit (three sweeps over index.html
+    + builders): each of these was a silent K25 default reachable from
+    K26 pages, invisible until a human noticed wrong output."""
+
+    @classmethod
+    def setUpClass(cls):
+        cls.html = (ROOT / "index.html").read_text("utf-8")
+
+    def test_my_agreement_uses_current_era_index(self):
+        self.assertIn("IDX26", _fn_body(self.html, "myAgreement"))
+
+    def test_proto_color_uses_current_era_faction(self):
+        self.assertIn("K26_FACTIONS", _fn_body(self.html, "protoColor"))
+
+    def test_roles_cache_is_era_keyed(self):
+        self.assertIn("ROLES_KN", self.html)
+
+    def test_mine_ranking_heading_not_hardcoded_25(self):
+        self.assertNotIn('מי מצביע כמוני <span class="chip acc">כנסת 25</span>', self.html)
+
+    def test_open_mk_resolves_era(self):
+        self.assertIn("mkKn(name)", _fn_body(self.html, "openMk"))
+
+    def test_bill_link_maps_are_per_era(self):
+        body = _fn_body(self.html, "billLinkMaps")
+        self.assertIn("per-era", body)
+        self.assertNotIn("for(const b of [...ALLB,...K26B])", body)
+
+    def test_list_order_refuses_unknown_era(self):
+        src = (ROOT / "build_k25_list_order.py").read_text("utf-8")
+        self.assertIn("refusing to overwrite data/k25_list_order.json", src)
+
+    def test_committees_recent_since_never_keyerrors(self):
+        src = (ROOT / "build_committees.py").read_text("utf-8")
+        self.assertIn("def recent_since_for", src)
+        self.assertNotIn("RECENT_SINCE[kn]", src)
+
+    def test_events_discovers_eras_from_disk(self):
+        src = (ROOT / "build_events.py").read_text("utf-8")
+        self.assertNotIn("for kn in (25, 26)", src)
+        self.assertIn("sorted(eras)", src)
+
+    def test_protocols_search_excludes_every_non25_era(self):
+        src = (ROOT / "build_protocols_search.py").read_text("utf-8")
+        self.assertIn('glob("k*_protocols_index.json")', src)
+
+
 if __name__ == "__main__":
     unittest.main()

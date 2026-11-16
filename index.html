@@ -1442,9 +1442,25 @@ function _protoTokenMatch(toks){
   if(pairKeys.size!==1) return null;
   return [...new Set(best)].length===1?best[0]:null;
 }
+/* Speaker-filter identity: a filter set from an MK card carries the
+   plain display name ("גילה גמליאל"), a chip carries the transcript's
+   raw header ("שרת החדשנות, המדע והטכנולוגיה גילה גמליאל") — exact
+   string comparison made the MK→protocol jump land on an empty reader
+   for every titled/nicknamed speaker. Match on the resolved MK key. */
+function _speakerMatch(filterSpeaker,raw){
+  if(!filterSpeaker) return true;
+  if(raw===filterSpeaker) return true;
+  const fk=protoSpeakerKey(filterSpeaker);
+  return !!fk&&protoSpeakerKey(raw)===fk;
+}
 function protoColor(name,hint){
   const key=protoSpeakerKey(name);
-  if(key) return fcol((MKP[key]||mkIndex[key]||IDX26[key]||{}).faction||hint||'');
+  if(key){ // colour by the faction of the era being read — MKP/mkIndex are
+    // K25 snapshots and shadowed IDX26, so a K26 speaker who switched
+    // parties since K25 was coloured with their old party (the name
+    // linked correctly; the colour contradicted the faction_hint label).
+    if(KN===CURRENT_KN) return fcol(IDX26[key]?.faction||K26_FACTIONS[key]||k26Entry(key)?.party?.name||hint||'');
+    return fcol((MKP[key]||mkIndex[key]||{}).faction||hint||''); }
   let h=0; for(const c of name) h=(h*31+c.charCodeAt(0))>>>0;
   return GUEST_PALETTE[h%GUEST_PALETTE.length];
 }
@@ -1664,7 +1680,9 @@ function ensurePlenumSearch(){ return _lazyOnce('plenumSearch',async()=>{ const 
 function ensureWiki(){ return _lazyOnce('wiki',async()=>{ const j=await _fetchJson('data/mk_wiki_abstracts.json'); if(j){ WIKI=_normKeys(j.by_name); WIKI_META=j._meta||{}; if(view==='mk') renderMkDetail() } return WIKI }) }
 function ensureExtras(){ if(EXTRAS) return Promise.resolve(EXTRAS); return _lazyOnce('extras',async()=>{ const j=await _fetchJson('data/k25_extras.json'); if(j){ j.queries_by_mk=_normKeys(j.queries_by_mk); j.agendas_by_mk=_normKeys(j.agendas_by_mk); EXTRAS=j; if(view==='mk') renderMkDetail(); else if(view==='billAll') renderBillLite(); else if(view==='committee') renderCommitteeDetail(); else if(view==='session') renderSessionDetail(); else if(view==='committees') renderCommittees() } return EXTRAS }) }
 function ensureBillDocs(){ if(BILL_DOCS) return Promise.resolve(BILL_DOCS); return _lazyOnce('billDocs',async()=>{ const j=await _fetchJson(`data/k${KN}_bill_docs.json`); if(j){ BILL_DOCS=j; if(view==='billAll') renderBillLite(); else if(view==='vote') renderVote() } return BILL_DOCS }) }
-function ensureRoles(){ if(ROLES) return Promise.resolve(ROLES); return _lazyOnce('roles',async()=>{ const j=await _fetchJson(`data/k${KN}_roles.json`); if(j){ ROLES=j; if(view==='mk') renderMkDetail() } return ROLES }) }
+let ROLES_KN=0; // era the cached ROLES belongs to — the singleton cache
+// served whichever era loaded first to both eras' MK cards all session.
+function ensureRoles(){ if(ROLES&&ROLES_KN===KN) return Promise.resolve(ROLES); return _lazyOnce('roles'+KN,async()=>{ const kn=KN; const j=await _fetchJson(`data/k${kn}_roles.json`); if(j){ ROLES=j; ROLES_KN=kn; if(view==='mk'&&KN===kn) renderMkDetail() } return ROLES }) }
 function ensurePresence26(){ if(PRESENCE26) return Promise.resolve(PRESENCE26); return _lazyOnce('presence26',async()=>{ let j=await _fetchJson('/.netlify/functions/presence'); if(!j||!Object.keys(j.days||{}).length) j=await _fetchJson('data/k26_presence.json'); if(j){ adoptPresence26(j); if(KN===CURRENT_KN&&(view==='now'||view==='mks'||view==='mk')) render() } return PRESENCE26 }) } // live state: Netlify Blobs via presence-poll.mjs; the committed file is the frozen GH-era seed/fallback only
 function ensureMkHighlights(){ if(MK_HIGHLIGHTS) return Promise.resolve(MK_HIGHLIGHTS); return _lazyOnce('mkHighlights',async()=>{ const j=await _fetchJson('data/mk_highlights.json'); if(j){ j.by_mk=_normKeys(j.by_mk); MK_HIGHLIGHTS=j; if(view==='mk') renderMkDetail() } return MK_HIGHLIGHTS }) }
 let EVENTS=null; // data/events.json — server-diffed, dated transitions (build_events.py)
@@ -1770,7 +1788,7 @@ function billHistoryHTML(b){
   <div class="rows" style="margin:.5rem -.9rem 0">${removed.map(r=>`<div class="row" style="cursor:default"><span class="flex"><b>${esc(disp(r.name))}</b> <span class="dim small">${r.initiator?'יוזם/ת':'מצטרף/ת'}</span><br><span class="dim small">${r.reason?esc(r.reason):'הוסר/ה מההצעה'}${r.to?` · ${fmtDate(r.to)}`:''}</span></span></div>`).join('')}</div></div>`;
 }
 function mkRolesHTML(name){
-  const roles=(ROLES&&ROLES.by_mk&&ROLES.by_mk[name])||[];
+  const roles=(ROLES&&ROLES_KN===KN&&ROLES.by_mk&&ROLES.by_mk[name])||[];
   if(!roles.length) return '';
   return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3l2.5 5.3 5.8.7-4.3 4 1.1 5.7L12 15.9 6.9 18.7 8 13 3.7 9l5.8-.7z"/></svg> תפקידים בכנסת ובממשלה <small class="dim">מהמאגר הרשמי · לפי תקופות כהונה בתפקיד</small></h3>
   <div class="rows" style="margin:.5rem -.9rem 0">${roles.map(r=>`<div class="row" style="cursor:default"><span class="flex"><b>${esc(r.role||'')}</b>${r.gov?` <span class="dim small">· ממשלה ${r.gov}</span>`:''}${r.faction?` <span class="dim small">· ${esc(shortF(r.faction))}</span>`:''}<br><span class="dim small">${r.from?fmtDate(r.from):''}${r.to?` – ${fmtDate(r.to)}`:' – היום'}</span></span>${!r.to?'<span class="chip for">מכהן/ת כיום</span>':''}</div>`).join('')}</div></div>`;
@@ -2294,7 +2312,7 @@ function applyRoute(){
 window.addEventListener('hashchange',applyRoute);
 /* One vote page for every plenum vote, addressed by vote id. */
 function openVote(id){ const kn=voteKn(id); if(kn&&kn!==KN) switchKnesset(kn); navTo('vote='+id,()=>{viewArg=String(id); view='vote'; buildTabs(); renderVote(); window.scrollTo({top:0})}) }
-function openMk(name){ mkRebelShowAll=false; mkBillsShowAll=false; mkPastCmtShowAll=false; mkPipeSel={name:null,i:-1}; navTo('mk='+encodeURIComponent(name),()=>{viewArg=name; view='mk'; buildTabs(); renderMkDetail(); window.scrollTo({top:0})}) }
+function openMk(name){ const kn=mkKn(name); if(kn&&kn!==KN) switchKnesset(kn); mkRebelShowAll=false; mkBillsShowAll=false; mkPastCmtShowAll=false; mkPipeSel={name:null,i:-1}; navTo('mk='+encodeURIComponent(name),()=>{viewArg=name; view='mk'; buildTabs(); renderMkDetail(); window.scrollTo({top:0})}) }
 function openFaction(name){ const kn=factionKn(name); if(kn&&kn!==KN) switchKnesset(kn); navTo('faction='+encodeURIComponent(name),()=>{viewArg=name; view='faction'; buildTabs(); renderFactionDetail(); window.scrollTo({top:0})}) }
 /* Faction names are per-Knesset (a K25 faction and a K26 party may share a
    name, a spelling — רע"ם vs רע״ם — or neither). Anything computed from one
@@ -2319,7 +2337,8 @@ function billKn(id){ const s=String(id); return ALLB_BY_ID[s]?25:K26B.some(b=>St
 function mkKn(name){ const e26=k26Entry(name); const has26=!!(e26&&(e26.elected||e26.serving)); // a candidate who didn't enter K26 is not "in K26" — if they served in K25, their page is the K25 one
   const has25=!!(mkIndex[name]||MKP[name]||TENURE[name]||FACTION_STINTS[name]||CONTACTS[name]); return has25&&has26?KN:has26?26:has25?25:null }
 function factionKn(name){ const in26=(K26?.parties||[]).some(p=>p.name===name), in25=currentFactions().some(f=>f.name===name||f.full===name); return in25&&in26?KN:in26?26:in25?25:null }
-function sessionKn(id){ const s=String(id); const in25=CMT?.recent_sessions?.some(x=>String(x.id)===s), in26=K26CMT?.recent_sessions?.some(x=>String(x.id)===s); return in25&&in26?KN:in26?26:in25?25:null }
+function sessionKn(id){ const s=String(id); const pk=(PROTO_SEARCH[s]||{}).kn; if(pk) return pk; // the protocol index stamps its era — the recent-sessions windows rotate sittings out and then knew nothing about them
+  const in25=CMT?.recent_sessions?.some(x=>String(x.id)===s), in26=K26CMT?.recent_sessions?.some(x=>String(x.id)===s); return in25&&in26?KN:in26?26:in25?25:null }
 /* Committee ids are the official committee ids (K25: 4185–4287, K26:
    4288–…), so an id alone says which Knesset's dataset owns it. Every
    committee entry point — search, deep link, in-app chip — resolves the
@@ -2356,7 +2375,7 @@ function openPlenum(sid){
    bills, committees, topics — each row deep-links to that object's page.
    Enter opens the best (highlighted) match; with no object match it goes
    to the protocol search — the one corpus this index does not scan. */
-let SEARCH_FLAT=[], SEARCH_ACTIVE=-1, SEARCH_TOPIC_COUNTS=null;
+let SEARCH_FLAT=[], SEARCH_ACTIVE=-1, SEARCH_TOPIC_COUNTS=null, SEARCH_TOPIC_SIG='';
 const normQ=s=>normName(s).replace(/[׳\u05F3]/g,"'").replace(/[״\u05F4]/g,'"'); // ש״ס == ש"ס
 function matchRank(text,q){ const t=normQ(text); return t.startsWith(q)?0:t.includes(q)?1:-1 }
 function bestRank(texts,q){ let b=-1; for(const t of texts){ const r=matchRank(t||'',q); if(r>=0&&(b<0||r<b)) b=r } return b }
@@ -2390,13 +2409,13 @@ function searchGroups(qRaw){
       .sort((a,b)=>a.r-b.r||(((KN===CURRENT_KN?b.inCur:b.inArch)) - ((KN===CURRENT_KN?a.inCur:a.inArch)))||disp(a.n).localeCompare(disp(b.n),'he'));
     const items=all.slice(0,SEARCH_GROUP_LIMIT)
       .map(({n,inArch,inCur})=>{ const f=factionOf(n);
-        const sub=(inCur&&(KN===CURRENT_KN||!inArch))?`${esc(party26[n]||shortF(K26_FACTIONS[n]||''))} · כנסת ${CURRENT_KN}${inArch?' · כיהן/ה גם בכנסת קודמת':''}`:`${esc(shortF(f))} · ${isCurrentMk(n)?'מכהן/ת כיום':'כיהן/ה בכנסת קודמת'}`;
+        const sub=(inCur&&(KN===CURRENT_KN||!inArch))?`${esc(party26[n]||shortF(K26_FACTIONS[n]||''))} · כנסת ${CURRENT_KN}${inArch?' · כיהן/ה גם בכנסת קודמת':''}`:`${esc(shortF(f))} · ${KN!==CURRENT_KN&&isCurrentMk(n)?'מכהן/ת כיום':'כיהן/ה בכנסת קודמת'}`; // isCurrentMk reads the frozen K25 roster — in the K26 instance it must not label a K25-only person 'currently serving'
         // Open the person in a Knesset they actually sat in: live-era-only
         // MKs in the live era, archive-only in the archive, both — wherever
         // the user already is.
         const target=inCur&&!inArch?CURRENT_KN:inArch&&!inCur?ERAS[0].kn:KN;
         return {html:`${avatar(n,party26[n]||f,28)}<span class="flex">${esc(disp(n))}<span class="sub">${sub}</span></span>`, go:()=>{ if(KN!==target) switchKnesset(target); openMk(n) }} });
-    push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> ח״כים',all,items,total=>searchMoreItem(total,items.length,'הח״כים',()=>{ mkFilter.q=qRaw; mkFilter.status='all'; go('mks') }));
+    push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="10" cy="8" r="3.5"/><path d="M3.5 20c.8-3.2 3.4-5 6.5-5s5.7 1.8 6.5 5"/><path d="M15.5 5.2a3.5 3.5 0 0 1 0 5.9M18 15.4c1.4.8 2.3 2.2 2.7 4.1"/></svg> ח״כים',all,items,total=>searchMoreItem(total,items.length,'הח״כים',()=>{ const t=all.filter(x=>x.inCur).length>=all.filter(x=>x.inArch).length?CURRENT_KN:ERAS[0].kn; if(KN!==t) switchKnesset(t); mkFilter.q=qRaw; mkFilter.status='all'; go('mks') }));
   }
   { // Factions / lists of BOTH Knessets — openFactionIn switches to the
     // owning Knesset, so a K25 faction found while browsing K26 (and vice
@@ -2405,7 +2424,7 @@ function searchGroups(qRaw){
       ...currentFactions().map(f=>({r:bestRank([f.name,f.full,shortF(f.full||f.name)],q),label:f.name,sub:`${f.members.length} ח״כים כיום · כנסת 25`,go:()=>openFactionIn(25,f.name)}))]
       .filter(x=>x.r>=0).sort((a,b)=>a.r-b.r||a.label.localeCompare(b.label,'he'));
     const items=all.slice(0,SEARCH_GROUP_LIMIT).map(({label,sub,go})=>({html:`<span class="flex">${esc(label)}<span class="sub">${esc(sub)}</span></span>`,go}));
-    push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="12" cy="17" r="2.6"/><path d="M9.3 8.6 10.6 14M14.7 8.6 13.4 14M9.6 7h4.8"/></svg> סיעות ורשימות',all,items,total=>searchMoreItem(total,items.length,'הסיעות',()=>go('factions')));
+    push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><circle cx="7" cy="7" r="2.6"/><circle cx="17" cy="7" r="2.6"/><circle cx="12" cy="17" r="2.6"/><path d="M9.3 8.6 10.6 14M14.7 8.6 13.4 14M9.6 7h4.8"/></svg> סיעות ורשימות',all,items,total=>searchMoreItem(total,items.length,'הסיעות',()=>{ const n26=all.filter(x=>String(x.sub).includes('כנסת 26')).length, t=n26>=all.length-n26?CURRENT_KN:ERAS[0].kn; if(KN!==t) switchKnesset(t); go('factions') })); // 'show all' lands in the era owning most matches — the per-hit openers switch eras, this list opener must too
   }
   { // Bills — full-field match (see billMatches), not name-only; both
     // Knessets, each hit opening in its own Knesset (openBillIn).
@@ -2413,7 +2432,7 @@ function searchGroups(qRaw){
       .sort((a,b)=>a.r-b.r||(b.b.updated||'').localeCompare(a.b.updated||''));
     const items=all.slice(0,SEARCH_GROUP_LIMIT)
       .map(({b,kn})=>({html:`<span class="flex">${esc(b.name)}<span class="sub">${esc((ERA_DATASETS[kn]||ERA_DATASETS[CURRENT_KN]).billStatus(b))}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''} · כנסת ${kn}</span></span>`,go:()=>openBillIn(kn,b.id)}));
-    push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> חוקים',all,items,total=>searchMoreItem(total,items.length,'החוקים',()=>{ allFilter.q=qRaw; allFilter.limit=30; go('bills') }));
+    push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> חוקים',all,items,total=>searchMoreItem(total,items.length,'החוקים',()=>{ const t=all[0]?.kn; if(t&&KN!==t) switchKnesset(t); allFilter.q=qRaw; allFilter.limit=30; go('bills') }));
   }
   { // Plenum votes — titles/descriptions the bill index misses; both
     // Knessets, each hit opening in its own Knesset (openVoteIn).
@@ -2421,7 +2440,7 @@ function searchGroups(qRaw){
       .sort((a,b)=>a.r-b.r||(b.v.date||'').localeCompare(a.v.date||'')||(b.v.id||0)-(a.v.id||0));
     const items=all.slice(0,SEARCH_GROUP_LIMIT)
       .map(({v,kn})=>({html:`<span class="flex">${esc(v.title||v.desc||'')}<span class="sub">${esc(v.kind_label||'')} · ${fmtDate(v.date)}${v.for!=null?` · ${v.for}–${v.against} · ${v.for>v.against?'עברה':v.against>v.for?'נדחתה':'תיקו'}`:''} · כנסת ${kn}</span></span>`,go:()=>openVoteIn(kn,v.id)}));
-    push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> הצבעות',all,items,total=>searchMoreItem(total,items.length,'ההצבעות',()=>{ eraFilter.q=qRaw; eraFilter.kind=''; eraFilter.topic=''; eraFilter.limit=30; go('votes') }));
+    push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> הצבעות',all,items,total=>searchMoreItem(total,items.length,'ההצבעות',()=>{ const t=all[0]?.kn; if(t&&KN!==t) switchKnesset(t); eraFilter.q=qRaw; eraFilter.kind=''; eraFilter.topic=''; eraFilter.limit=30; go('votes') }));
   }
   { // Committees — both Knessets: ids are era-unique, and openCommittee
     // switches to the owning Knesset, so a K25 result found while browsing
@@ -2433,10 +2452,11 @@ function searchGroups(qRaw){
       .sort((a,b)=>a.r-b.r||(b.c.sessions_total||0)-(a.c.sessions_total||0));
     const items=all.slice(0,SEARCH_GROUP_LIMIT)
       .map(({c,kn})=>({html:`<span class="flex">${esc(c.name)}<span class="sub">${esc(c.type||'')} · ${c.sessions_total||0} ישיבות · כנסת ${kn}</span></span>`,go:()=>openCommittee(c.id)}));
-    push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ועדות',all,items,total=>searchMoreItem(total,items.length,'הוועדות',()=>{ committeeFilter.q=qRaw; committeeFilter.limit=90; go('committees') }));
+    push('<svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="m12 3 9 5H3z"/><path d="M4 21h16M5 18h14"/><path d="M6.5 10v8M10.2 10v8M13.8 10v8M17.5 10v8"/></svg> ועדות',all,items,total=>searchMoreItem(total,items.length,'הוועדות',()=>{ const t=all[0]?.kn; if(t&&KN!==t) switchKnesset(t); committeeFilter.q=qRaw; committeeFilter.limit=90; go('committees') }));
   }
   { // Topics -> the votes view filtered by that topic
-    if(!SEARCH_TOPIC_COUNTS){ SEARCH_TOPIC_COUNTS={}; ALLB.forEach(b=>(b.topics||[]).forEach(t=>SEARCH_TOPIC_COUNTS[t]=(SEARCH_TOPIC_COUNTS[t]||0)+1)) }
+    const topicSig=ALLB.length+'/'+K26B.length; // frozen-empty bug: caching {} from a first search before the archive landed hid the topics group all session; count both eras' bills
+    if(SEARCH_TOPIC_SIG!==topicSig){ SEARCH_TOPIC_SIG=topicSig; SEARCH_TOPIC_COUNTS={}; [...ALLB,...K26B].forEach(b=>(b.topics||[]).forEach(t=>SEARCH_TOPIC_COUNTS[t]=(SEARCH_TOPIC_COUNTS[t]||0)+1)) }
     const all=Object.entries(SEARCH_TOPIC_COUNTS).map(([t,n])=>({t,n,r:matchRank(t,q)})).filter(x=>x.r>=0)
       .sort((a,b)=>a.r-b.r||b.n-a.n);
     const items=all.slice(0,SEARCH_GROUP_LIMIT)
@@ -2537,7 +2557,8 @@ function renderSessionDetail(){
     // demand. Committee id is resolved by name so the chip still links.
     const p=PROTO_SEARCH[String(id)];
     if(p&&(p.committee||p.date)){
-      const cid=(CMT?.committees||[]).find(c=>c.name===p.committee)?.id;
+      const cid=((p.kn===CURRENT_KN?K26CMT?.committees:CMT?.committees)||[]).find(c=>c.name===p.committee)?.id
+        ?? ((p.kn===CURRENT_KN?CMT?.committees:K26CMT?.committees)||[]).find(c=>c.name===p.committee)?.id; // resolve the chip in the sitting's own era first — CMT is K25-only and a shared committee name linked the K25 page from a K26 sitting
       s={committee:p.committee||'',committee_id:cid,start:p.date||'',items:[],docs:[]};
     }
   }
@@ -2629,30 +2650,38 @@ let _billLinkMaps=null, _billLinkSrc=0;
 function billLinkMaps(){
   const src=ALLB.length*100000+K26B.length;
   if(_billLinkMaps&&_billLinkSrc===src) return _billLinkMaps;
+  // Maps are per-era (key -> {25: bill, 26: bill}): private numbers and
+  // bill numbers restart every Knesset and titles get re-filed, so the
+  // old flat maps let a K26 bill silently overwrite its K25 namesake —
+  // a K25 protocol citing [הצעת חוק פ/775/25] would have linked the K26
+  // bill the day the first K26 harvest landed. Resolution prefers the
+  // era of the text being read (or the citation's own /NN suffix).
   const byPriv={}, byNum={}, byName={};
   const norm=s=>String(s||'').normalize('NFC').replace(/[^\p{L}\p{N} ]/gu,' ').replace(/\s+/g,' ').trim();
-  for(const b of [...ALLB,...K26B]){
-    if(b.private_number!=null) byPriv[String(b.private_number)]=b;
-    if(b.number!=null) byNum[String(b.number)]=b;
+  const put=(map,k,b,kn)=>{ if(k==null||k==='') return; (map[String(k)]??={})[kn]=b };
+  for(const [kn,b] of [...ALLB.map(b=>[ERAS[0].kn,b]),...K26B.map(b=>[CURRENT_KN,b])]){
+    put(byPriv,b.private_number,b,kn);
+    put(byNum,b.number,b,kn);
     if(b.name){ // protocols tag enacted laws as הצעת חוק X while the index calls them חוק X (and vice versa) — index every prefix variant
       const n=norm(b.name);
-      byName[n]=b;
-      byName[n.replace(/^הצעת /,'')]=b;
-      if(n.startsWith('הצעת חוק ')) byName['חוק '+n.slice(9)]=b;
-      if(n.startsWith('חוק ')) byName['הצעת '+n]=b;
+      put(byName,n,b,kn);
+      put(byName,n.replace(/^הצעת /,''),b,kn);
+      if(n.startsWith('הצעת חוק ')) put(byName,'חוק '+n.slice(9),b,kn);
+      if(n.startsWith('חוק ')) put(byName,'הצעת '+n,b,kn);
     }
   }
-  _billLinkMaps={byPriv,byNum,byName,norm}; _billLinkSrc=src; return _billLinkMaps;
+  const pick=(map,k,pref)=>{ const e=map[String(k)]; if(!e) return null; return e[pref]||e[ERAS[0].kn]||e[CURRENT_KN]||null };
+  _billLinkMaps={byPriv,byNum,byName,norm,pick}; _billLinkSrc=src; return _billLinkMaps;
 }
 function billLinksPrepare(text){
-  const {byPriv,byNum,byName,norm}=billLinkMaps();
+  const {byPriv,byNum,byName,norm,pick}=billLinkMaps();
   const links=[]; const tok=i=>`\uE000${i}\uE001`;
   let s=String(text??'');
   const chip=(b,label)=>b?`<a class="bill-ref" href="#" onclick="event.preventDefault();event.stopPropagation();${K26B.includes(b)?`openBill26('${b.id}')`:`openBillPage('${b.id}')`}" title="לדף הצעת החוק">${esc(label)}</a>`:`<span class="bill-ref dim">${esc(label)}</span>`;
-  const bracketBill=(()=>{ const m=s.match(/\[הצעת חוק\s+פ\/(\d+)\/\d+/)||s.match(/מס'\s*כ\/(\d+)/)||s.match(/חוב'\s*מ\/(\d+)/); if(!m) return null; return byPriv[String(+m[1])]||byNum[String(+m[1])]||null })();
-  s=s.replace(/<<\s*הצח\s*>>([\s\S]*?)<<\s*הצח\s*>>/g,(m,name)=>{ const b=byName[norm(name)]||bracketBill; links.push(chip(b,name.trim())); return tok(links.length-1) });
-  s=s.replace(/\[הצעת חוק\s+פ\/(\d+)\/\d+[^\]]*\]/g,(m,num)=>{ const b=byPriv[String(+num)]; links.push(b?chip(b,`הצעת חוק פ/${num} — לדף ההצעה ←`):`<span class="bill-ref dim">הצעת חוק פ/${num}</span>`); return tok(links.length-1) });
-  s=s.replace(/\[מס'\s*כ\/(\d+)[^\]]*\]/g,(m,num)=>{ const b=byNum[String(+num)]; links.push(b?chip(b,`הצעת חוק כ/${num} — לדף ההצעה ←`):`<span class="bill-ref dim">הצעת חוק כ/${num}</span>`); return tok(links.length-1) });
+  const bracketBill=(()=>{ const m=s.match(/\[הצעת חוק\s+פ\/(\d+)\/(\d+)/)||s.match(/מס'\s*כ\/(\d+)/)||s.match(/חוב'\s*מ\/(\d+)/); if(!m) return null; const kn=+m[2]||KN; return pick(byPriv,String(+m[1]),kn)||pick(byNum,String(+m[1]),kn) })();
+  s=s.replace(/<<\s*הצח\s*>>([\s\S]*?)<<\s*הצח\s*>>/g,(m,name)=>{ const b=pick(byName,norm(name),KN)||bracketBill; links.push(chip(b,name.trim())); return tok(links.length-1) });
+  s=s.replace(/\[הצעת חוק\s+פ\/(\d+)\/(\d+)[^\]]*\]/g,(m,num,kn)=>{ const b=pick(byPriv,String(+num),+kn||KN); links.push(b?chip(b,`הצעת חוק פ/${num} — לדף ההצעה ←`):`<span class="bill-ref dim">הצעת חוק פ/${num}</span>`); return tok(links.length-1) });
+  s=s.replace(/\[מס'\s*כ\/(\d+)[^\]]*\]/g,(m,num)=>{ const b=pick(byNum,String(+num),KN); links.push(b?chip(b,`הצעת חוק כ/${num} — לדף ההצעה ←`):`<span class="bill-ref dim">הצעת חוק כ/${num}</span>`); return tok(links.length-1) });
   return {text:s,links};
 }
 function billLinksApply(html,links){
@@ -2680,7 +2709,7 @@ function protoTurnsHTML(doc=PROTO_CUR, filter=protoFilter){
   for(let ti=0;ti<doc.turns.length;ti++){
     const t=doc.turns[ti];
     if(t.role==='topic'){ if(t.text===lastTopic) continue; lastTopic=t.text }
-    if(filter.speaker&&t.speaker!==filter.speaker) continue;
+    if(filter.speaker&&!_speakerMatch(filter.speaker,t.speaker)) continue;
     if(filter.q&&!filter.hlOnly&&!t.text.includes(filter.q)&&!t.speaker.includes(filter.q)) continue;
     turns.push([ti,t]); // ti = index into doc.turns — the anchor highlights link to (data-turn)
   }
@@ -2701,7 +2730,7 @@ function renderProtocol(){
   const box=$('#protoBox'); if(!box||!PROTO_CUR) return;
   const spk=Object.entries(PROTO_CUR.speakers).sort((a,b)=>b[1].words-a[1].words);
   box.innerHTML=`
-  <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,14).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${protoFilter.speaker&&protoFilter.speaker!==n?'off':''}" onclick="protoFilter.speaker=protoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderProtocol()" title="${s.turns} קטעים · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
+  <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,14).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${protoFilter.speaker&&!_speakerMatch(protoFilter.speaker,n)?'off':''}" onclick="protoFilter.speaker=protoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderProtocol()" title="${s.turns} קטעים · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
   ${protoFilter.speaker?`<button class="chip" onclick="protoFilter.speaker='';renderProtocol()">✕ כל הדוברים</button>`:''}</div>
   <input type="search" placeholder="חיפוש בפרוטוקול… (Enter — לתוצאה הראשונה)" onkeydown="if(event.key==='Enter'){event.preventDefault();protoMarkNav('proto',1)}" value="${esc(protoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="protoFilter.q=this.value;protoFilter.hlOnly=true;protoFilter.hl=this.value.trim()?[this.value.trim()]:[];_markState.proto={i:-1};$('#protoTurns').innerHTML=protoTurnsHTML();protoSyncHitBar('proto')">
   <div class="small dim" style="margin-bottom:.5rem">${PROTO_CUR.turns.filter(t=>t.role!=='topic').length} קטעים · ${spk.length} דוברים${protoFilter.q?` · ${protoOccurrences(PROTO_CUR,protoFilter.q)} אזכורים מודגשים בכל הפרוטוקול`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו</div>
@@ -2782,7 +2811,7 @@ function renderPlenumProtocol(){
   const HL=plenumProtoFilter.hl.length?plenumProtoFilter.hl:plenumProtoFilter.q;
   const occ=HL?protoOccurrences(PLENUM_CUR,HL):0;
   box.innerHTML=`
-  <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,16).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${plenumProtoFilter.speaker&&plenumProtoFilter.speaker!==n?'off':''}" onclick="plenumProtoFilter.speaker=plenumProtoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderPlenumProtocol()" title="${s.turns} קטעים · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
+  <div class="chips" style="margin-bottom:.4rem">${spk.slice(0,16).map(([n,s])=>{const col=protoColor(n,s.faction_hint); return `<button class="chip spk-chip ${plenumProtoFilter.speaker&&!_speakerMatch(plenumProtoFilter.speaker,n)?'off':''}" onclick="plenumProtoFilter.speaker=plenumProtoFilter.speaker==='${jsq(n)}'?'':'${jsq(n)}';renderPlenumProtocol()" title="${s.turns} קטעים · ${s.words} מילים"><i style="width:.65rem;height:.65rem;border-radius:50%;background:${col};display:inline-block"></i>${esc(n)} · ${s.turns}</button>`}).join('')}
   ${plenumProtoFilter.speaker?`<button class="chip" onclick="plenumProtoFilter.speaker='';renderPlenumProtocol()">✕ כל הדוברים</button>`:''}</div>
   <input type="search" placeholder="חיפוש בפרוטוקול… (Enter — לתוצאה הראשונה)" onkeydown="if(event.key==='Enter'){event.preventDefault();protoMarkNav('plenum',1)}" value="${esc(plenumProtoFilter.q)}" style="width:100%;margin-bottom:.6rem" oninput="plenumProtoFilter.q=this.value;plenumProtoFilter.hl=this.value.trim()?[this.value.trim()]:[];_markI=-1;$('#plenumTurns').innerHTML=protoTurnsHTML(PLENUM_CUR,plenumProtoFilter);const o=$('#plenumOcc');if(o)o.textContent=plenumProtoFilter.hl.length?protoOccurrences(PLENUM_CUR,plenumProtoFilter.hl):'';_markState.plenum={i:-1};protoSyncHitBar('plenum')">
   <div class="small dim" style="margin-bottom:.5rem">${PLENUM_CUR.turns.filter(t=>t.role!=='topic').length} קטעים · ${spk.length} דוברים${HL?` · <span id="plenumOcc">${occ}</span> אזכורים מודגשים בכל הפרוטוקול`:''} · צבע = סיעה לח״כים, גוון אישי למוזמנים · לחצו על שם ח״כ לכרטיס שלו
@@ -3609,7 +3638,7 @@ function renderVotesAll(){
   const KINDLBL={reading3:'קריאה שלישית',reading2:'קריאה שנייה',reading1:'קריאה ראשונה — העברה להכנה ל־2–3',pre1:'דיון מוקדם — העברה להכנה לקריאה ראשונה',reservation:'הסתייגויות',noconfidence:'אי־אמון',transfer:'העברות לוועדה',agenda:'הצעות לסדר',secondary:'חקיקת משנה',election:'בחירות בכנסת (יו״ר, מבקר…)',continuity:'דין רציפות',other:'אחר'};
   let list=VS.filter(v=>{
     if(eraFilter.kind&&v.kind!==eraFilter.kind)return false;
-    if(eraFilter.topic&&!((ALLB_BY_ID[v.item_id]||{}).topics||[]).includes(eraFilter.topic))return false;
+    if(eraFilter.topic&&!((billAny(v.item_id)||{}).topics||[]).includes(eraFilter.topic))return false; // billAny, not ALLB_BY_ID: this shared list renders K26 votes too, and a K25-only lookup filtered every one of them out under a carried-over topic
     if(eraFilter.q&&!normQ((v.title||'')+' '+(v.desc||'')+' '+(v.kind_label||'')).includes(normQ(eraFilter.q)))return false;
     const _mk=(v.date||'').slice(0,7); if(eraFilter.from&&_mk<eraFilter.from)return false; if(eraFilter.to&&_mk>eraFilter.to)return false;
     return true});
@@ -4347,7 +4376,7 @@ function mkKnStrip(name){
   }
   return `<div class="chips" style="margin-top:.7rem">${rec25?`<button class="chip" onclick="switchKnesset(25);openMk('${jsq(name)}')">כנסת 25 · ${rec25.votes.length} הצבעות ←</button>`:`<span class="chip">${K25_READY?'לא כיהן/ה בכנסת 25':'היסטוריית כנסת 25 נטענת…'}</span>`}<button class="chip on">כנסת 26 · מוצג כעת</button></div>`;
 }
-function myAgreement(name){ const m=mkIndex[name]; if(!m)return null; let s=0,t=0;
+function myAgreement(name){ const m=(KN===CURRENT_KN?IDX26:mkIndex)[name]; if(!m)return null; let s=0,t=0; // per-era vote index: the K25 mkIndex against the K26 store's myVotes matched nothing, so the K26 'most like me' sort + hemicycle hover silently returned null for everyone
   for(const v of m.votes){const mine=S.myVotes[String(v.bill.id)]; if(!mine)continue; t++; s+= v.result===mine?1:(v.result===3||mine===3?.5:0)}
   return t?{pct:Math.round(s/t*100),n:t}:null }
 
@@ -4416,6 +4445,25 @@ function mkInitiatedHTML(name,hideEmpty=false){
   <div class="rows" style="margin:.5rem -.9rem 0">${shown.map(b=>{const others=(b.initiators||[]).filter(i=>i.initiator&&i.name!==name).length;return `<div class="row" onclick="openBillPage('${b.id}')"><span class="flex">${esc(b.name)}<br><span class="dim small">${esc(statusBucket(b))}${b.committee?` · ${esc(b.committee)}`:''}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}${others?` · עם עוד ${others} יוזמים`:''}</span></span><span class="chip acc">להצעה ←</span></div>`}).join('')}</div>
   ${ledShown.length>shown.length?`<div style="text-align:center;margin-top:.7rem"><button class="btn" onclick="mkBillsShowAll=true;renderMkDetail()">הצגת כל ${ledShown.length.toLocaleString('he-IL')} ההצעות</button></div>`:mkBillsShowAll&&ledShown.length>12?`<div style="text-align:center;margin-top:.7rem"><button class="btn ghost" onclick="mkBillsShowAll=false;renderMkDetail()">קיפול הרשימה</button></div>`:''}`
   :`<p class="muted small" style="margin-top:.4rem">לא נמצאו הצעות חוק שחבר הכנסת יזמ/ה בכנסת 25${joinedN?` — אבל הצטרף/ה כחותם/ת ל־${joinedN} הצעות של ח״כים אחרים`:''}.</p>`}</div>`;
+}
+/* Bills this MK initiated in Knesset 26 (K26B initiators, initiator===
+   true) — the K26 MK card previously showed only the K25 list below,
+   so a K26-only MK's actual current legislative work was invisible on
+   their own card. Empty until the first K26 bills land. */
+function mkInitiated26HTML(name){
+  const led=[]; let joinedN=0;
+  for(const b of K26B){
+    const roles=(b.initiators||[]).filter(i=>i.name===name);
+    if(!roles.length) continue;
+    if(roles.some(i=>i.initiator)) led.push(b); else joinedN++;
+  }
+  if(!led.length) return '';
+  led.sort((a,b)=>billActivityDate(b).localeCompare(billActivityDate(a)));
+  const shown=led.slice(0,12);
+  return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M14 3H6a2 2 0 0 0-2 2v14a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V9z"/><path d="M14 3v6h6"/><path d="M9 13h6M9 17h6"/></svg> הצעות חוק שחבר הכנסת יזמ/ה <small class="dim">${led.length.toLocaleString('he-IL')} הצעות בכנסת ${CURRENT_KN} שבהן ${esc(disp(name))} יוזם/ת</small></h3>
+  ${joinedN?`<div class="small muted" style="margin-top:.35rem">בנוסף הצטרף/ה כחותם/ת ל־${joinedN} הצעות של אחרים בכנסת ${CURRENT_KN}.</div>`:''}
+  <div class="rows" style="margin:.5rem -.9rem 0">${shown.map(b=>{const others=(b.initiators||[]).filter(i=>i.initiator&&i.name!==name).length;return `<div class="row" onclick="openBill26('${b.id}')"><span class="flex">${esc(b.name)}<br><span class="dim small">${esc(b.status||'')}${billActivityDate(b)?` · ${esc(billActivityLabel(b))}`:''}${others?` · עם עוד ${others} יוזמים`:''}</span></span><span class="chip acc">להצעה ←</span></div>`}).join('')}</div>
+  ${led.length>shown.length?`<div class="small dim" style="margin-top:.45rem">מוצגות ${shown.length} האחרונות מתוך ${led.length.toLocaleString('he-IL')}.</div>`:''}</div>`;
 }
 /* ============ P1 OData extras (build_odata_extras.py -> data/k25_extras.json) ============ */
 function mkExtrasHTML(name){
@@ -4519,6 +4567,7 @@ function renderMkDetail(){
     ${mkContactHTML(name)}
     ${mkKnStrip(name)}
     ${mkWikiHTML(name)}
+    ${mkInitiated26HTML(name)}
     ${mkInitiatedHTML(name,true)}
     ${mkRolesHTML(name)}
     ${mkCommitteesHTML(name)}
@@ -5666,7 +5715,7 @@ function renderMine(){
   // are shared across eras. Both groups show in Mine — it's the personal
   // command center — but each is tagged with its Knesset.
   const fbByEra=ERAS.map(e=>({kn:e.kn,bills:eraBills(e.kn).filter(b=>(STORE[e.kn].followBills||[]).includes(String(b.id)))}));
-  const fb=fbByEra.flatMap(g=>g.bills); const fm=S.followMks.map(n=>mkIndex[n]||{name:n,faction:(k26Entry(n)||{}).party?.name||'',votes:[]});
+  const fb=fbByEra.flatMap(g=>g.bills); const fm=S.followMks.map(n=>mkIndex[n]||IDX26[n]||{name:n,faction:(k26Entry(n)||{}).party?.name||'',votes:[]}); // followed-MK rows read the per-era vote indexes — mkIndex alone showed K26-only follows with no faction/activity and returning MKs under their K25 party
   const fc=(S.followCommittees||[]).map(id=>committeeById(id)).filter(Boolean); // followed committees may belong to either Knesset
   const ff=(S.followFactions||[]);
   const topMk=rank[0], topFac=fr[0];
@@ -5714,8 +5763,8 @@ function renderMine(){
   }
   const RV={1:'בעד',2:'נגד',3:'נמנע'};
   for(const m of fm){
-    const rec=mkIndex[m.name];
-    if(rec) for(const v of rec.votes.slice(-4)) pushFeed(v.bill.vote_date,'👤',`${disp(m.name)} הצביע/ה ${RV[v.result]||''}: ${displayText(v.bill)}`,`סיעה: ${shortF(v.bill.mk_votes?.find(x=>normName(x.mk_name)===normName(m.name))?.faction||rec.faction||'')} · התוצאה ${v.bill.total_for}–${v.bill.total_against}`,`openVote('${v.bill.id}')`);
+    const rec=mkIndex[m.name]||IDX26[m.name]; // both eras' vote indexes (IDX26 entries carry voteModel26 bills, same shape)
+    if(rec) for(const v of rec.votes.slice(-4)) pushFeed(v.bill.vote_date,'👤',`${disp(m.name)} הצביע/ה ${RV[v.result]||''}: ${displayText(v.bill)}`,`סיעה: ${shortF(v.bill.mk_votes?.find(x=>normName(x.mk_name)===normName(m.name))?.faction||rec.faction||'')} · התוצאה ${v.bill.total_for}–${v.bill.total_against}`,`openVote('${v.bill.id}')`,`vote:${v.bill.id}`);
     const hl=MK_HIGHLIGHTS?.by_mk?.[normName(m.name)];
     if(hl) for(const a of (hl.appearances||[]).slice(0,3)) pushFeed(a.date,'🗣️',`${disp(m.name)} דיבר/ה ב${a.kind==='plenum'?'מליאה':'וועדה'}: ${a.committee}`,`${a.turns} קטעים · ${a.words.toLocaleString('he-IL')} מילים`,openMkTurn(a,m.name));
   }
@@ -5724,6 +5773,11 @@ function renderMine(){
     const mineMk=inits.find(i=>S.followMks.includes(i.name));
     if(mineMk&&!fbIds.has(String(b.id))) pushFeed(billActivityDate(b),'✍️',`הצעת חוק של ${disp(mineMk.name)}: ${b.name}`,`${billActivityLabel(b)||statusBucket(b)} · השלב כעת: ${statusBucket(b)}`,`openBillPage('${b.id}')`);
   }
+  for(const b of K26B){ // K26 twin of the followed-MK initiated-bill rows above
+    const inits=(b.initiators||[]).filter(i=>i.initiator);
+    const mineMk=inits.find(i=>S.followMks.includes(i.name));
+    if(mineMk&&!fbIds.has(String(b.id))) pushFeed(billActivityDate(b),'✍️',`הצעת חוק של ${disp(mineMk.name)}: ${b.name}`,`${billActivityLabel(b)||b.status||''} · כנסת ${CURRENT_KN}`,`openBill26('${b.id}')`);
+  }
   const sessSrc=[...(CMT?.recent_sessions||[]),...(K26CMT?.recent_sessions||[])];
   for(const s of sessSrc){ if((S.followCommittees||[]).map(String).includes(String(s.committee_id))) pushFeed((s.start||s.date||'').slice(0,10),'🏛️',`ישיבה של ועדה במעקב: ${cmtName(s.committee_id)}`,`${s.title||'ישיבת ועדה'}`,`openCommittee('${s.committee_id}')`,`session:${s.id}`) }
   if(ff.length){
@@ -5731,6 +5785,7 @@ function renderMine(){
     for(const f of ff){ const cf=currentFactions().find(x=>x.name===f||shortF(x.name)===f); if(cf) cf.members.forEach(n=>memberNames.add(n));
       const p=(K26?.parties||[]).find(x=>x.name===f); if(p) (p.elected||[]).forEach(n=>memberNames.add(n)) }
     for(const b of ALLB){ const hit=(b.initiators||[]).find(i=>i.initiator&&memberNames.has(i.name)); if(hit&&!fbIds.has(String(b.id))) pushFeed(billActivityDate(b),'👥',`הצעת חוק של ${disp(hit.name)} (${ff[0]}): ${b.name}`,`${billActivityLabel(b)||statusBucket(b)} · השלב כעת: ${statusBucket(b)}`,`openBillPage('${b.id}')`) }
+    for(const b of K26B){ const hit=(b.initiators||[]).find(i=>i.initiator&&memberNames.has(i.name)); if(hit&&!fbIds.has(String(b.id))) pushFeed(billActivityDate(b),'👥',`הצעת חוק של ${disp(hit.name)} (${ff[0]}): ${b.name}`,`${billActivityLabel(b)||b.status||''} · כנסת ${CURRENT_KN}`,`openBill26('${b.id}')`) }
   }
   feed.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const feedTop=feed.slice(0,18);
@@ -5768,7 +5823,7 @@ function renderMine(){
         return mineStarred.length?`<div class="rows" style="margin:.4rem -.9rem 0">${mineStarred.map(x=>`<div class="row" onclick="${x.go}"><span class="flex">${esc(x.lbl)}</span><span class="chip" style="color:#8a660a;border-color:#c9a227;background:#f6ebc3;font-weight:800">★ ${x.n.toLocaleString('he-IL')}</span></div>`).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">עוד אין מוני עוקבים למה שסימנתם — הם יופיעו כאן ככל שהמעקב באתר יצטבר.</p>' })()}
     </div>
   </div>
-  ${rank.length?`<div class="sec-title">מי מצביע כמוני <span class="chip acc">כנסת 25</span> <small>על ${mineBills.length} ההצבעות שסימנת בכנסת 25</small></div>
+  ${rank.length?`<div class="sec-title">מי מצביע כמוני <span class="chip acc">כנסת ${KN}</span> <small>על ${mineBills.length} ההצבעות שסימנת בכנסת ${KN}</small></div>
   <div class="grid c2" style="align-items:start"><div class="card pad"><h3 style="margin-bottom:.5rem">הכי קרובים אליי</h3>${rank.slice(0,8).map((r,i)=>`<div class="row" style="margin:0 -.9rem" onclick="openMk('${jsq(r.n)}')"><b style="color:var(--accent);width:1.7rem">${i+1}</b>${avatar(r.n,r.f,36)}<span class="flex">${esc(disp(r.n))}<br><span class="dim small">${esc(shortF(r.f))} · ${r.t} משותפות</span></span><b style="color:var(--for)">${r.pct}%</b></div>`).join('')}
   ${farRank.length?`<h3 style="margin:.9rem 0 .5rem">הכי רחוקים ממני</h3>${farRank.map((r,i)=>`<div class="row" style="margin:0 -.9rem" onclick="openMk('${jsq(r.n)}')"><b style="color:var(--dim);width:1.7rem">${rank.length-i}</b>${avatar(r.n,r.f,36)}<span class="flex">${esc(disp(r.n))}<br><span class="dim small">${esc(shortF(r.f))} · ${r.t} משותפות</span></span><b style="color:var(--against)">${r.pct}%</b></div>`).join('')}`:''}</div>
   <div class="card pad"><h3 style="margin-bottom:.5rem">לפי סיעה</h3>${partyGroups.map(g=>`<div style="display:flex;gap:.45rem;align-items:center;margin:.2rem 0 .35rem"><span class="chip acc">כנסת ${g.kn}</span><span class="small dim">לפי ההצבעות שסימנת בכנסת ${g.kn}</span></div>${g.rows.map(x=>`<div class="fbar" style="cursor:pointer" onclick="openFactionIn(${g.kn},'${jsq(x.f)}')" title="${esc(x.f)}: ${x.pct}% התאמה · ${x.n} ח״כים בדירוג — לדף הסיעה בכנסת ${g.kn}"><span class="nm" style="color:${fcol(x.f)}">${esc(x.f)} ←</span><span class="tr"><span class="progress"><i style="width:${x.pct}%;background:linear-gradient(90deg,var(--accent),var(--for))"></i></span></span><b>${x.pct}%</b></div>`).join('')}`).join('')}
