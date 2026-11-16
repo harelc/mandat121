@@ -1268,7 +1268,7 @@ function voteModel26(id){
   const key=String(id); if(VOTE_MODELS26[key]) return VOTE_MODELS26[key];
   const v=K26V_BY_ID[key]; if(!v) return null;
   const rows=VOTE_RES26.votes[key]||[];
-  const m={id:key,bill_id:v.item_id||null,lite:null,name:v.title||'',title:v.title||'',sub:v.desc||'',
+  const m={id:key,kn:CURRENT_KN,bill_id:v.item_id||null,lite:null,name:v.title||'',title:v.title||'',sub:v.desc||'',
     vote_date:v.date,session:v.session||null,kind:v.kind||null,kind_label:v.kind_label||'',method_id:v.method_id||null,secret:v.secret||null,
     has_tally:v.for!=null&&v.against!=null,bill_type:'',topics:[],doc_url:null,summary:null,synopsis:null,
     total_for:v.for||0,total_against:v.against||0,total_abstain:v.abstain||0,
@@ -1626,7 +1626,7 @@ function noMkVotesHTML(b){
   if(b.method_id===3) return wrap(searchIcon,`הצבעה זו נערכה <b>בהצבעה חשאית</b> מאחורי פרגוד — לא נרשם איך הצביע כל ח״כ, ולכן אין מפת מליאה ואין רשימת ״מי הצביע איך״.${b.secret&&b.secret.length?`<div class="rows" style="margin:.7rem -.9rem 0;text-align:start">${b.secret.map(s=>`<div class="row"><span class="flex">${esc(s.name)}</span><span class="vchip f">${s.votes} קולות</span></div>`).join('')}</div>`:''}`);
   return wrap(searchIcon,`פירוט ההצבעה לפי ח״כ עדיין באיסוף מהמאגר הרשמי — התוצאה המספרית למעלה מעודכנת.`);
 }
-function voteMkVotes(m){ if(!m) return []; if(!m.mk_votes) m.mk_votes=mkVotesFor(m.id,m.vote_date); else for(const v of m.mk_votes) if(!v.faction) v.faction=factionOn(v.mk_name,m.vote_date); return m.mk_votes } // refresh empty factions: a model cached before tenure loaded must not stay faction-less forever
+function voteMkVotes(m){ if(!m) return []; if(!m.mk_votes) m.mk_votes=mkVotesFor(m.id,m.vote_date); else if(m.kn!==CURRENT_KN) for(const v of m.mk_votes) if(!v.faction) v.faction=factionOn(v.mk_name,m.vote_date); return m.mk_votes } // refresh empty factions: a model cached before tenure loaded must not stay faction-less forever — K25 models only: factionOn() reads K25 stints, and filling a current-era model with them poisons its cached faction bars/rebels
 /* Saved "my vote" keys were once split two ways: a bill id for a bill's
    chosen vote, '__v<voteId>' for every other vote. Normalise both to the
    vote id itself — the only key from here on. Bill ids and vote ids never
@@ -3981,7 +3981,7 @@ async function exportMkPNG(name){
   if(!votes.length){ d.card(d.y,84); d.T(d.W-d.PAD-24,d.y+50,'אין הצבעות מליאה מתועדות בכנסת זו',{s:18,w:800}); d.y+=102; d.finish(); return }
   const c={1:0,2:0,3:0}; votes.forEach(v=>c[v.result]++); const tot=votes.length;
   let loyT=0,loy=0; const devs=[];
-  for(const v of votes){ const bill=v.bill; const own=(bill.mk_votes||[]).find(x=>x.mk_name===name); const maj=factionMajorityCached(bill,shortF((own&&own.faction)||factionOn(name,bill.vote_date)||faction).trim()); if(!maj) continue; loyT++; if(v.result===maj) loy++; else if(maj!==3) devs.push(v) }
+  for(const v of votes){ const bill=v.bill; const own=(bill.mk_votes||[]).find(x=>x.mk_name===name); const maj=factionMajorityCached(bill,shortF((own&&own.faction)||(kn26?'':factionOn(name,bill.vote_date))||faction).trim()); if(!maj) continue; loyT++; if(v.result===maj) loy++; else if(maj!==3) devs.push(v) } // kn26: factionOn() is K25 stints — never grade a K26 vote against a K25 faction
   const topics={}; votes.forEach(v=>(v.bill.topics||[]).forEach(t=>topics[t]=(topics[t]||0)+1)); const topTopics=Object.entries(topics).sort((a,b)=>b[1]-a[1]).slice(0,5);
   { const h=172; d.card(d.y,h); const cy=d.y+75, cx=d.W-d.PAD-90, r=52, circ=2*Math.PI*r; let off=0;
     [[c[1],d.C.for],[c[2],d.C.against],[c[3],d.C.abstain]].forEach(([v,col])=>{ const len=circ*(v/tot); d.el.push(`<circle cx="${cx}" cy="${cy}" r="${r}" fill="none" stroke="${col}" stroke-width="17" stroke-dasharray="${Math.max(len-2,0)} ${circ}" transform="rotate(-90 ${cx} ${cy})" stroke-dashoffset="${-off}"/>`); off+=len });
@@ -4743,9 +4743,8 @@ function renderAnalysis26(){
   const part={}, reb={}, facOf={};
   for(const vid of voteIds){
     const m=voteModel26(vid); if(!m) continue;
-    const byF={}; m.mk_votes.forEach(v=>{ facOf[v.mk_name]=v.faction; (byF[v.faction]??={1:0,2:0,3:0})[v.result]++ });
-    const maj={}; for(const [f,c] of Object.entries(byF)){ const t=c[1]+c[2]; if(t>=3) maj[f]=c[1]>=c[2]?1:2 }
-    m.mk_votes.forEach(v=>{ part[v.mk_name]=(part[v.mk_name]||0)+1; if(maj[v.faction]&&v.result!==maj[v.faction]&&v.result!==3) reb[v.mk_name]=(reb[v.mk_name]||0)+1 });
+    m.mk_votes.forEach(v=>{ facOf[v.mk_name]=v.faction; part[v.mk_name]=(part[v.mk_name]||0)+1 });
+    for(const r of rebels(m)) if(r.faction) reb[r.mk_name]=(reb[r.mk_name]||0)+1; // THE shared rebel definition (factionMajority-based), same as the vote pages — no forked majority/abstention rules here; faction-less rows (unresolved names) form no faction and can't rebel
   }
   const ini={}; K26B.forEach(b=>(b.initiators||[]).forEach(i=>{ if(i.initiator) ini[i.name]=(ini[i.name]||0)+1 }));
   const top=(obj,n)=>Object.entries(obj).map(([name,v])=>({name,v})).sort((a,b)=>b.v-a.v).slice(0,n);

@@ -191,6 +191,23 @@ class AuditFollowupTest(unittest.TestCase):
         src = (ROOT / "build_protocols_search.py").read_text("utf-8")
         self.assertIn('glob("k*_protocols_index.json")', src)
 
+    def test_vote_mk_votes_never_fills_current_era_from_k25_stints(self):
+        # factionOn() reads FACTION_STINTS (K25); voteMkVotes is called on
+        # current-era models via matchStrip/castMine and its fill mutates
+        # the cached VOTE_MODELS26 entries.
+        body = _fn_body(self.html, "voteMkVotes")
+        self.assertIn("m.kn!==CURRENT_KN", body)
+        self.assertIn("kn:CURRENT_KN", _fn_body(self.html, "voteModel26"))
+
+    def test_analysis26_uses_shared_rebel_definition(self):
+        body = _fn_body(self.html, "renderAnalysis26")
+        self.assertIn("rebels(m)", body)
+        self.assertNotIn("c[1]+c[2]", body)
+
+    def test_mk_png_loyalty_never_grades_current_era_on_k25_faction(self):
+        body = _fn_body(self.html, "exportMkPNG")
+        self.assertIn("kn26?'':factionOn(name,bill.vote_date)", body)
+
 
 if __name__ == "__main__":
     unittest.main()
