@@ -96,6 +96,8 @@ def session_words_text(text):
 def main():
     global KNESSET, OUT, SHARD_DIR, MANIFEST
     force = "--force" in sys.argv
+    if "--knesset" not in sys.argv:
+        raise SystemExit(f"usage: {sys.argv[0]} --knesset {{25,26}} — the era is required, never defaulted")
     if "--knesset" in sys.argv:
         KNESSET = int(sys.argv[sys.argv.index("--knesset") + 1])
         if KNESSET not in (25, 26):

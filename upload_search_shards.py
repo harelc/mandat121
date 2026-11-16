@@ -36,7 +36,8 @@ BUCKET = os.environ.get("R2_BUCKET", "mandat121protocols")
 PUBLIC_BASE = os.environ.get(
     "R2_PUBLIC_BASE",
     "https://pub-a65c4e6efb634d8da9873e4f51835a60.r2.dev").rstrip("/")
-CORPORA = {"c": ROOT / "data" / "search_c", "p": ROOT / "data" / "search_p"}
+CORPORA = {"c": ROOT / "data" / "search_c", "p": ROOT / "data" / "search_p",
+           "c26": ROOT / "data" / "search_c26", "p26": ROOT / "data" / "search_p26"}
 
 
 def _sign(key, msg):

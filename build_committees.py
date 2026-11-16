@@ -279,7 +279,7 @@ def incremental_main(kn, recent_since, bill_ids, bill_id_set, cmap, smap, prev, 
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, default=25, choices=(25, 26))
+    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
     ap.add_argument("--full", action="store_true",
                     help="ignore previous output/state and rebuild from scratch")
     args = ap.parse_args()

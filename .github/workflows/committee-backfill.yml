@@ -38,7 +38,7 @@ jobs:
           python-version: "3.12"
 
       - name: Build committee search index (streaming, resumable)
-        run: python3 -u build_committee_search.py
+        run: python3 -u build_committee_search.py --knesset 25
 
       - name: Upload shards to R2
         env:

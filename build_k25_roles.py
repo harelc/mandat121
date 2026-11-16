@@ -98,7 +98,7 @@ def wanted_names(kn):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, default=25, choices=(25, 26))
+    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
     kn = ap.parse_args().knesset
 
     pos_desc = {p["Id"]: p["Description"]

@@ -239,7 +239,7 @@ def classify(desc, title=""):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, default=25)
+    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
     ap.add_argument("--full", action="store_true")
     args = ap.parse_args()
     kn = args.knesset

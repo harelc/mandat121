@@ -145,7 +145,7 @@ def parse_text(session, text):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, default=25, choices=(25, 26))
+    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
     kn = ap.parse_args().knesset
     src = Path("data/committees.json" if kn == 25 else f"data/k{kn}_committees.json")
     if not src.exists():

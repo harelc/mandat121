@@ -112,6 +112,8 @@ def session_counts(sid, urls, committee, date):
 
 def main():
     global KNESSET, OUT, SHARD_DIR, MANIFEST, COMMITTEES_F
+    if "--knesset" not in sys.argv:
+        raise SystemExit(f"usage: {sys.argv[0]} --knesset {{25,26}} — the era is required, never defaulted")
     if "--knesset" in sys.argv:
         KNESSET = int(sys.argv[sys.argv.index("--knesset") + 1])
         if KNESSET not in (25, 26):

@@ -343,7 +343,7 @@ class VoteResultsResumeTest(unittest.TestCase):
             (data / "k25_vote_results.json").write_text(json.dumps(
                 {"names": ["a"], "votes": {"1": [[0, 1]] * 100}}), "utf-8")
             mod.fetch_vote = mock.Mock(side_effect=AssertionError("network!"))
-            with mock.patch.object(sys, "argv", ["build_vote_results.py"]):
+            with mock.patch.object(sys, "argv", ["build_vote_results.py", "--knesset", "25"]):
                 mod.main()
             votes = json.loads((data / "k25_votes.json").read_text("utf-8"))
             self.assertEqual(votes[0]["for"], 100)
@@ -366,7 +366,7 @@ class VoteResultsResumeTest(unittest.TestCase):
             (data / "k25_vote_results.json").write_text(json.dumps(
                 {"names": ["a"], "votes": {"2": [[0, 1]], "1": [[0, 2]]}}), "utf-8")
             mod.fetch_vote = mock.Mock(side_effect=AssertionError("network!"))
-            with mock.patch.object(sys, "argv", ["build_vote_results.py"]):
+            with mock.patch.object(sys, "argv", ["build_vote_results.py", "--knesset", "25"]):
                 mod.main()
             pairs = json.loads((data / "k25_vote_results.json").read_text("utf-8"),
                                object_pairs_hook=lambda p: p)

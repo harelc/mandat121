@@ -66,7 +66,7 @@ def norm(s):
 
 def main():
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, default=25, choices=(25, 26))
+    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
     kn = ap.parse_args().knesset
     pos = [r for r in get("KNS_PersonToPosition", f"KnessetNum eq {kn}")
            if r.get("PositionID") in ROLES and r.get("CommitteeID")]

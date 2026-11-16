@@ -134,7 +134,7 @@ def load_existing(main_path, shard_dir):
 def main():
     import argparse
     ap = argparse.ArgumentParser()
-    ap.add_argument("--knesset", type=int, default=25, choices=(25, 26))
+    ap.add_argument("--knesset", type=int, required=True, choices=(25, 26))
     ap.add_argument("--full", action="store_true",
                     help="rebuild the whole term from OData (default: "
                          "incremental — refetch only the recent window and "
