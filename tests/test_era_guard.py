@@ -62,6 +62,20 @@ class KnessetArgRequiredTest(unittest.TestCase):
                                       f"{wf.name}:{i} runs {m.group(1)} without naming an era")
 
 
+class BuilderImportsTest(unittest.TestCase):
+    def test_knesset_type_defined_at_module_level(self):
+        # Regression (run 43814011849): a scripted edit inserted the
+        # era_registry import inside build_agenda.py's docstring, so
+        # --knesset parsing died with NameError in the daily workflow.
+        # Every era builder must actually HAVE the name after import.
+        for name in ERA_BUILDERS:
+            with self.subTest(builder=name):
+                mod = load_module(name)
+                self.assertTrue(hasattr(mod, "knesset_type"),
+                                f"{name}: knesset_type missing at module level "
+                                "(import inside docstring/string?)")
+
+
 class ShardUploaderCorporaTest(unittest.TestCase):
     def test_uploader_knows_every_client_corpus(self):
         mod = load_module("upload_search_shards.py")
@@ -95,14 +109,16 @@ class FrontendEraHelpersTest(unittest.TestCase):
 
 class EraLiteralFreezeTest(unittest.TestCase):
     """No NEW era-dependent code paths. The count of KN/kn === <number>
-    comparisons in index.html is frozen at the Phase-1 baseline (the
-    per-era renderers/dataset globals documented as Phase 2 in
-    ROADMAP's era contract). Adding an era branch anywhere else is how
-    the K26 divergences happened; if one is truly justified, bump the
-    baseline IN THE SAME COMMIT with the justification in ROADMAP —
-    that bump is the reviewable act, never a silent edit."""
+    comparisons in index.html is frozen at 2 — both inside the era
+    accessor layer itself (eraCorpus, voteModelAny), the one place era
+    numbers are data. Everything else routes through ERAS /
+    ERA_DATASETS / eraClosed / CURRENT_KN / ERA_PAGE_VARIANTS. Adding
+    an era branch anywhere else is how the K26 divergences happened;
+    if one is truly justified, bump the baseline IN THE SAME COMMIT
+    with the justification in ROADMAP — that bump is the reviewable
+    act, never a silent edit."""
 
-    BASELINE = 92
+    BASELINE = 2
 
     def test_era_literal_count_frozen(self):
         html = (ROOT / "index.html").read_text("utf-8")

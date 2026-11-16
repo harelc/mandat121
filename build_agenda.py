@@ -3,7 +3,6 @@
 Build data/agenda.json — "what's on this week's agenda" for המנדט ה־121.
 
 The official knesset.gov.il agenda page joins two things, and so do we —
-from era_registry import knesset_type
 from the official OData v4 feed only (main.knesset.gov.il is Radware-walled
 to scripts; see KNESSET_APIS.md / ROADMAP working rules):
 
@@ -27,6 +26,7 @@ never backfilled.
 Stdlib only, no auth. Explicit $skip/$top pagination (nextLink hangs on
 filtered queries — see KNESSET_APIS.md). Usage: python3 build_agenda.py
 """
+from era_registry import knesset_type
 import json
 import time
 import urllib.parse
