@@ -19,6 +19,16 @@ CI; never committed — CWE-798): R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY,
 R2_ENDPOINT (https://<account>.r2.cloudflarestorage.com).
 Optional: R2_BUCKET (default mandat121protocols), R2_PUBLIC_BASE
 (default the site's r2.dev URL). Stdlib only, AWS SigV4 signing inline.
+
+Usage: upload_search_shards.py [--corpora c,p,c26,p26] [--force]
+       upload_search_shards.py --diagnose
+Default uploads every corpus. --corpora restricts to a subset; the
+bucket manifest keeps its entries for corpora not selected. A selected
+corpus that is SMALLER than what the bucket already serves (fewer
+shards, or materially fewer bytes) is refused — the committed
+data/search_c is a 268-sitting fallback while the bucket holds the
+full backfilled corpus, so uploading the checkout verbatim would
+regress live search. --force overrides, loudly.
 """
 import hashlib
 import hmac
@@ -163,6 +173,31 @@ def local_corpus(d):
     return files, version
 
 
+def parse_selection(argv, known):
+    """(--corpora a,b selection, --force?) from argv. Default: all."""
+    selected, force = set(known), "--force" in argv
+    for i, a in enumerate(argv):
+        spec = None
+        if a == "--corpora" and i + 1 < len(argv):
+            spec = argv[i + 1]
+        elif a.startswith("--corpora="):
+            spec = a.split("=", 1)[1]
+        if spec is not None:
+            selected = {x.strip() for x in spec.split(",") if x.strip()}
+    return selected, force
+
+
+def is_shrink(old_entry, n_files, total_bytes):
+    """True if a local corpus would repoint the bucket at less data
+    than it already serves for that corpus."""
+    shards = (old_entry or {}).get("shards") or {}
+    if not shards:
+        return False
+    old_bytes = sum(m[1] for m in shards.values()
+                    if isinstance(m, list) and len(m) > 1)
+    return n_files < len(shards) or total_bytes < old_bytes * 0.98
+
+
 def diagnose():
     """List the buckets this token can see on the endpoint's account
     (names only). Settles bucket-name / wrong-account mismatches behind
@@ -212,23 +247,53 @@ def main():
             return 1
     if "--diagnose" in sys.argv:
         return diagnose()
+    selected, force = parse_selection(sys.argv[1:], CORPORA)
+    unknown = selected - set(CORPORA)
+    if unknown:
+        print(f"unknown corpora {sorted(unknown)} — known: {sorted(CORPORA)}")
+        return 1
+    old_ok = True
     try:
         req = urllib.request.Request(PUBLIC_BASE + "/manifest.json",
                                      headers={"Cache-Control": "no-cache"})
         with urllib.request.urlopen(req, timeout=30) as r:
             old = json.loads(r.read())
     except Exception:
-        old = {"corpora": {}}
+        old, old_ok = {"corpora": {}}, False
+    if not old_ok and selected != set(CORPORA):
+        print("REFUSED: bucket manifest unreadable, so unselected corpora "
+              "could not be preserved in it. Nothing uploaded.")
+        return 1
     manifest = {"version": 1, "corpora": {}}
     jobs = []  # (key, path, content_type, cache_control)
+    shrink_refusals = []
     for corpus, d in CORPORA.items():
+        old_c = (old.get("corpora") or {}).get(corpus) or {}
+        if corpus not in selected:
+            if old_c:
+                manifest["corpora"][corpus] = old_c  # preserved as served
+            print(f"search_{corpus}: not selected, bucket entry preserved")
+            continue
         if not d.exists():
+            if old_c:
+                manifest["corpora"][corpus] = old_c
             print(f"search_{corpus}: no local dir, skipped")
             continue
         files, version = local_corpus(d)
+        total_bytes = sum((d / n).stat().st_size for n in files)
+        if is_shrink(old_c, len(files), total_bytes) and not force:
+            shrink_refusals.append(
+                f"search_{corpus}: local {len(files)} shards/"
+                f"{total_bytes/1e6:.1f} MB < bucket's "
+                f"{len(old_c.get('shards') or {})} shards — refusing to "
+                f"repoint live search at less data (is this the committed "
+                f"fallback corpus? rerun committee-backfill, or --force "
+                f"if the shrink is deliberate)")
+            if old_c:
+                manifest["corpora"][corpus] = old_c
+            continue
         manifest["corpora"][corpus] = {"version": version, "shards": {
             n: [h, (d / n).stat().st_size] for n, h in files.items()}}
-        old_c = (old.get("corpora") or {}).get(corpus) or {}
         old_shards = old_c.get("shards") or {}
         def old_hash(meta):
             return meta[0] if isinstance(meta, list) else meta
@@ -239,6 +304,11 @@ def main():
             jobs.append((f"shards/{version}/search_{corpus}/{n}", d / n,
                          "application/json",
                          "public, max-age=86400, immutable"))
+    if shrink_refusals:
+        for r in shrink_refusals:
+            print("REFUSED: " + r)
+        print("Nothing uploaded.")
+        return 1
     # 2 GB guard (pre-flight). Preferred accounting: S3 LIST of the
     # whole bucket (sees EVERYTHING, including any stray objects the
     # ledger doesn't know). If LIST is forbidden (object-scoped token),
