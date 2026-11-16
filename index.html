@@ -4599,10 +4599,16 @@ function mkContactHTML(name){
   // Wikidata-discovered X (build_mk_wiki.py): only when the Knesset publishes none.
   // Provenance is kept visibly separate — never presented as Knesset-official.
   const wdX=(!c.twitter&&WIKI[name]?.x_handles?.length)?WIKI[name].x_handles[0]:'';
+  // Knesset profile URL derived from mk_id (present in both eras'
+  // contact files) rather than the stored knesset_profile field: that
+  // field only ever landed in the regenerated K26 file, while the
+  // frozen K25 snapshot has mk_id but no profile field. No mk_id, no
+  // chip — never a ".../None" link.
+  const profileUrl=c.mk_id?`https://main.knesset.gov.il/mk/apps/mk/mk-personal-details/${esc(c.mk_id)}`:'';
   return `<div class="card pad" style="margin-top:.85rem"><h3><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m4 7.5 8 6 8-6"/></svg> יצירת קשר רשמית <small class="dim">כפי שמפורסם באתר הכנסת${live!==undefined?` · נוכחות חיה נכון ל־${esc(liveWhen)}`:''}</small></h3>
   <div style="display:flex;gap:.45rem;flex-wrap:wrap;margin-top:.55rem;align-items:center">
   ${live!==undefined?chipFor(live):''}
-  ${c.knesset_profile?`<a class="chip acc" href="${esc(c.knesset_profile)}" target="_blank" rel="noopener" title="פרופיל באתר הכנסת">פרופיל באתר הכנסת ↗</a>`:''}
+  ${profileUrl?`<a class="chip acc" href="${profileUrl}" target="_blank" rel="noopener" title="פרופיל באתר הכנסת">פרופיל באתר הכנסת ↗</a>`:''}
   ${c.email?`<a class="chip acc" href="mailto:${esc(c.email)}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5.5" width="18" height="13" rx="2"/><path d="m4 7.5 8 6 8-6"/></svg> ${esc(c.email)}</a>`:''}
   ${c.phone?`<a class="chip" href="tel:${esc(c.phone.replace(/[^0-9+]/g,''))}"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M5 4h4l1.5 4.5L8 10a12 12 0 0 0 6 6l1.5-2.5L20 15v4a2 2 0 0 1-2.2 2A17.5 17.5 0 0 1 3 6.2 2 2 0 0 1 5 4z"/></svg> ${esc(c.phone)}</a>`:''}
   ${soc.map(([k,l])=>`<a class="chip" href="${esc(c[k])}" target="_blank" rel="noopener">${l} ↗</a>`).join('')}

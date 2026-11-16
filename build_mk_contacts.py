@@ -77,7 +77,8 @@ def main():
             continue
         out[key] = {
             "mk_id": m.get("MkId"),
-            "knesset_profile": f"https://main.knesset.gov.il/mk/apps/mk/mk-personal-details/{m.get('MkId')}",
+            "knesset_profile": (f"https://main.knesset.gov.il/mk/apps/mk/mk-personal-details/{m.get('MkId')}"
+                                if m.get("MkId") else ""),
             "email": (m.get("Email") or "").strip(),
             "phone": (m.get("Phone") or "").strip(),
             "fax": (m.get("Fax") or "").strip(),
