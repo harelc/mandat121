@@ -1493,14 +1493,19 @@ function voteMkVotes(m){ if(!m) return []; if(!m.mk_votes) m.mk_votes=mkVotesFor
    idempotent; a legacy bill key maps to that bill's highest-reading,
    latest vote, which is the vote it originally pointed at. */
 function migrateMyVotes(){
+  // Era-aware: vote/bill ids are globally unique across Knessets, so a
+  // key resolves against EITHER era's indexes. (Was K25-only — it ran
+  // when the K25 archive landed and silently deleted every K26 "my
+  // vote", e.g. the sitting-2 vote 46716, from both stores.)
+  const isVote=id=>VOTE_BY_ID[id]||K26V_BY_ID[id];
   for(const st of Object.values(STORE)){
     const out={};
     for(const [k,val] of Object.entries(st.myVotes||{})){
       let nk=null;
       if(k.startsWith('__v')) nk=k.slice(3);
       else if(ALLB_BY_ID[k]&&(ALLB_BY_ID[k].votes||[]).length){ const bv=[...ALLB_BY_ID[k].votes].sort((x,y)=>y.reading-x.reading||(y.date||'').localeCompare(x.date||''))[0]; nk=String(bv.vote_id) }
-      else if(VOTE_BY_ID[k]) nk=k;
-      if(nk&&VOTE_BY_ID[nk]&&!(nk in out)) out[nk]=val;
+      else if(isVote(k)) nk=k;
+      if(nk&&isVote(nk)&&!(nk in out)) out[nk]=val;
     }
     st.myVotes=out;
   }
