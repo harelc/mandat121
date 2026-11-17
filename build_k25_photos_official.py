@@ -30,28 +30,53 @@ def photo_path(name):
 def norm(s):
     return " ".join(str(s).replace("'", "").replace("׳", "").split())
 
+TARGET_KNESSET = 25
+
+def pick_row(candidates):
+    """Pick one API row from all rows matching a name.
+
+    The API returns one row per (person, Knesset term), and distinct
+    people can share a name — e.g. כהן אלי is both MkId 714 (b. 1949,
+    Knesset 15 only) and MkId 928 (b. 1972, Knessets 20-26, the K25
+    minister). Taking the first name match (the old setdefault) served
+    the 714 portrait for the K25 MK. Prefer a row from the target
+    Knesset, which only the right person can have; fall back to the
+    most recent term otherwise.
+    """
+    if not candidates:
+        return None
+    in_target = [r for r in candidates if r.get("Knesset") == TARGET_KNESSET]
+    pool = in_target or candidates
+    return max(pool, key=lambda r: (r.get("Knesset") or 0, r.get("MkId") or 0))
+
+def index_rows(rows):
+    by_key, by_norm = {}, {}
+    for row in rows:
+        if row.get("ImgPath"):
+            key = f"{row['LastName']} {row['FirstName']}"
+            by_key.setdefault(key, []).append(row)
+            by_norm.setdefault(norm(key), []).append(row)
+    return by_key, by_norm
+
+def find_row(by_key, by_norm, key):
+    pool = list(by_key.get(key, ())) + list(by_norm.get(norm(key), ()))
+    if not pool:
+        toks = key.split()
+        for cand in (" ".join(toks[1:] + toks[:1]), " ".join([toks[-1]] + toks[:-1])):
+            pool += by_key.get(cand, ())
+            pool += by_norm.get(norm(cand), ())
+            if pool:
+                break
+    return pick_row(pool)
+
 def main():
     req = urllib.request.Request(API, headers=UA)
     with urllib.request.urlopen(req, timeout=120) as r:
         rows = json.load(r)["mkPrevious"]
-    by_key = {}
-    for row in rows:
-        if row.get("ImgPath"):
-            by_key.setdefault(f"{row['LastName']} {row['FirstName']}", row)
-    by_norm = {norm(k): k for k in by_key}
+    by_key, by_norm = index_rows(rows)
 
     def find(key):
-        if key in by_key:
-            return by_key[key]
-        if norm(key) in by_norm:
-            return by_key[by_norm[norm(key)]]
-        toks = key.split()
-        for cand in (" ".join(toks[1:] + toks[:1]), " ".join([toks[-1]] + toks[:-1])):
-            if cand in by_key:
-                return by_key[cand]
-            if norm(cand) in by_norm:
-                return by_key[by_norm[norm(cand)]]
-        return None
+        return find_row(by_key, by_norm, key)
 
     mkp = json.load(open(DATA / "mk_photos.json", encoding="utf-8"))
     targets = {}  # name -> kind
