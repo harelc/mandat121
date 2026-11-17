@@ -396,6 +396,17 @@
     "faction": null,
     "gov": null,
     "from": "2026-11-10",
+    "to": "2026-11-17"
+   }
+  ],
+  "כהנא מתן": [
+   {
+    "role": "יושב–ראש הכנסת",
+    "kind": "knesset",
+    "ministry": null,
+    "faction": null,
+    "gov": null,
+    "from": "2026-11-17",
     "to": null
    }
   ]
