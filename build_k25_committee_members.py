@@ -62,8 +62,36 @@ def get(entity, filt, base=None):
             return rows
         skip += len(vals)
 
+# Canonical name = the vote-harvest spelling; other sources' spellings of
+# the same person collapse onto it. Identical to WANTED_ALIAS in
+# build_k25_tenure.py / build_k25_roles.py (mirrors NAME_CANON in
+# index.html) — keep in sync. This builder missed it, so its name pool
+# held both סגלוביץ יואב (CEC preview) and סגלוביץ' יואב (vote harvest)
+# for one person.
+WANTED_ALIAS = {"גנץ בני": "גנץ בנימין", "סגלוביץ יואב": "סגלוביץ' יואב",
+                "מלקו צגה צגנש": "מלקו צגה", "סטרוק אורית": "סטרוק אורית מלכה",
+                "פינדרוס יצחק זאב": "פינדרוס יצחק"}
+
+
 def norm(s):
-    return " ".join(str(s).replace("'", "").replace("׳", "").split())
+    return " ".join(str(s).replace("'", "").replace("׳", "").replace("’", "").split())
+
+
+def canonical_names(names):
+    """{norm(name): canonical spelling} — one deterministic spelling per
+    person. Iterating the raw `wanted` set instead picks whichever
+    spelling hash order surfaces last (PYTHONHASHSEED differs per run),
+    so this file flip-flopped סגלוביץ <-> סגלוביץ' between hourly runs,
+    each flip a data commit + deploy + notification issue (e.g. #38)."""
+    orig = {}
+    for w in sorted({WANTED_ALIAS.get(n, n) for n in names}):
+        k = norm(w)
+        # Collision not covered by WANTED_ALIAS: the apostrophe spelling
+        # is the canonical one (vote harvest / tenure / roles).
+        if k not in orig or ("'" in w and "'" not in orig[k]):
+            orig[k] = w
+    return orig
+
 
 def main():
     ap = argparse.ArgumentParser()
@@ -102,7 +130,7 @@ def main():
     if not wanted:
         print(f"K{kn}: no name pool to match persons against — skipping")
         return
-    orig = {norm(w): w for w in wanted}
+    orig = canonical_names(wanted)
     wanted_n = set(orig)
     ALIAS = {"גנץ בנימין": "גנץ בני"}
 

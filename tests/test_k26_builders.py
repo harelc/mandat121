@@ -89,6 +89,40 @@ class K26CommitteeMembersTest(unittest.TestCase):
         self.assertEqual(out["by_mk"][name][0]["role"], "chair")
         self.assertEqual(out["by_committee"]["99"][0]["name"], name)
 
+    def test_canonical_spelling_wins_when_pool_has_both(self):
+        # Regression (issue #38): the CEC preview spells him סגלוביץ
+        # and the vote harvest סגלוביץ' — the builder must emit the
+        # canonical (vote-harvest) spelling deterministically, not
+        # whichever the wanted set's hash order surfaces that run.
+        mod = load_module("build_k25_committee_members.py")
+        self.assertEqual(
+            mod.canonical_names(["סגלוביץ יואב", "סגלוביץ' יואב"]),
+            {"סגלוביץ יואב": "סגלוביץ' יואב"})
+        self.assertEqual(
+            mod.canonical_names(["סגלוביץ' יואב", "סגלוביץ יואב"]),
+            {"סגלוביץ יואב": "סגלוביץ' יואב"})
+
+        person = {"PersonID": 7, "LastName": "סגלוביץ", "FirstName": "יואב"}
+
+        def fake_get(entity, filt, base=None):
+            if entity == "KNS_Person":
+                return [person]
+            return [{"PersonID": 7, "PositionID": 42, "CommitteeID": 99,
+                     "CommitteeName": "ועדת החוץ והביטחון",
+                     "StartDate": "2026-11-11", "FinishDate": None}]
+
+        with tempfile.TemporaryDirectory() as td:
+            data = Path(td)
+            shutil.copy(ROOT / "data" / "k26_preview.json", data / "k26_preview.json")
+            (data / "k26_vote_results.json").write_text(json.dumps(
+                {"names": ["סגלוביץ' יואב"]}, ensure_ascii=False), "utf-8")
+            mod.DATA, mod.get = data, fake_get
+            sys.argv = ["build_k25_committee_members.py", "--knesset", "26"]
+            mod.main()
+            out = json.loads((data / "k26_committee_members.json").read_text("utf-8"))
+        self.assertEqual(list(out["by_mk"]), ["סגלוביץ' יואב"])
+        self.assertEqual(out["by_committee"]["99"][0]["name"], "סגלוביץ' יואב")
+
 
 class K26ListOrderTest(unittest.TestCase):
     def test_ranks_match_preview_order(self):

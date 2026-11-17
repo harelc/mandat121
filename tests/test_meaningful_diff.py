@@ -55,6 +55,26 @@ class MeaningfulDiffTest(unittest.TestCase):
     def test_non_json_byte_change_is_meaningful(self):
         self.assertTrue(mod.is_meaningful(b"\xff\x00a", b"\xff\x00b"))
 
+    def test_geresh_only_name_flip_is_noise(self):
+        # Issue #38: the whole commit was סגלוביץ -> סגלוביץ' in a
+        # by_mk dict key plus the matching by_committee name value.
+        old = enc({"by_mk": {"סגלוביץ יואב": [{"committee_id": 4289, "role": "member"}]},
+                   "by_committee": {"4289": [{"name": "סגלוביץ יואב", "role": "member"}]}})
+        for spelling in ("סגלוביץ' יואב", "סגלוביץ׳ יואב", "סגלוביץ’ יואב"):
+            new = enc({"by_mk": {spelling: [{"committee_id": 4289, "role": "member"}]},
+                       "by_committee": {"4289": [{"name": spelling, "role": "member"}]}})
+            self.assertFalse(mod.is_meaningful(old, new), spelling)
+
+    def test_punctuation_flip_hiding_real_change_still_meaningful(self):
+        old = enc({"by_mk": {"סגלוביץ יואב": [{"committee_id": 4289, "role": "member"}]}})
+        new = enc({"by_mk": {"סגלוביץ' יואב": [{"committee_id": 4289, "role": "chair"}]}})
+        self.assertTrue(mod.is_meaningful(old, new))
+
+    def test_real_name_change_is_meaningful(self):
+        old = enc({"by_mk": {"סגלוביץ יואב": []}})
+        new = enc({"by_mk": {"סגלוביץ' דוד": []}})
+        self.assertTrue(mod.is_meaningful(old, new))
+
 
 if __name__ == "__main__":
     unittest.main()
