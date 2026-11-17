@@ -2922,14 +2922,22 @@ function presenceGridHTML(seats){
   <span class="small dim">${pgMode==='week'?'עוצמת התא = שיעור ימי המעקב באותו שבוע שבהם נכח/ה':'מוצגים '+Math.min(pgLimit,total)+' הימים האחרונים מתוך '+total+' ימי מעקב'}</span></div>
   <div class="pg-scroll"><div class="pg-stage" id="pgStage"><canvas id="pgCanvas"></canvas><div class="pg-tip" id="pgTip"></div></div></div>
   ${pgMode==='day'&&total>pgLimit?`<div style="margin-top:.55rem"><button class="btn ghost small" onclick="pgLimit+=60;renderNow26()">הצגת 60 ימים קודמים נוספים</button></div>`:''}
-  <p class="small dim" style="margin-top:.55rem">מעבר עכבר או נגיעה מציגים ח״כ ותאריך; לחיצה על התא פותחת את דף הח״כ/ית (במסך מגע: נגיעה שנייה באותו תא). העמודות בסדר המפה למעלה; מי שעזב/ה את הכנסת אינו בעמודות, אבל ימי הנוכחות שלו/ה נשמרים בדף האישי.</p></section>`;
+  <p class="small dim" style="margin-top:.55rem">מעבר עכבר או נגיעה מציגים ח״כ ותאריך; לחיצה על התא פותחת את דף הח״כ/ית (במסך מגע: נגיעה שנייה באותו תא). שורת ה<b>סה״כ</b> למטה: גובה העמודה = ימי הנוכחות מתוך כל ימי המעקב — עברו עליה למספר המדויק, ולחיצה פותחת את דף הח״כ/ית. העמודות בסדר המפה למעלה; מי שעזב/ה את הכנסת אינו בעמודות, אבל ימי הנוכחות שלו/ה נשמרים בדף האישי.</p></section>`;
 }
 let pgTap=null, pgTouch=false; // touch has no hover: first tap pins a cell (below), second tap on the same cell opens it
-function pgCellAt(mx,my){ if(!PG||mx>PG.gridR) return null; const c=Math.floor((PG.gridR-mx)/PG.pitch), r=Math.floor((my-PG.headH)/PG.rowH); return (c>=0&&c<PG.ncols&&r>=0&&r<PG.rows.length)?{c,r}:null }
+function pgCellAt(mx,my){ if(!PG||mx>PG.gridR) return null; const c=Math.floor((PG.gridR-mx)/PG.pitch); if(c<0||c>=PG.ncols) return null;
+  if(my>=PG.sumY&&my<PG.sumY+PG.sumH) return {c,sum:true}; // bottom totals strip
+  const r=Math.floor((my-PG.headH)/PG.rowH); return (r>=0&&r<PG.rows.length)?{c,r}:null }
 function pgShowTip(c,r,mx,my){
   const tip=document.getElementById('pgTip'); if(!tip||!PG) return;
-  const col=PG.m.cols[c], row=PG.rows[r], val=row.cells[c];
+  const col=PG.m.cols[c];
+  if(r<0){ // sum row: exact total + share of tracked days (the bar alone can't carry that precision)
+    const tot=PG.m.totalDays, pct=tot?Math.round(100*col.total/tot):0;
+    tip.innerHTML=`<b>${esc(disp(col.raw))}</b> · ${esc(shortF(col.faction))}<br>סה״כ נוכחות: <b>${col.total} מתוך ${tot} ימי מעקב</b> (${pct}%)<br><span class="dim">גובה מלא = כל ${tot} הימים</span>`;
+  } else {
+  const row=PG.rows[r], val=row.cells[c];
   tip.innerHTML=`<b>${esc(disp(col.raw))}</b> · ${esc(shortF(col.faction))}<br>${row.date?`${fmtDate(row.date)} — ${val?'נכח/ה במשכן':'לא נכח/ה'}`:`שבוע ${fmtDate(row.weekOf)} — נכח/ה ${Math.round(val*row.ndays)} מתוך ${row.ndays} ימי מעקב`} · סה״כ ${col.total} ימי נוכחות`;
+  }
   tip.style.display='block'; const tw=tip.offsetWidth, th=tip.offsetHeight;
   tip.style.left=Math.max(0,Math.min(mx+14,PG.W-tw-4))+'px';
   // Flip above the cursor when below would clip — with a single
@@ -2943,13 +2951,17 @@ function drawPresenceGrid(hover){
   if(!window._pgResize){ window._pgResize=true; addEventListener('resize',()=>{ if(document.getElementById('pgCanvas')) drawPresenceGrid() }) }
   const m=pgModel(PG_SEATS), rows=pgRows(m), cs=getComputedStyle(document.documentElement);
   const ink=cs.getPropertyValue('--ink').trim()||'#222', dim=cs.getPropertyValue('--dim').trim()||'#888', line=cs.getPropertyValue('--line').trim()||'#ddd';
-  const labelW=64, headH=22, footH=22, ncols=Math.max(1,m.cols.length);
+  // Sum row: tall enough that totals differing by a few days read as
+  // visibly different bar heights (was footH=22 -> <=13px bars, where a
+  // 5-day gap in 50 tracked days is ~1px). 60px + quarter scale lines
+  // separate coarse levels at a glance; hover/tap gives the exact count.
+  const labelW=64, headH=22, sumH=60, ncols=Math.max(1,m.cols.length);
   const pitch=Math.max(3,(W-labelW)/ncols), cellH=Math.max(4,Math.min(11,pitch)), rowH=cellH+1;
-  const H=headH+rows.length*rowH+footH+4, dpr=window.devicePixelRatio||1;
+  const sumY=headH+rows.length*rowH+6, H=sumY+sumH+8, dpr=window.devicePixelRatio||1;
   cv.width=W*dpr; cv.height=H*dpr; cv.style.height=H+'px';
   const x=cv.getContext('2d'); x.scale(dpr,dpr); x.clearRect(0,0,W,H);
   const gridR=W-labelW, cellX=c=>gridR-(c+1)*pitch; // RTL: MK #1 at the right
-  PG={m,rows,pitch,cellH,rowH,headH,labelW,gridR,ncols,W,H};
+  PG={m,rows,pitch,cellH,rowH,headH,labelW,gridR,ncols,W,H,sumY,sumH};
   // faction blocks on the top axis
   let i=0; x.textAlign='center'; x.textBaseline='middle';
   while(i<m.cols.length){ let j=i; while(j+1<m.cols.length&&m.cols[j+1].faction===m.cols[i].faction) j++;
@@ -2961,24 +2973,29 @@ function drawPresenceGrid(hover){
     x.fillStyle=dim; x.textAlign='right'; x.fillText(r.label,W-2,y+cellH/2);
     r.cells.forEach((v,c)=>{ x.fillStyle=v?m.cols[c].color:line; x.globalAlpha=v?(v>=1?1:.25+.75*v):.55; x.fillRect(cellX(c)+.5,y,pitch-1,cellH) });
     x.globalAlpha=1 });
-  // per-MK totals strip along the bottom
-  const fy=headH+rows.length*rowH+5;
-  x.fillStyle=dim; x.textAlign='right'; x.fillText('סה״כ ימים',W-2,fy+(footH-8)/2);
-  m.cols.forEach((c,ci)=>{ const h=Math.max(1,(footH-9)*(m.totalDays?c.total/m.totalDays:0)); x.fillStyle=c.color; x.globalAlpha=.9; x.fillRect(cellX(ci)+.5,fy+footH-8-h,pitch-1,h) });
+  // per-MK totals strip along the bottom (hoverable — see pgCellAt)
+  const fy=sumY;
+  x.strokeStyle=line; x.lineWidth=1; x.globalAlpha=.65;
+  for(let q=0;q<=4;q++){ const y=fy+sumH-q*sumH/4; x.beginPath(); x.moveTo(0,y); x.lineTo(gridR,y); x.stroke() }
   x.globalAlpha=1;
-  if(hover){ x.strokeStyle=ink; x.lineWidth=1.4; x.strokeRect(cellX(hover.c)+.5,headH+hover.r*rowH,pitch-1,cellH) }
+  x.fillStyle=dim; x.textAlign='right'; x.font='9px system-ui';
+  x.fillText('סה״כ ימים',W-2,fy+sumH/2-6);
+  x.fillText(m.totalDays?`מתוך ${m.totalDays}`:'',W-2,fy+sumH/2+6);
+  m.cols.forEach((c,ci)=>{ const h=c.total?Math.max(2,sumH*(m.totalDays?c.total/m.totalDays:0)):0; x.fillStyle=c.color; x.globalAlpha=.9; x.fillRect(cellX(ci)+.5,fy+sumH-h,pitch-1,h) });
+  x.globalAlpha=1;
+  if(hover){ x.strokeStyle=ink; x.lineWidth=1.4; x.strokeRect(cellX(hover.c)+.5,hover.sum?fy:headH+hover.r*rowH,pitch-1,hover.sum?sumH:cellH) }
   if(!cv._pgBound){ cv._pgBound=true;
     cv.addEventListener('pointerdown',e=>{ pgTouch=e.pointerType==='touch'||e.pointerType==='pen' });
     cv.addEventListener('mousemove',e=>{ if(!PG||pgTouch) return; const rect=cv.getBoundingClientRect(), mx=e.clientX-rect.left, my=e.clientY-rect.top;
       const cell=pgCellAt(mx,my), tip=document.getElementById('pgTip');
       if(!cell){ if(tip) tip.style.display='none'; if(!pgRaf){pgRaf=true; requestAnimationFrame(()=>{pgRaf=false; drawPresenceGrid()})} return }
       if(!pgRaf){ pgRaf=true; requestAnimationFrame(()=>{ pgRaf=false; drawPresenceGrid(cell) }) }
-      pgShowTip(cell.c,cell.r,mx,my) });
+      pgShowTip(cell.c,cell.sum?-1:cell.r,mx,my) });
     cv.addEventListener('mouseleave',()=>{ const tip=document.getElementById('pgTip'); if(tip) tip.style.display='none'; pgTap=null; drawPresenceGrid() });
     cv.addEventListener('click',e=>{ if(!PG) return; const rect=cv.getBoundingClientRect(), mx=e.clientX-rect.left, my=e.clientY-rect.top;
       const cell=pgCellAt(mx,my); if(!cell) return;
-      if(pgTouch&&!(pgTap&&pgTap.c===cell.c&&pgTap.r===cell.r)){ // first tap only inspects — cells are ~5px, a blind tap would open the wrong MK
-        pgTap={...cell}; drawPresenceGrid(cell); pgShowTip(cell.c,cell.r,PG.gridR-(cell.c+.5)*PG.pitch,PG.headH+cell.r*PG.rowH+PG.cellH/2); return }
+      if(pgTouch&&!(pgTap&&pgTap.c===cell.c&&pgTap.r===cell.r&&!!pgTap.sum===!!cell.sum)){ // first tap only inspects — cells are ~5px, a blind tap would open the wrong MK
+        pgTap={...cell}; drawPresenceGrid(cell); pgShowTip(cell.c,cell.sum?-1:cell.r,PG.gridR-(cell.c+.5)*PG.pitch,cell.sum?PG.sumY+PG.sumH/2:PG.headH+cell.r*PG.rowH+PG.cellH/2); return }
       pgTap=null; openMk(PG.m.cols[cell.c].raw) });
   }
 }
