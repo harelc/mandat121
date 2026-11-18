@@ -3164,9 +3164,14 @@ function agendaItemHTML(it){
   const name=link?`<a href="#" onclick="event.preventDefault();event.stopPropagation();openBillPage('${it.item_id}')">${esc(it.name)}</a>`:esc(it.name);
   return `<li>${name}${it.item_type?` <span class="dim">· ${esc(it.item_type)}</span>`:''}${it.status?`<br><span class="dim">${esc(it.status)}</span>`:''}</li>`;
 }
+/* Plenum order of business, presentation order: draft laws (הצעת חוק)
+   after the sitting's other business (agenda motions, queries, one-minute
+   speeches…). Display-only — the stored items keep the official Ordinal
+   order, and the stable sort keeps that order inside each group. */
+const billsLast=items=>[...(items||[])].sort((a,b)=>(a.item_type==='הצעת חוק')-(b.item_type==='הצעת חוק'));
 function agendaPlenumHTML(s,max=6){
   return `<div class="agenda-sess"><div style="display:flex;gap:.4rem;align-items:center;flex-wrap:wrap"><span class="chip acc"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="4" width="18" height="17" rx="2"/><path d="m8.5 12.5 2.5 2.5 5-5.5"/></svg> מליאה</span><b>${esc((s.start||'').slice(11,16))}</b><span class="small muted">ישיבה מס׳ ${s.number||''}${s.special?' · ישיבה מיוחדת':''}</span><span class="small dim">${s.items.length} פריטים על סדר היום</span>${plenumProtoChip(s.id)}<button class="btn ghost small" style="padding:.25rem .65rem;margin-inline-start:auto" onclick="openPlenum('${s.id}')">לישיבה ←</button></div>
-  ${s.items.length?`<ol class="agenda-items">${s.items.slice(0,max).map(agendaItemHTML).join('')}${s.items.length>max?`<li class="dim">…ועוד ${s.items.length-max} פריטים</li>`:''}</ol>`:'<div class="small muted">סדר היום טרם פורסם</div>'}</div>`;
+  ${s.items.length?`<ol class="agenda-items">${billsLast(s.items).slice(0,max).map(agendaItemHTML).join('')}${s.items.length>max?`<li class="dim">…ועוד ${s.items.length-max} פריטים</li>`:''}</ol>`:'<div class="small muted">סדר היום טרם פורסם</div>'}</div>`;
 }
 function agendaCmtHTML(s,max=4){
   const cancelled=(s.status||'').includes('מבוטלת');
@@ -5296,7 +5301,7 @@ function renderPlenumSession(){
   const todayStr=agClientToday();
   const statusChip=!a?'':date>todayStr?'<span class="chip">מתוכננת</span>':date===todayStr?'<span class="chip acc">היום</span>':'<span class="chip">התקיימה</span>';
   const timeStr=a?`${(a.start||'').slice(11,16)}${a.finish?`–${String(a.finish).slice(11,16)}`:''}`:'';
-  const agendaSec=a?`<h3 style="margin-top:1rem">על סדר היום${date>=todayStr?' <small class="dim">כפי שפורסם מראש בסדר היום הרשמי</small>':''}</h3>${(a.items||[]).length?`<div class="rows" style="margin:.4rem -.9rem 0">${a.items.map(it=>{ const link=it.in_dataset&&billAny(it.item_id); return `<div class="row" ${link?`onclick="openBillPage('${it.item_id}')"`:'style="cursor:default"'}><span class="flex">${esc(it.name)}${it.item_type?`<br><span class="dim small">${esc(it.item_type)}</span>`:''}${it.status?`<br><span class="dim small">${esc(it.status)}</span>`:''}</span>${link?'<span class="chip acc">לחוק ←</span>':''}</div>` }).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">סדר היום טרם פורסם לישיבה זו.</p>'}`:'';
+  const agendaSec=a?`<h3 style="margin-top:1rem">על סדר היום${date>=todayStr?' <small class="dim">כפי שפורסם מראש בסדר היום הרשמי</small>':''}</h3>${(a.items||[]).length?`<div class="rows" style="margin:.4rem -.9rem 0">${billsLast(a.items).map(it=>{ const link=it.in_dataset&&billAny(it.item_id); return `<div class="row" ${link?`onclick="openBillPage('${it.item_id}')"`:'style="cursor:default"'}><span class="flex">${esc(it.name)}${it.item_type?`<br><span class="dim small">${esc(it.item_type)}</span>`:''}${it.status?`<br><span class="dim small">${esc(it.status)}</span>`:''}</span>${link?'<span class="chip acc">לחוק ←</span>':''}</div>` }).join('')}</div>`:'<p class="muted small" style="margin-top:.4rem">סדר היום טרם פורסם לישיבה זו.</p>'}`:'';
   const protoNote=p?'':`<div class="small muted" style="margin-top:.8rem">${date>todayStr?'דברי הכנסת — הפרוטוקול הרשמי המלא — יתפרסמו אחרי הישיבה, ויופיעו בעמוד הזה עם חיפוש מלא.':date===todayStr?'הישיבה מתקיימת היום — דברי הכנסת יתפרסמו אחריה ויופיעו בעמוד הזה.':'לישיבה זו טרם פורסמו דברי כנסת במאגר הרשמי — כשיופיעו, ייפתח בעמוד הזה הפרוטוקול המלא.'}</div>`;
   app.innerHTML=`
   ${backBtnHTML('plenum','› כל ישיבות המליאה')}
@@ -5773,6 +5778,8 @@ function renderMine(){
   // followed bills (the snapshot feed below cannot claim these).
   if(EVENTS) for(const e of EVENTS){
     if(e.type==='status_change'&&fbIds.has(String(e.bill_id))) pushFeed(e.date,'🔀',`חוק במעקב שינה שלב: ${e.name||''}`,`${e.from||'—'} ← ${e.to||''} · כנסת ${e.kn}`,`openBillPage('${e.bill_id}')`);
+    else if(e.type==='new_bill'&&fbIds.has(String(e.bill_id))) pushFeed(e.date,'📜',`חוק במעקב הונח: ${e.name||''}`,`${e.status||'הצעת חוק חדשה'} · כנסת ${e.kn}`,`openBillPage('${e.bill_id}')`,`bill:${e.bill_id}`);
+    else if(e.type==='new_bill_doc'&&fbIds.has(String(e.bill_id))) pushFeed(e.date,'📄',`נוסח חדש לחוק במעקב: ${e.name||''}`,`${(e.docs||[]).join(' · ')||'מסמך חדש'} · כנסת ${e.kn}`,`openBillPage('${e.bill_id}')`);
     else if(e.type==='new_vote'&&e.item_id&&fbIds.has(String(e.item_id))) pushFeed(e.date,'🗳️',`הצבעה חדשה על חוק במעקב: ${(ALLB_BY_ID[e.item_id]&&displayText(ALLB_BY_ID[e.item_id]))||e.name||''}`,`${e.for??''}–${e.against??''}`,`openVote('${e.vote_id}')`,`vote:${e.vote_id}`);
     else if(e.type==='new_session'&&(S.followCommittees||[]).map(String).includes(String(e.committee_id))) pushFeed(e.date,'🏛️',`ישיבה חדשה בוועדה במעקב: ${e.committee||cmtName(e.committee_id)}`,`ישיבת ועדה · כנסת ${e.kn}`,`openCommittee('${e.committee_id}')`,`session:${e.session_id}`);
   }

@@ -341,6 +341,9 @@ def event_highlights(ref, files):
             bill_name = e.get('name') or names.get(kn, {}).get(str(e.get('bill_id')), e.get('bill_id'))
             status = e.get('status')
             out.append(("bill", f"📜 New bill (K{kn}): {bill_name}" + (f" — {status}" if status else "")))
+        elif t == "new_bill_doc":
+            docs = ", ".join(e.get("docs") or [])
+            out.append(("bill", f"📄 New bill document (K{kn}): {e.get('name') or e.get('bill_id')}" + (f" — {docs}" if docs else "")))
         elif t == "status_change":
             out.append(("bill", f"📜 Bill status (K{kn}): {e.get('name') or ''} — {e.get('from')} → {e.get('to')}"))
         elif t == "new_vote":
