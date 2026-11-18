@@ -578,6 +578,21 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
 .bmc-btn:hover{transform:scale(1.05);box-shadow:0 4px 14px rgba(255,221,0,.5)}
 .bmc-btn img{width:18px;height:18px}
 .bmc-x{position:absolute;top:-6px;inset-inline-end:-6px;background:var(--surface2);border:1px solid var(--line);color:var(--dim);width:18px;height:18px;border-radius:50%;cursor:pointer;font-size:.65rem;line-height:1;padding:0;display:flex;align-items:center;justify-content:center;box-shadow:0 1px 3px rgba(0,0,0,.35)}
+/* support modal: operating-expenses appeal, shown after 2 min on site,
+   snoozed for a week on any dismissal (see script before </body>) */
+.support-modal-overlay{position:fixed;inset:0;background:rgba(38,34,26,.62);backdrop-filter:blur(4px);display:flex;align-items:center;justify-content:center;z-index:300;padding:1rem;animation:supportModalFade .25s ease}
+.support-modal-overlay[hidden]{display:none}
+@keyframes supportModalFade{from{opacity:0}to{opacity:1}}
+.support-modal{position:relative;background:var(--bg);color:var(--text);border:1px solid var(--line);border-radius:18px;max-width:430px;width:100%;padding:1.6rem 1.5rem 1.25rem;box-shadow:0 12px 40px rgba(20,16,8,.45)}
+.support-modal h2{font-size:1.2rem;font-weight:800;margin:0 0 .6rem;line-height:1.35}
+.support-modal p{font-size:.93rem;line-height:1.7;color:var(--mid);margin:0 0 1.25rem}
+.support-modal-actions{display:flex;flex-direction:column;gap:.6rem}
+.support-cta{display:block;text-align:center;background:#FFDD00;color:#000;font-weight:700;font-size:.98rem;padding:.75rem 1.1rem;border-radius:10px;text-decoration:none;box-shadow:0 2px 8px rgba(255,221,0,.3);transition:transform .15s,box-shadow .15s}
+.support-cta:hover{transform:translateY(-2px);box-shadow:0 4px 14px rgba(255,221,0,.5);text-decoration:none}
+.support-later{background:var(--surface);border:1px solid var(--line);color:var(--mid);font-family:inherit;font-size:.88rem;padding:.55rem 1.1rem;border-radius:10px;cursor:pointer}
+.support-later:hover{border-color:var(--accent);color:var(--accent)}
+.support-modal-close{position:absolute;top:.6rem;inset-inline-end:.6rem;width:1.75rem;height:1.75rem;border-radius:50%;border:1px solid var(--line);background:var(--surface2);color:var(--dim);font-size:.8rem;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
+.support-modal-close:hover{color:var(--text);border-color:var(--accent)}
 .fbar{display:flex;align-items:center;gap:.6rem;font-size:.83rem;padding:.35rem 0}
 .fbar .nm{width:7.2rem;flex-shrink:0;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;font-weight:600}
 .fbar .tr{flex:1}
@@ -729,11 +744,25 @@ footer{max-width:1120px;margin:0 auto;padding:0 1rem 6rem;color:var(--dim);font-
   <p>המנדט ה־121 — 120 נבחרו, ה־121 מפקח. מעקב אזרחי אחרי הכנסת. כל המידע מגיע מפרסומים רשמיים של הכנסת (חוקים, הצבעות המליאה, ועדות ודיונים של כנסת 26; כנסת 25 שמורה כאן במלואה). המעקב וההצבעות שלי נשמרים רק בדפדפן הזה.</p>
   <p class="foot-meta">&copy; הראל קין | <a href="https://creativecommons.org/licenses/by-nc-sa/4.0/" target="_blank" rel="noopener">CC BY-NC-SA 4.0</a></p>
   <div id="visit-line" hidden style="margin-top:.5rem"></div>
-  <div class="foot-bmc"><span id="bmc-wrap" class="bmc-wrap"><a class="bmc-btn" href="https://www.buymeacoffee.com/harelc" target="_blank" rel="noopener"><img src="https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg" alt="">אהבתם? רוצים לתמוך בפיתוח? קנו לי קפה</a><button type="button" class="bmc-x" onclick="document.getElementById('bmc-wrap').remove()" title="סגור" aria-label="סגירת כפתור התמיכה">&times;</button></span></div>
+  <div class="foot-bmc"><span id="bmc-wrap" class="bmc-wrap"><a class="bmc-btn" href="https://www.buymeacoffee.com/harelc" target="_blank" rel="noopener"><img src="https://cdn.buymeacoffee.com/buttons/bmc-new-btn-logo.svg" alt="">אהבתם ורוצים להשתתף בעלות הפעלת האתר? קנו לי כוס קפה</a><button type="button" class="bmc-x" onclick="document.getElementById('bmc-wrap').remove()" title="סגור" aria-label="סגירת כפתור התמיכה">&times;</button></span></div>
 </footer>
 
 <nav class="tabs" aria-label="ניווט ראשי"><div class="tabs-in" id="tabs"></div></nav>
 <div class="toast" id="toast"></div>
+
+<!-- Support modal: shown by the support-modal script before </body>
+     after 2 minutes on site; dismissed for a week. -->
+<div class="support-modal-overlay" id="supportModal" hidden>
+  <div class="support-modal" role="dialog" aria-modal="true" aria-labelledby="supportModalTitle">
+    <button type="button" class="support-modal-close" id="supportModalClose" aria-label="סגירת חלונית התמיכה">✕</button>
+    <h2 id="supportModalTitle">עולה כסף להפעיל את האתר הזה</h2>
+    <p>אם נהניתם מהאתר או שהוא עזר לכם, תרומה חד־פעמית קטנה תעזור מאוד כדי לשאת בעלויות התפעול של האתר. כל סכום עוזר להשאיר אותו באוויר ומעודכן.</p>
+    <div class="support-modal-actions">
+      <a class="support-cta" id="supportModalCta" href="https://www.buymeacoffee.com/harelc" target="_blank" rel="noopener">☕ לתרומה ב־Buy Me a Coffee</a>
+      <button type="button" class="support-later" id="supportModalLater">אחר כך</button>
+    </div>
+  </div>
+</div>
 
 <!-- Intro slideshow: schematic scenes, no screenshots. Populated/animated
      by the intro block at the end of the main script. -->
@@ -5976,6 +6005,52 @@ window.addEventListener('load',()=>{ setTimeout(()=>{
 
 loadStarCounts();
 load().catch(e=>{$('#app').innerHTML=`<div class="card empty"><div class="big"><svg class="icn" viewBox="0 0 24 24" aria-hidden="true"><path d="M12 4 2.8 20h18.4z"/><path d="M12 10v4.2M12 17.2v.3"/></svg></div>שגיאה בטעינת הנתונים: ${esc(e.message)}<br><span class="small">הריצו שרת מקומי: python3 -m http.server 8080 ופתחו את הדף הראשי</span></div>`});
+</script>
+<script>
+// Support modal (ported from elections-vote-transfer's i18n.js, with this
+// site's timing): appears after 2 minutes on the site, and any dismissal
+// — ✕, "אחר כך", backdrop, Esc, or clicking the CTA — snoozes it for a
+// week via a localStorage timestamp.
+(function(){
+  var KEY='m121_support_modal_dismissed_at';
+  var INTERVAL_MS=7*24*60*60*1000; // 1 week
+  var DELAY_MS=2*60*1000;           // 2 minutes
+  var overlay=document.getElementById('supportModal');
+  if(!overlay) return;
+  function snoozed(){
+    try{
+      var ts=parseInt(localStorage.getItem(KEY)||'0',10);
+      return ts>0 && (Date.now()-ts)<INTERVAL_MS;
+    }catch(e){ return false; }
+  }
+  function snooze(){
+    try{ localStorage.setItem(KEY,String(Date.now())); }catch(e){/* private mode */}
+  }
+  function dismiss(){
+    snooze();
+    overlay.hidden=true;
+    document.removeEventListener('keydown',onKey);
+  }
+  function onKey(e){ if(e.key==='Escape') dismiss(); }
+  function show(){
+    if(snoozed() || !overlay.hidden) return;
+    // Never stack over the intro slideshow or another modal; retry shortly.
+    var intro=document.getElementById('introOverlay');
+    if((intro && !intro.hidden) || document.getElementById('civicModal')){
+      setTimeout(show,10000);
+      return;
+    }
+    overlay.hidden=false;
+    document.addEventListener('keydown',onKey);
+    var close=document.getElementById('supportModalClose');
+    if(close) close.focus();
+  }
+  document.getElementById('supportModalClose').addEventListener('click',dismiss);
+  document.getElementById('supportModalLater').addEventListener('click',dismiss);
+  document.getElementById('supportModalCta').addEventListener('click',snooze);
+  overlay.addEventListener('click',function(e){ if(e.target===overlay) dismiss(); });
+  if(!snoozed()) setTimeout(show,DELAY_MS);
+})();
 </script>
 <script>
 // First-party traffic beacon (netlify/functions/hit.mjs). A "view" on
