@@ -5786,6 +5786,23 @@ function renderMine(){
   for(const b of fb){
     pushFeed(billActivityDate(b),'📜',`פעילות בחוק במעקב: ${displayText(b)}`,`${billActivityLabel(b)} · השלב כעת: ${statusBucket(b)}`,`openBillPage('${b.id}')`);
   }
+  // Catch-up journey milestones for followed bills: stages datable
+  // from the bill's own record even when they predate both the follow
+  // and the server event stream (which began Nov 2026) — a bill is
+  // usually starred only after it was laid on the table, so its early
+  // states would otherwise never appear here. Readings are NOT
+  // repeated: every reading vote already lands as its own 🗳️ row
+  // below. Committee stages and publication are the milestones no
+  // other row reports. No stage is ever dated from b.updated — that
+  // is an OData sync watermark, not a stage date.
+  for(const b of fb){
+    const hist=(CMT&&CMT.bill_committees[String(b.id)])||[];
+    if(hist.length){ const first=[...hist].sort((x,y)=>(x.date||'').localeCompare(y.date||''))[0];
+      pushFeed(first.date,'🏛️',`חוק במעקב נידון בוועדה: ${displayText(b)}`,`${cmtName(first.committee_id)} · ${hist.length} ישיבות במאגר`,`openBillPage('${b.id}')`,`journey:${b.id}:cmt`) }
+    const prep=hist.find(h=>h.status_id===113||(h.status||'').includes('שנייה ושלישית'));
+    if(prep) pushFeed(prep.date,'⚖️',`חוק במעקב בהכנה לקריאה שנייה ושלישית: ${displayText(b)}`,`${cmtName(prep.committee_id)}`,`openBillPage('${b.id}')`,`journey:${b.id}:prep`);
+    if(b.publication_date) pushFeed(b.publication_date,'📕',`חוק במעקב פורסם בספר החוקים: ${displayText(b)}`,`הפך לחוק${b.publication_series?` · ${b.publication_series}`:''}`,`openBillPage('${b.id}')`,`journey:${b.id}:pub`);
+  }
   for(const v of VOTES_ALL){
     if(v.item_id&&fbIds.has(String(v.item_id))){ const b=ALLB_BY_ID[v.item_id]; pushFeed(v.date,'🗳️',`הצבעה על חוק במעקב: ${b?displayText(b):''}`,`${v.for??''}–${v.against??''} · ${RL[v.reading]||v.kind_label||'הצבעת מליאה'}`,`openVote('${v.id}')`,`vote:${v.id}`) }
     if((S.followTopics||[]).length&&v.item_id&&ALLB_BY_ID[v.item_id]){ const ts=(ALLB_BY_ID[v.item_id].topics||[]).filter(t=>(S.followTopics||[]).includes(t)); if(ts.length) pushFeed(v.date,'🏷️',`הצבעה בנושא במעקב (${ts.join(', ')}): ${displayText(ALLB_BY_ID[v.item_id])}`,`${v.for??''}–${v.against??''}`,`openVote('${v.id}')`,`vote:${v.id}`) }
