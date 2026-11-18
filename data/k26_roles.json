@@ -25,6 +25,15 @@
   ],
   "פינדרוס יצחק": [
    {
+    "role": "סגן יושב-ראש הכנסת",
+    "kind": "knesset",
+    "ministry": null,
+    "faction": null,
+    "gov": null,
+    "from": "2026-11-17",
+    "to": null
+   },
+   {
     "role": "יו\"ר סיעה",
     "kind": "faction",
     "ministry": null,
@@ -36,6 +45,15 @@
   ],
   "פורר עודד": [
    {
+    "role": "סגן יושב-ראש הכנסת",
+    "kind": "knesset",
+    "ministry": null,
+    "faction": null,
+    "gov": null,
+    "from": "2026-11-17",
+    "to": null
+   },
+   {
     "role": "יו\"ר סיעה",
     "kind": "faction",
     "ministry": null,
@@ -46,6 +64,15 @@
    }
   ],
   "טאהא ווליד": [
+   {
+    "role": "סגן יושב-ראש הכנסת",
+    "kind": "knesset",
+    "ministry": null,
+    "faction": null,
+    "gov": null,
+    "from": "2026-11-17",
+    "to": null
+   },
    {
     "role": "יו\"ר סיעה",
     "kind": "faction",
@@ -402,6 +429,72 @@
   "כהנא מתן": [
    {
     "role": "יושב–ראש הכנסת",
+    "kind": "knesset",
+    "ministry": null,
+    "faction": null,
+    "gov": null,
+    "from": "2026-11-17",
+    "to": null
+   }
+  ],
+  "ברדוגו יעקב": [
+   {
+    "role": "סגן יושב-ראש הכנסת",
+    "kind": "knesset",
+    "ministry": null,
+    "faction": null,
+    "gov": null,
+    "from": "2026-11-17",
+    "to": null
+   }
+  ],
+  "גינזבורג איתן": [
+   {
+    "role": "סגן יושב-ראש הכנסת",
+    "kind": "knesset",
+    "ministry": null,
+    "faction": null,
+    "gov": null,
+    "from": "2026-11-17",
+    "to": null
+   }
+  ],
+  "טיבי אחמד": [
+   {
+    "role": "סגן יושב-ראש הכנסת",
+    "kind": "knesset",
+    "ministry": null,
+    "faction": null,
+    "gov": null,
+    "from": "2026-11-17",
+    "to": null
+   }
+  ],
+  "פינק יאיא (יאיר)": [
+   {
+    "role": "סגן יושב-ראש הכנסת",
+    "kind": "knesset",
+    "ministry": null,
+    "faction": null,
+    "gov": null,
+    "from": "2026-11-17",
+    "to": null
+   }
+  ],
+  "סון הר מלך לימור": [
+   {
+    "role": "סגנית יושב-ראש הכנסת",
+    "kind": "knesset",
+    "ministry": null,
+    "faction": null,
+    "gov": null,
+    "from": "2026-11-17",
+    "to": null
+   }
+  ],
+  "מלכיאלי מיכאל": [
+   {
+    "role": "סגן יושב-ראש הכנסת",
     "kind": "knesset",
     "ministry": null,
     "faction": null,
