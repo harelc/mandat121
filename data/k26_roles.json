@@ -287,6 +287,15 @@
   ],
   "סער גדעון": [
    {
+    "role": "שר הפנים",
+    "kind": "gov",
+    "ministry": "משרד הפנים",
+    "faction": null,
+    "gov": 37,
+    "from": "2026-11-11",
+    "to": null
+   },
+   {
     "role": "שר החוץ",
     "kind": "gov",
     "ministry": "משרד החוץ",
