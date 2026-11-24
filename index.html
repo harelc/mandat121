@@ -1610,7 +1610,7 @@ function avatar(name,faction,size=48){
   const ph=MKP[name];
   if(ph&&ph.photo_url) return `<div class="avatar" style="width:${size}px;height:${size}px"><img src="${esc(ph.photo_url)}" alt="" loading="lazy" onerror="this.remove()">${''}</div>`;
   const official=OFFICIAL_PHOTOS[name];
-  if(official&&official.file) return `<div class="avatar" style="width:${size}px;height:${size}px"><img src="${esc(official.file)}" alt="" loading="lazy" onerror="this.remove()"></div>`;
+  if(official&&official.file) return `<div class="avatar" style="width:${size}px;height:${size}px"><img src="${esc(dataUrl(official.file))}" alt="" loading="lazy" onerror="this.remove()"></div>`;
   const p=disp(name).split(' '); const ini=(p[0]?.[0]||'')+(p[p.length-1]?.[0]||'');
   return `<div class="avatar" style="width:${size}px;height:${size}px;background:${fcol(faction)};font-size:${Math.round(size*.36)}px">${esc(ini)}</div>`;
 }
@@ -1702,7 +1702,37 @@ function migrateMyVotes(){
    being absent — they show placeholders / omit the section). */
 const _lazyPromises={};
 function _lazyOnce(key,loader){ if(!_lazyPromises[key]) _lazyPromises[key]=Promise.resolve().then(loader).catch(()=>{ delete _lazyPromises[key] }); return _lazyPromises[key] }
-const _fetchJson=url=>fetch(url).then(r=>r.ok?r.json():null).catch(()=>null);
+/* Live Knesset data (K26, events, new protocols/portraits, search shards)
+   lives in the mandat121protocols Cloudflare R2 bucket, versioned by
+   data-manifest.json (PUT last by upload_data.py). Frozen K25 files stay
+   on Netlify; any path present in data-manifest.json is fetched from R2
+   with ?v=<sha16> cache-busting, with automatic fallback to local data/. */
+const R2_SHARD_BASE='https://pub-a65c4e6efb634d8da9873e4f51835a60.r2.dev';
+let _dataManifest=null, _dataManifestP=null;
+const _useLocalData=()=>/^(localhost|127\.0\.0\.1)$/.test(location.hostname)&&!new URLSearchParams(location.search).has('r2');
+function loadDataManifest(){
+  if(_useLocalData()) return Promise.resolve(null);
+  if(!_dataManifestP) _dataManifestP=fetch(R2_SHARD_BASE+'/data-manifest.json',{cache:'no-cache'})
+    .then(r=>r.ok?r.json():null)
+    .then(j=>{ if(j&&j.files&&typeof j.files==='object') _dataManifest=j.files; return _dataManifest })
+    .catch(()=>null);
+  return _dataManifestP;
+}
+function dataUrl(path){
+  const meta=_dataManifest&&_dataManifest[path];
+  const h=Array.isArray(meta)?meta[0]:meta;
+  if(h&&/^[A-Za-z0-9._-]+$/.test(h)) return `${R2_SHARD_BASE}/${path}?v=${h}`;
+  return path;
+}
+async function _fetchData(path){
+  const u=dataUrl(path);
+  try{
+    const r=await fetch(u);
+    if(r.ok||u===path) return r;
+  }catch{}
+  return u===path?null:fetch(path).catch(()=>null);
+}
+const _fetchJson=url=>(url.startsWith('data/')?_fetchData(url):fetch(url).catch(()=>null)).then(r=>r&&r.ok?r.json():null).catch(()=>null);
 const _normKeys=o=>{ const r={}; for(const[k,v]of Object.entries(o||{})) r[normName(k)]=v; return r };
 function ensureAgenda(){ const kn=KN; if(AG_CACHE[kn]){ AGENDA=AG_CACHE[kn]; agRefreshToday(AGENDA); return Promise.resolve(AGENDA) } if(AG_MAIN_LOADING.has(kn)) return Promise.resolve(null); AG_MAIN_LOADING.add(kn);
   return _fetchJson(eraFile(kn,'agenda')).then(j=>{ AG_MAIN_LOADING.delete(kn); if(!j||j.error) return null;
@@ -1868,7 +1898,7 @@ function ensureK25Archive(){
   if(K25_READY) return Promise.resolve(true);
   if(K25_ARCHIVE_PROMISE) return K25_ARCHIVE_PROMISE;
   K25_ARCHIVE_PROMISE=(async()=>{
-    const [cr,abr,avr,vrr]=await Promise.all([fetch('data/committees.json').catch(()=>null),fetch('data/k25_bills.json').catch(()=>null),fetch('data/k25_votes.json').catch(()=>null),fetch('data/k25_vote_results.json').catch(()=>null)]);
+    const [cr,abr,avr,vrr]=await Promise.all([_fetchData('data/committees.json'),_fetchData('data/k25_bills.json'),_fetchData('data/k25_votes.json'),_fetchData('data/k25_vote_results.json')]);
     if(abr&&abr.ok){ ALLB=await abr.json(); ALLB.forEach(b=>ALLB_BY_ID[b.id]=b); MK_INITIATED={}; ALLB.forEach(b=>(b.initiators||[]).forEach(i=>{ i.name=normName(i.name); if(i.initiator) MK_INITIATED[i.name]=(MK_INITIATED[i.name]||0)+1 })) }
     if(avr&&avr.ok){ VOTES_ALL=await avr.json(); VOTES_ALL.forEach(v=>VOTE_BY_ID[v.id]=v) }
     const vr=(vrr&&vrr.ok)?await vrr.json():null; if(vr){ vr.names=(vr.names||[]).map(normName); VOTE_RES=vr }
@@ -1922,7 +1952,8 @@ function ensureK25Archive(){
 async function load(){
   const _loadT0=performance.now();
   const _loadMark=phase=>console.info(`[load] ${phase} ${Math.round(performance.now()-_loadT0)}ms`);
-  if(!TENURE_FETCH) TENURE_FETCH=fetch('data/k25_tenure.json').then(r=>r.ok?r.json():null).catch(()=>null);
+  await loadDataManifest();
+  if(!TENURE_FETCH) TENURE_FETCH=_fetchData('data/k25_tenure.json').then(r=>r&&r.ok?r.json():null).catch(()=>null);
   // Phase 1 proper: only what renderNow26 needs to paint (preview +
   // serving tenure + portraits). Everything else K26 is phase 2 too —
   // the sooner the first paint lands, the sooner the browser drops
@@ -1930,7 +1961,7 @@ async function load(){
   // heavy may start before this paint — the 4.9 MB vote-results fetch
   // used to start here and compete with phase 1 on the same connection,
   // stalling the "טוען את נתוני הכנסת…" screen on a hard refresh.
-  const [pr,kr,t26]=await Promise.all([fetch('data/mk_photos.json').catch(()=>null),fetch('data/k26_preview.json').catch(()=>null),fetch('data/k26_tenure.json').catch(()=>null)]);
+  const [pr,kr,t26]=await Promise.all([_fetchData('data/mk_photos.json'),_fetchData('data/k26_preview.json'),_fetchData('data/k26_tenure.json')]);
   // Name keys are canonicalised (whitespace-collapsed) at ingestion: some
   // builders emit 'גואטה  ששון ששי' / 'דיסטל אטבריאן  גלית' with a double
   // space, others the single-space form. Un-normalised, the same person
@@ -1954,10 +1985,10 @@ async function load(){
   // pages whole within seconds, even on a slow connection.
   // Secondary datasets are NOT fetched here — see the lazy loaders above.
   // Each view pulls what it needs via ensureAgenda()/ensureCmem()/…
-  const [lor,tnr,oph,cor,b26,v26,lo26,c26,cm26,oph26,cor26]=await Promise.all([fetch('data/k25_list_order.json').catch(()=>null),TENURE_FETCH,fetch('data/k25_official_photos.json').catch(()=>null),fetch('data/mk_contacts.json').catch(()=>null),fetch('data/k26_bills.json').catch(()=>null),fetch('data/k26_votes.json').catch(()=>null),fetch('data/k26_list_order.json').catch(()=>null),fetch('data/k26_committees.json').catch(()=>null),fetch('data/k26_committee_members.json').catch(()=>null),fetch('data/k26_official_photos.json').catch(()=>null),fetch('data/k26_contacts.json').catch(()=>null)]);
+  const [lor,tnr,oph,cor,b26,v26,lo26,c26,cm26,oph26,cor26]=await Promise.all([_fetchData('data/k25_list_order.json'),TENURE_FETCH,_fetchData('data/k25_official_photos.json'),_fetchData('data/mk_contacts.json'),_fetchData('data/k26_bills.json'),_fetchData('data/k26_votes.json'),_fetchData('data/k26_list_order.json'),_fetchData('data/k26_committees.json'),_fetchData('data/k26_committee_members.json'),_fetchData('data/k26_official_photos.json'),_fetchData('data/k26_contacts.json')]);
   if(b26&&b26.ok){ K26B=await b26.json(); K26B.forEach(b=>(b.initiators||[]).forEach(i=>i.name=normName(i.name))) }
   if(v26&&v26.ok){ K26V=await v26.json(); K26V.forEach(v=>K26V_BY_ID[String(v.id)]=v) }
-  { const vr26=await fetch('data/k26_vote_results.json').catch(()=>null); if(vr26&&vr26.ok){ const j=await vr26.json(); VOTE_RES26={names:(j.names||[]).map(normName),votes:j.votes||{}} } }
+  { const vr26=await _fetchData('data/k26_vote_results.json'); if(vr26&&vr26.ok){ const j=await vr26.json(); VOTE_RES26={names:(j.names||[]).map(normName),votes:j.votes||{}} } }
   buildIdx26(); // per-MK K26 vote index — MK/faction pages populate from it as data lands
   buildIdx26();
   if(lo26&&lo26.ok){ const lo=await lo26.json(); for(const[k,v]of Object.entries(lo.ranks||{})) if(v.rank) RANK26[normName(k)]=v.rank }
@@ -2657,7 +2688,7 @@ async function toggleProtocol(id){
     // Everything older is parsed on demand by the committee-protocol Netlify
     // function — same trick as the plenum reader, no static storage.
     let doc=null;
-    const r=await fetch(`data/protocols/${id}.json`); if(r.ok) doc=await r.json();
+    const r=await _fetchData(`data/protocols/${id}.json`); if(r&&r.ok) doc=await r.json();
     if(!doc){
       const r2=await fetch(`/.netlify/functions/committee-protocol?id=${encodeURIComponent(id)}&v=2`); // &v= bumps past immutable-cached responses when the parser changes (v2: continuation attribution)
       if(r2.status===404){ box.innerHTML='<p class="muted small">לישיבה זו לא פורסם פרוטוקול במאגר הכנסת.</p>'; return }
@@ -3251,7 +3282,7 @@ function agendaEnsure(){
   for(const m of agendaNeededMonths()){
     if(AGENDA._loaded.has(m)||AGENDA._loading.has(m)||!(AGENDA.months||[]).includes(m)) continue;
     AGENDA._loading.add(m);
-    fetch(`${dir}/${m}.json`).then(r=>r.ok?r.json():null).then(j=>{
+    _fetchJson(`${dir}/${m}.json`).then(j=>{
       if(j){ const pi=new Set((AGENDA.plenum||[]).map(s=>s.id)), ci=new Set((AGENDA.committees||[]).map(s=>s.id));
         (j.plenum||[]).forEach(s=>{ if(!pi.has(s.id)) AGENDA.plenum.push(s) });
         (j.committees||[]).forEach(s=>{ s.docs=s.docs||[]; if(!ci.has(s.id)) AGENDA.committees.push(s) }); }
@@ -4058,8 +4089,8 @@ function pngDoc(kicker,pageUrl,filename,sourceLine){
     }};
   return d;
 }
-async function mkPhotoDataURL(name){ // photo for the MK PNG card: official local file first (same-origin), then the Knesset photo URL; null -> initials disc
-  const cands=[OFFICIAL_PHOTOS[name]?.file, MKP[name]?.photo_url].filter(Boolean);
+async function mkPhotoDataURL(name){ // photo for the MK PNG card: official file first (R2 or same-origin), then the Knesset photo URL; null -> initials disc
+  const cands=[OFFICIAL_PHOTOS[name]?.file?dataUrl(OFFICIAL_PHOTOS[name].file):null, MKP[name]?.photo_url].filter(Boolean);
   for(const u of cands){ try{ const r=await fetch(u); if(!r.ok) continue; const blob=await r.blob(); const du=await new Promise(res=>{ const fr=new FileReader(); fr.onload=()=>res(fr.result); fr.onerror=()=>res(null); fr.readAsDataURL(blob) }); if(du) return du }catch(e){} }
   return null;
 }
@@ -5058,8 +5089,8 @@ const _shardCache={};
    by manifest.json — see upload_search_shards.py) so the indexes don't
    bloat git; the committed data/search_* files are the fallback if the
    bucket is unreachable or has no such shard. Manifest is fetched once
-   per session; a bad version string is never trusted into a URL. */
-const R2_SHARD_BASE='https://pub-a65c4e6efb634d8da9873e4f51835a60.r2.dev';
+   per session; a bad version string is never trusted into a URL.
+   (R2_SHARD_BASE is declared alongside the data-manifest loader above.) */
 let _shardManifestP=null;
 function shardManifest(){
   if(!_shardManifestP) _shardManifestP=fetch(R2_SHARD_BASE+'/manifest.json',{cache:'no-cache'}).then(r=>r.ok?r.json():null).catch(()=>null);

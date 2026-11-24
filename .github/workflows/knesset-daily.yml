@@ -43,8 +43,8 @@ on:
         default: false
 
 permissions:
-  contents: write
-  issues: write # post-push change-summary issue (mentions the owner -> GitHub emails it; no mail secrets needed)
+  contents: read
+  issues: write # post-publish change-summary issue (mentions the owner -> GitHub emails it; no mail secrets needed)
 
 concurrency:
   group: knesset-daily
@@ -60,6 +60,9 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+
+      - name: Pull live data & state from R2
+        run: python3 -u upload_data.py pull --knesset $CURRENT_KNESSET --snapshot-dir /tmp/r2_baseline
 
       - name: Probe Knesset 26 OData
         id: probe
@@ -202,79 +205,55 @@ jobs:
       - name: Build event stream (diff snapshot)
         run: python3 -u build_events.py
 
-      - name: Commit refreshed data
-        id: commit
+      - name: Publish refreshed data to R2
+        id: publish
+        env:
+          R2_ACCESS_KEY_ID: ${{ secrets.R2_ACCESS_KEY_ID }}
+          R2_SECRET_ACCESS_KEY: ${{ secrets.R2_SECRET_ACCESS_KEY }}
+          R2_ENDPOINT: ${{ secrets.R2_ENDPOINT }}
         run: |
-          git config user.name "mandat121-data-bot"
-          git config user.email "actions@github.com"
-          git add data/
-          if git diff --cached --quiet; then
-            echo "No data changes."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          # Every commit to main triggers a Netlify deploy, so don't let
-          # build-timestamp churn (agenda generated_at, contacts/wiki
-          # fetched_at) or re-serialization noise create one: restore
-          # files whose staged diff is semantically empty, and skip the
-          # commit entirely when nothing meaningful remains.
-          python3 meaningful_diff.py
-          if git diff --cached --quiet; then
-            echo "Only timestamps/formatting changed — no commit, no deploy."
-            echo "changed=false" >> "$GITHUB_OUTPUT"
-            exit 0
-          fi
-          git commit -m "data: daily OData refresh ($(date -u +%Y-%m-%d))"
-          # The build takes ~an hour; main can move under us (human pushes).
-          # A bare push then dies non-fast-forward and loses the whole run's
-          # data (happened 2026-11-10, run 42819693977). Rebase our data-only
-          # commit onto the latest main and retry; a rebase *conflict* still
-          # fails loudly — never silently overwrite a human data change with
-          # a build snapshot.
-          for attempt in 1 2 3; do
-            git fetch origin main
-            if ! git rebase origin/main; then
-              git rebase --abort
-              echo "::error::Rebase of the data commit onto latest main conflicted (attempt $attempt) — refusing to force it; tomorrow's run will rebuild on top."
-              exit 1
-            fi
-            if git push origin main; then
-              echo "Pushed on attempt $attempt."
-              echo "changed=true" >> "$GITHUB_OUTPUT"
-              echo "sha=$(git rev-parse HEAD)" >> "$GITHUB_OUTPUT"
-              exit 0
-            fi
-            echo "Push rejected (main moved again), retrying…"
-          done
-          echo "::error::Could not push after 3 attempts — main kept moving."
-          exit 1
+          # Publish live/changing data + builder state directly to Cloudflare R2
+          # (zero git commits to main -> zero Netlify deploy credits burned).
+          # meaningful_diff filtering, JSON validation, and the 2 GB R2 cap guard
+          # all run inside upload_data.py before flipping data-manifest.json.
+          python3 -u upload_data.py push --knesset $CURRENT_KNESSET \
+            --snapshot-dir /tmp/r2_baseline \
+            --changed-out /tmp/r2_changed.json
+          # Also keep the live era's protocol/plenum search shards in sync on R2
+          # (never touches K25 c/p — those stay owned by committee-backfill.yml).
+          python3 -u upload_search_shards.py --corpora "c${CURRENT_KNESSET},p${CURRENT_KNESSET}"
+          python3 - <<'EOF' >> "$GITHUB_OUTPUT"
+          import json
+          from pathlib import Path
+          p = Path("/tmp/r2_changed.json")
+          changed = json.loads(p.read_text(encoding="utf-8")) if p.is_file() else []
+          print(f"changed={str(bool(changed)).lower()}")
+          EOF
 
       # Mail without mail secrets: GitHub emails issue mentions to the
       # owner under their normal notification settings. The issue is
       # closed immediately — it exists only to carry the summary into
       # the inbox and leave a searchable archive. Non-fatal: the data
-      # is already pushed, a notification failure must not fail the run.
-      - name: Notify owner of the data commit (summary issue)
-        if: ${{ steps.commit.outputs.changed == 'true' }}
+      # is already live on R2, a notification failure must not fail the run.
+      - name: Notify owner of the data refresh (summary issue)
+        if: ${{ steps.publish.outputs.changed == 'true' }}
         continue-on-error: true
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          sha="${{ steps.commit.outputs.sha }}"
           {
-            echo "@${{ github.repository_owner }} — \`knesset-daily\` just pushed a data commit to \`main\`."
+            echo "@${{ github.repository_owner }} — \`knesset-daily\` just published refreshed Knesset data to Cloudflare R2 (no Netlify deploy)."
             echo
-            python3 summarize_commit.py "$sha"
+            python3 summarize_commit.py --baseline /tmp/r2_baseline --changed /tmp/r2_changed.json
             echo
-            echo "**Commit:** ${{ github.server_url }}/${{ github.repository }}/commit/$sha"
             echo "**Run:** ${{ github.server_url }}/${{ github.repository }}/actions/runs/${{ github.run_id }}"
             echo
             echo "_Auto-closed: this issue is only an email notification + archive._"
           } > notify-body.md
           # Title carries the headline (e.g. "2 new committee sessions, 1 new
           # bill"), not just the date — it's all the email subject shows.
-          title=$(python3 summarize_commit.py "$sha" --title || echo "data refresh $(git log -1 --format=%cs "$sha") — pushed to main")
+          title=$(python3 summarize_commit.py --baseline /tmp/r2_baseline --changed /tmp/r2_changed.json --title || echo "data refresh $(date -u +%Y-%m-%d) — published to R2")
           url=$(gh issue create --title "$title" --body-file notify-body.md)
           echo "Notification issue: $url"
-          gh issue close "$url" --comment "Data already on main — closing; this issue was the email notification." \
+          gh issue close "$url" --comment "Data already live on R2 — closing; this issue was the email notification." \
             || echo "::warning::Could not auto-close $url — close it manually."

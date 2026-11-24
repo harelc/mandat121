@@ -35,7 +35,8 @@ import json
 import re
 import subprocess
 import sys
-from pathlib import PurePosixPath
+from datetime import datetime, timezone
+from pathlib import Path, PurePosixPath
 
 VOLATILE_KEYS = {"generated_at", "fetched_at", "_meta", "today", "this_week"}
 MAX_HIGHLIGHTS = 15
@@ -158,11 +159,31 @@ def _blob(spec):
 
 
 def _json_at(ref, path):
-    raw = _blob(f"{ref}:{path}")
+    if ref is None:
+        p = Path(path)
+        raw = p.read_bytes() if p.is_file() else None
+    else:
+        raw = _blob(f"{ref}:{path}")
     try:
         return json.loads(raw) if raw else None
     except Exception:
         return None
+
+
+def changed_files_from_baseline(baseline_dir, changed_entries):
+    """Build the same [(status, path, old_b, new_b)] list from a baseline
+    snapshot dir and the live working tree (for R2-only runs with no git commit)."""
+    base = Path(baseline_dir)
+    out = []
+    for status, rel in changed_entries:
+        old_p = base / rel
+        new_p = Path(rel)
+        old_b = old_p.read_bytes() if (status != "A" and old_p.is_file()) else None
+        if old_b is None and status != "A":
+            old_b = _blob(f"HEAD:{rel}")
+        new_b = new_p.read_bytes() if (status != "D" and new_p.is_file()) else None
+        out.append((status, rel, old_b, new_b))
+    return out
 
 
 def _parent(ref):
@@ -502,10 +523,7 @@ def shrink_warnings(files):
     return out
 
 
-def collect(ref):
-    parent, files = changed_files(ref)
-    if parent is None:
-        return None, [], [], []
+def _collect_from(ref, files):
     ev, sess_ids = event_highlights(ref, files)
     highlights = ev + portrait_highlights(ref, files) + plenum_highlights(files) \
         + item_highlights(ref, files, sess_ids)
@@ -515,25 +533,27 @@ def collect(ref):
         if k not in seen:
             seen.add(k)
             uniq.append((kind, text))
-    return files, uniq, shrink_warnings(files), parent
+    return files, uniq, shrink_warnings(files)
+
+
+def collect(ref):
+    parent, files = changed_files(ref)
+    if parent is None:
+        return None, [], [], []
+    files, uniq, warnings = _collect_from(ref, files)
+    return files, uniq, warnings, parent
 
 
 # ---------------------------------------------------------------- output
-def summarize(ref="HEAD"):
-    files, highlights, warnings, parent = collect(ref)
-    subject = _git("log", "-1", "--format=%s", ref).strip()
-    lines = [f"**Commit:** `{ref}` — {subject}", ""]
-    if parent is None:
-        return "\n".join(lines + ["(no parent commit to diff against)"])
-
-    lines += ["## What changed", ""]
+def _format_summary(header, files, highlights, warnings):
+    lines = [header, "", "## What changed", ""]
     if highlights:
         lines += [f"- {t}" for _, t in highlights[:MAX_HIGHLIGHTS]]
         if len(highlights) > MAX_HIGHLIGHTS:
             lines.append(f"- …and {len(highlights) - MAX_HIGHLIGHTS} more (see file table)")
     else:
         named = [friendly_label(p) for _, p, _, _ in files if not is_internal(p)]
-        lines.append("No new bills, votes or sessions in this commit — a contents/metadata "
+        lines.append("No new bills, votes or sessions in this update — a contents/metadata "
                      "refresh of: " + (", ".join(dict.fromkeys(named[:6])) or "internal files") + ".")
     if warnings:
         lines += ["", "### ⚠️ Removals / shrinkage", ""] + warnings[:8]
@@ -560,7 +580,7 @@ def summarize(ref="HEAD"):
         rows.append(f"| {friendly_label(path)} | `{path}` | {status} | {size} | {detail} |")
     for g in groups.values():
         rows.append(f"| {g['label']} | `{g['paths'][0]}` … ({g['n']} file(s)) | M | "
-                    f"{g['delta']:+,} B total | grouped — see commit for individual files |")
+                    f"{g['delta']:+,} B total | grouped — see run logs for individual files |")
 
     lines += ["<details><summary>Technical file table (sizes, grouped shards)</summary>", "",
               "| Layer | File | Change | Size | Detail |", "|---|---|---|---|---|"]
@@ -571,9 +591,7 @@ def summarize(ref="HEAD"):
     return "\n".join(lines)
 
 
-def title_for(ref="HEAD"):
-    date = _git("log", "-1", "--format=%cs", ref).strip()
-    files, highlights, warnings, _ = collect(ref)
+def _format_title(date, files, highlights, warnings):
     counts = {}
     for kind, text in highlights:
         label = {"bill": None, "vote": "new plenum vote(s)", "session": "new committee session(s)",
@@ -591,7 +609,46 @@ def title_for(ref="HEAD"):
     return f"data refresh {date} — {head}"
 
 
+def summarize(ref="HEAD"):
+    files, highlights, warnings, parent = collect(ref)
+    subject = _git("log", "-1", "--format=%s", ref).strip()
+    header = f"**Commit:** `{ref}` — {subject}"
+    if parent is None:
+        return "\n".join([header, "", "(no parent commit to diff against)"])
+    return _format_summary(header, files, highlights, warnings)
+
+
+def title_for(ref="HEAD"):
+    date = _git("log", "-1", "--format=%cs", ref).strip()
+    files, highlights, warnings, _ = collect(ref)
+    return _format_title(date, files, highlights, warnings)
+
+
+def summarize_baseline(baseline_dir, changed_entries):
+    files = changed_files_from_baseline(baseline_dir, changed_entries)
+    files, highlights, warnings = _collect_from(None, files)
+    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return _format_summary(
+        f"**R2 data refresh:** `{date}` (published directly to Cloudflare R2 — no Netlify deploy)",
+        files, highlights, warnings,
+    )
+
+
+def title_for_baseline(baseline_dir, changed_entries):
+    files = changed_files_from_baseline(baseline_dir, changed_entries)
+    files, highlights, warnings = _collect_from(None, files)
+    date = datetime.now(timezone.utc).strftime("%Y-%m-%d")
+    return _format_title(date, files, highlights, warnings)
+
+
 if __name__ == "__main__":
-    args = [a for a in sys.argv[1:] if not a.startswith("--")]
-    ref = args[0] if args else "HEAD"
-    print(title_for(ref) if "--title" in sys.argv else summarize(ref))
+    if "--baseline" in sys.argv:
+        bi = sys.argv.index("--baseline")
+        ci = sys.argv.index("--changed")
+        bdir = sys.argv[bi + 1]
+        entries = json.loads(Path(sys.argv[ci + 1]).read_text(encoding="utf-8"))
+        print(title_for_baseline(bdir, entries) if "--title" in sys.argv else summarize_baseline(bdir, entries))
+    else:
+        args = [a for a in sys.argv[1:] if not a.startswith("--")]
+        ref = args[0] if args else "HEAD"
+        print(title_for(ref) if "--title" in sys.argv else summarize(ref))
