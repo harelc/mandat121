@@ -946,8 +946,21 @@ try{ const raw=JSON.parse(localStorage.getItem(LS)||localStorage.getItem('openkn
   for(const e of ERAS) STORE[e.kn].followBills=[...u]; }
 let S=STORE[CURRENT_KN];
 let prevSeen=S.lastSeen;
-function save(){S.lastSeen=new Date().toISOString().slice(0,10);localStorage.setItem(LS,JSON.stringify(STORE))}
-function setKN(n){ if(KN===n) return; KN=n; S=STORE[String(n)]; prevSeen=S.lastSeen; AGENDA=AG_CACHE[n]||null; agendaAnchor=null; agendaLastBody=''; save(); renderKSwitch(); buildTabs(); if(n===25) ensureK25Archive() }
+/* lastSeen is the "since your last visit" baseline, NOT a save timestamp.
+   It used to be stamped inside save() — i.e. on every star/vote toggle and
+   on every boot sub-phase — so the window silently moved to today while
+   the user was still browsing, and anything the Knesset did later that
+   same day (same date string, `date > prevSeen` false) was lost forever.
+   Now it is stamped exactly once per era per session: at boot for the
+   landing era (in load()), and on an era switch for the era switched to
+   (below) — after prevSeen has captured the old value for this session. */
+function save(){localStorage.setItem(LS,JSON.stringify(STORE))}
+function stampVisit(){ S.lastSeen=new Date().toLocaleDateString('en-CA',{timeZone:'Asia/Jerusalem'}); save() }
+/* Inclusive on purpose: activity carries a date, not a time, so an item
+   dated the day of the previous visit may well have happened after it.
+   Re-showing that one day beats losing it (the old strict `>` did). */
+const inSinceWindow=d=>!!prevSeen&&!!d&&String(d).slice(0,10)>=prevSeen;
+function setKN(n){ if(KN===n) return; KN=n; S=STORE[String(n)]; prevSeen=S.lastSeen; AGENDA=AG_CACHE[n]||null; agendaAnchor=null; agendaLastBody=''; stampVisit(); renderKSwitch(); buildTabs(); if(n===25) ensureK25Archive() }
 /* Does this Knesset's dataset own the entity the current hash points at?
    Used by the manual Knesset switch: staying on a faction/MK/bill page
    across the switch only works if the other era has that same entity. */
@@ -1715,7 +1728,7 @@ function ensureRoles(){ if(ROLES&&ROLES_KN===KN) return Promise.resolve(ROLES); 
 function ensurePresence26(){ if(PRESENCE26) return Promise.resolve(PRESENCE26); return _lazyOnce('presence26',async()=>{ let j=await _fetchJson('/.netlify/functions/presence'); if(!j||!Object.keys(j.days||{}).length) j=await _fetchJson('data/k26_presence.json'); if(j){ adoptPresence26(j); if(KN===CURRENT_KN&&(view==='now'||view==='mks'||view==='mk')) render() } return PRESENCE26 }) } // live state: Netlify Blobs via presence-poll.mjs; the committed file is the frozen GH-era seed/fallback only
 function ensureMkHighlights(){ if(MK_HIGHLIGHTS) return Promise.resolve(MK_HIGHLIGHTS); return _lazyOnce('mkHighlights',async()=>{ const j=await _fetchJson('data/mk_highlights.json'); if(j){ j.by_mk=_normKeys(j.by_mk); MK_HIGHLIGHTS=j; if(view==='mk') renderMkDetail() } return MK_HIGHLIGHTS }) }
 let EVENTS=null; // data/events.json — server-diffed, dated transitions (build_events.py)
-function ensureEvents(){ if(EVENTS) return Promise.resolve(EVENTS); return _lazyOnce('events',async()=>{ const j=await _fetchJson('data/events.json'); if(Array.isArray(j)){ EVENTS=j; if(view==='mine') renderMine() } return EVENTS }) }
+function ensureEvents(){ if(EVENTS) return Promise.resolve(EVENTS); return _lazyOnce('events',async()=>{ const j=await _fetchJson('data/events.json'); if(Array.isArray(j)){ EVENTS=j; if(view==='mine') renderMine(); else if(view==='now') renderNow() } return EVENTS }) }
 /* Scroll to + flash one exact turn (data-turn anchor in protoTurnsHTML).
    Highlight rows promise THIS turn, not just the sitting — anything less
    is a misleading button. Returns false when the turn isn't rendered
@@ -1929,7 +1942,7 @@ async function load(){
   // First paint: the K26 Now page (the default route) is fully drawable
   // now. K25-archive routes render their empty states and are re-rendered
   // by phase 2 below the moment the bulk lands.
-  buildTabs(); renderKSwitch(); save();
+  buildTabs(); renderKSwitch(); stampVisit(); // once per session, after prevSeen was captured at script init — see save()
   appLoaded=true; applyRoute();
   _loadMark('phase1 painted');
   setupGlobalSearch();
@@ -3033,12 +3046,74 @@ const k25CtaHTML=(label,sub)=>`<button class="k25-cta" onclick="switchKnesset(25
    civic framing; only the era's data fills the slots. K26 differences
    (presence history, "what's coming" cards) live BELOW this block, not
    in a differently-shaped hero. */
-function homeHeroHTML({kn,badge,h1,lead,kpis,newVotes,compact}){
+/* "Since your last visit" digest — the rethink of the old pane, which
+   counted ONLY plenum votes. A young Knesset votes rarely (K26: 3 votes,
+   none after 18 Nov), so the pane read "nothing happened" while bills
+   were laid, committees sat and protocols were published. This counts
+   every activity type the site tracks for the era and shows the newest
+   example of each as a link — and when truly nothing is new, it says so
+   next to the LATEST activity that did happen (with its date), instead
+   of static prose. Sources: era votes/bills datasets, the server event
+   stream (ensureEvents — dated new_bill / status_change / new_bill_doc /
+   new_session transitions the client snapshot cannot prove), committee
+   recent_sessions (fallback before the event stream lands) and the
+   plenum/committee protocol indexes (lazy; Now re-renders as they land).
+   new_vote events are NOT counted here — eraVotes is authoritative. */
+function sinceDigestHTML(kn){
+  if(!prevSeen) return '';
+  const byDateDesc=(a,b)=>(b.date||'').localeCompare(a.date||'');
+  const votes=eraVotes(kn).filter(v=>inSinceWindow(v.date)).sort(byDateDesc);
+  const ev=(EVENTS||[]).filter(e=>e.kn===kn&&inSinceWindow(e.date));
+  const newBills=ev.filter(e=>e.type==='new_bill').sort(byDateDesc);
+  const stageCh=ev.filter(e=>e.type==='status_change').sort(byDateDesc);
+  const newDocs=ev.filter(e=>e.type==='new_bill_doc').sort(byDateDesc);
+  const sessEv=ev.filter(e=>e.type==='new_session').sort(byDateDesc);
+  // Before events.json lands (or for eras it doesn't cover), committee
+  // sittings can still be dated from the committees dataset itself.
+  const sessFb=EVENTS?[]:(eraCmt(kn)?.recent_sessions||[]).filter(s=>inSinceWindow((s.start||s.date||''))).map(s=>({date:String(s.start||s.date||'').slice(0,10),committee_id:s.committee_id,committee:s.committee||cmtName(s.committee_id)}));
+  const sessions=sessEv.length?sessEv:sessFb;
+  const pln=plenumEntries(kn).filter(e=>inSinceWindow(e.date)).sort(byDateDesc);
+  const cproto=Object.entries(PROTO_SEARCH).filter(([,e])=>(e.kn||25)===kn&&inSinceWindow(e.date)).map(([sid,e])=>({sid,...e})).sort(byDateDesc);
+  const fbIds=new Set((S.followBills||[]).map(String)), fcIds=new Set((S.followCommittees||[]).map(String));
+  const followedN=ev.filter(e=>fbIds.has(String(e.bill_id))||fcIds.has(String(e.committee_id))).length
+    +votes.filter(v=>v.item_id&&fbIds.has(String(v.item_id))).length;
+  const billGo=id=>`openBillPage('${id}')`;
+  const cats=[
+    votes.length&&{icon:'🗳️',label:'הצבעות מליאה חדשות',n:votes.length,ex:votes[0],exText:votes[0].title||votes[0].desc||'',go:`openVote('${votes[0].id}')`,more:`go('votes')`},
+    newBills.length&&{icon:'📜',label:'הצעות חוק חדשות שהונחו',n:newBills.length,ex:newBills[0],exText:newBills[0].name||'',go:billGo(newBills[0].bill_id),more:`go('bills')`},
+    stageCh.length&&{icon:'🔀',label:'חוקים ששינו שלב',n:stageCh.length,ex:stageCh[0],exText:`${stageCh[0].name||''} — ${stageCh[0].from||'—'} ← ${stageCh[0].to||''}`,go:billGo(stageCh[0].bill_id),more:`go('bills')`},
+    newDocs.length&&{icon:'📄',label:'נוסחים חדשים לחוקים',n:newDocs.length,ex:newDocs[0],exText:newDocs[0].name||'',go:billGo(newDocs[0].bill_id),more:`go('bills')`},
+    sessions.length&&{icon:'🏛️',label:'ישיבות ועדה',n:sessions.length,ex:sessions[0],exText:sessions[0].committee||'',go:`openCommittee('${sessions[0].committee_id}')`,more:`go('committees')`},
+    pln.length&&{icon:'📖',label:'פרוטוקולי מליאה שפורסמו',n:pln.length,ex:pln[0],exText:`ישיבת מליאה מס׳ ${pln[0].number}`,go:`openPlenum('${pln[0].sid}')`,more:`go('protocols')`},
+    cproto.length&&{icon:'📖',label:'פרוטוקולי ועדה שפורסמו',n:cproto.length,ex:cproto[0],exText:cproto[0].committee||'',go:`openSession('${cproto[0].sid}')`,more:`go('protocols')`},
+  ].filter(Boolean);
+  const total=cats.reduce((s,c)=>s+c.n,0);
+  const head=`<h3>הפיקוח שלכם מאז הביקור הקודם <small class="dim">${fmtDate(prevSeen)} · כולל אותו יום</small></h3>`;
+  const mineBtn=`<button class="btn ghost small" style="padding:.15rem .6rem;vertical-align:baseline" onclick="go('mine')">${followCount()?`★ למעקב שלי (${followCount()})`:'למעקב שלי'} ←</button>`;
+  if(!total){
+    // Nothing new: still show the most recent real activity per type, so
+    // the pane proves the site is alive and dates its own silence.
+    const lastV=[...eraVotes(kn)].sort(byDateDesc)[0];
+    const lastS=[...(eraCmt(kn)?.recent_sessions||[])].map(s=>({date:String(s.start||s.date||'').slice(0,10),committee:s.committee,committee_id:s.committee_id})).sort(byDateDesc)[0];
+    const lastP=[...plenumEntries(kn)].sort(byDateDesc)[0];
+    const bits=[
+      lastV&&`<button class="chip" onclick="openVote('${lastV.id}')">🗳️ הצבעה אחרונה: ${fmtDate(lastV.date)}</button>`,
+      lastS&&`<button class="chip" onclick="openCommittee('${lastS.committee_id}')">🏛️ ישיבת ועדה אחרונה: ${fmtDate(lastS.date)}${lastS.committee?` · ${esc(lastS.committee)}`:''}</button>`,
+      lastP&&`<button class="chip" onclick="openPlenum('${lastP.sid}')">📖 פרוטוקול מליאה אחרון: ${fmtDate(lastP.date)}</button>`,
+    ].filter(Boolean);
+    return `<div class="card pad" style="margin-top:.8rem">${head}<p class="small muted" style="margin-top:.3rem;line-height:1.9">לא נרשמה פעילות חדשה מאז — לא הצבעות, לא חוקים חדשים, לא ישיבות ולא פרוטוקולים. ככה נראית פגרה/שבוע שקט; אלה האחרונים שכן קרו:</p>${bits.length?`<div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.45rem">${bits.join('')}</div>`:''}<div style="margin-top:.5rem">${mineBtn}</div></div>`;
+  }
+  return `<div class="card pad" style="margin-top:.8rem">${head}
+  <div style="display:flex;gap:.4rem;flex-wrap:wrap;margin-top:.45rem">${cats.map(c=>`<span class="chip acc">${c.icon} ${c.n.toLocaleString('he-IL')} ${esc(c.label)}</span>`).join('')}${followedN?`<span class="chip" style="background:var(--against-dim);color:var(--against);font-weight:800">★ ${followedN} מהן במעקב שלי</span>`:''}</div>
+  <div class="rows" style="margin:.45rem -.9rem 0">${cats.map(c=>`<div class="row" onclick="${c.go}"><span>${c.icon}</span><span class="flex"><b>${esc(c.label)}</b> · האחרון: ${esc(c.exText)}<br><span class="dim small">${fmtDate(c.ex.date)}</span></span><span class="chip acc">לפתיחה ←</span></div>`).join('')}</div>
+  <div style="margin-top:.5rem;display:flex;gap:.45rem;flex-wrap:wrap"><button class="btn small" onclick="go('mine')">כל מה שזז — במעקב שלי ←</button>${followCount()?'':`<span class="small dim" style="align-self:center">סמנו ☆ על חוק/ח״כ/ועדה — והעדכונים שלהם ירוכזו שם</span>`}</div></div>`;
+}
+function homeHeroHTML({kn,badge,h1,lead,kpis,compact}){
   return `<section class="card hero rise${compact?' compact':''}"><span class="badge ${kn===CURRENT_KN?'k26':''}">${badge}</span>
     <h1 style="margin-top:.4rem">${h1}</h1>
     <p class="clamp" onclick="this.classList.toggle('exp')" title="לחצו להרחבה או לקיפול">${lead}</p>
     ${compact?`<p class="small muted clamp" onclick="this.classList.toggle('exp')" title="לחצו להרחבה או לקיפול" style="line-height:1.9;margin-top:.3rem"><b style="color:var(--text)">איך מפקחים?</b> לכל חוק כמה שאלות בסיסיות: מי יזם ומי שינה · מי הופיע ומי נעדר מהדיונים עליו · מי הצביע איך — ואיך הייתם מצביעים אתם.</p>`:`<div class="card pad" style="margin-top:.8rem;background:var(--surface)"><h3>איך מפקחים? כמה שאלות בסיסיות לכל חוק</h3><p class="small muted" style="line-height:1.9;margin-top:.3rem"><b style="color:var(--text)">מי יזם ומי שינה?</b> — עקבו אחרי מסע החוק והוועדה שדנה בו. <b style="color:var(--text)">מי הופיע ומי נעדר מהדיונים עליו?</b> — בוועדות ובמליאה. <b style="color:var(--text)">מי הצביע איך?</b> — ואיך הייתם מצביעים אתם. כל דף באתר עונה על אחת מהן.</p></div>`}
-    ${prevSeen?`<div class="card pad" style="margin-top:.8rem"><h3>הפיקוח שלכם מאז הביקור הקודם <small class="dim">${fmtDate(prevSeen)}</small></h3><p class="small muted" style="margin-top:.3rem;line-height:1.9">${newVotes?`<b style="color:var(--text)">${newVotes} הצבעות מליאה חדשות</b> התקיימו מאז. פתחו אותן, סמנו איך הייתם מצביעים, ובדקו מי הצביע כמוכם.`:'לא התקיימו הצבעות מליאה חדשות מאז הביקור הקודם — הכנסת לא מצביעה כל יום. בינתיים אפשר לעקוב אחרי מה שכן זז: דיוני הוועדות ופרוטוקולי המליאה, והצעות חוק חדשות שעוד לפני ההצבעה.'} <button class="btn ghost small" style="padding:.15rem .6rem;vertical-align:baseline" onclick="go('mine')">${followCount()?`★ למעקב שלי (${followCount()})`:'למעקב שלי'} ←</button></p></div>`:''}
+    ${sinceDigestHTML(kn)}
     ${kpis}
     <div style="display:flex;gap:.5rem;flex-wrap:wrap"><button class="btn primary" style="margin-top:.9rem" onclick="openIntro()">חדשים כאן? הסבר מצויר בפחות מדקה ▶</button>
     ${!prevSeen&&followCount()?`<button class="btn" style="margin-top:.9rem" onclick="go('mine')">★ המעקב שלי (${followCount()})</button>`:''}</div>
@@ -3071,6 +3146,7 @@ function renderNow26(){
   ensurePlenumTv(); // live plenum TV block (#plenumTvBox); paints itself when the status read lands
   ensureAgenda(); // סדר יום pane (k26_agenda.json) — shows below once OData has published a sitting
   ensurePlenumSearch(); ensureProtoSearch(); // recent-protocols section; re-renders Now when they land
+  ensureEvents(); // since-your-last-visit digest (hero) counts dated transitions from the event stream; re-renders Now when it lands
   const parties=K26?K26.parties.filter(p=>p.seats>0):[];
   const serving=k26ServingSeats();
   const seats=serving||[]; if(!serving&&K26){ const arc=[...K26.parties].sort((a,b)=>partyRank(a.name,26)-partyRank(b.name,26)); for(const p of arc) p.elected.forEach(name=>seats.push({name,faction:p.name,color:p.color,result:0,rank:(p.candidates||[]).indexOf(name)+1})) }
@@ -3083,7 +3159,7 @@ function renderNow26(){
   const legendMap={}; seats.forEach(s=>{ const f=shortF(s.faction); (legendMap[f]??={n:0,color:s.color}); legendMap[f].n++ });
   const legend=Object.entries(legendMap).sort((a,b)=>b[1].n-a[1].n||partyRank(a[0],26)-partyRank(b[0],26));
   $('#app').innerHTML=`
-  ${homeHeroHTML({kn:26,compact:true,badge:'כנסת 26 · הכנסת הנוכחית',h1:'הכנסת ה־26, במעקב אזרחי שוטף.',lead:`<b>המנדט ה־121 נשאר אצלכם</b> — מעקב אזרחי חי אחרי כל חוק, כל הצבעה וכל ח״כ בכנסת ה־26. סמנו איך הייתם מצביעים, וגלו מי מצביע כמוכם.`,kpis:homeKpisHTML({members:seats.length,factions:serving?legend.length:parties.length,bills:K26B.length,votes:K26V.length,detailed:K26V.filter(v=>v.for!=null).length,lastVote:K26V.length?fmtDate([...K26V].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date):''}),newVotes:prevSeen?K26V.filter(v=>(v.date||'')>prevSeen).length:0})}
+  ${homeHeroHTML({kn:26,compact:true,badge:'כנסת 26 · הכנסת הנוכחית',h1:'הכנסת ה־26, במעקב אזרחי שוטף.',lead:`<b>המנדט ה־121 נשאר אצלכם</b> — מעקב אזרחי חי אחרי כל חוק, כל הצבעה וכל ח״כ בכנסת ה־26. סמנו איך הייתם מצביעים, וגלו מי מצביע כמוכם.`,kpis:homeKpisHTML({members:seats.length,factions:serving?legend.length:parties.length,bills:K26B.length,votes:K26V.length,detailed:K26V.filter(v=>v.for!=null).length,lastVote:K26V.length?fmtDate([...K26V].sort((a,b)=>(b.date||'').localeCompare(a.date||''))[0].date):''})})}
   <div id="plenumTvBox"></div>
   ${(AGENDA&&(AGENDA.plenum.length||AGENDA.committees.length))?agendaHTML():''}
   <div class="sec-title">${serving?'מליאת הכנסת ה־26':'המליאה הנכנסת'} <small>${serving?'מי מכהן/ת בפועל — כולל כניסות ויציאות לפי החוק הנורווגי':'רחפו או לחצו על מושב — חלקם כיהנו גם בכנסת 25'}</small></div>
@@ -3317,9 +3393,10 @@ function renderNow(){
   // belongs to the current Knesset (26). On this archive home it rendered
   // the frozen K25 schedule against today's date — an empty, stale month.
   ensurePlenumTv(); // live plenum TV block (#plenumTvBox); paints itself when the status read lands
+  ensurePlenumSearch(); ensureProtoSearch(); ensureEvents(); // since-your-last-visit digest (hero); each re-renders Now when it lands
   const app=$('#app');
   const latest=VOTES_ALL.reduce((mx,v)=>(v.date||'')>mx?(v.date||''):mx,'');
-  const newSince=prevSeen? VOTES_ALL.filter(v=>(v.date||'')>prevSeen) : [];
+  const newSince=VOTES_ALL.filter(v=>inSinceWindow(v.date));
   const months={}; VOTES_ALL.forEach(v=>{const m=(v.date||'').slice(0,7); if(m)months[m]=(months[m]||0)+1});
   // All months of the Knesset, not a trailing window: iterate first→last vote
   // month and fill gaps with 0, so recess/silent months show as gaps.
@@ -3336,7 +3413,7 @@ function renderNow(){
     .sort((a,b)=>partyRank(a.faction,25)-partyRank(b.faction,25)||listRank25(a.name)-listRank25(b.name)||disp(a.name).localeCompare(disp(b.name),'he'));
   const fac25={}; seats25.forEach(s=>{const f=shortF(s.faction); (fac25[f]??={n:0,color:s.color}); fac25[f].n++});
   app.innerHTML=`
-  ${homeHeroHTML({kn:25,compact:true,badge:'כנסת 25 · ארכיון מלא',h1:'הכנסת ה־25, במעקב אזרחי שוטף.',lead:`<b>המנדט ה־121 נשאר אצלכם</b> — מעקב אזרחי חי אחרי כל חוק, כל הצבעה וכל ח״כ בכנסת ה־25. סמנו איך הייתם מצביעים, וגלו מי מצביע כמוכם.`,kpis:homeKpisHTML({members:seats25.length,factions:Object.keys(fac25).length,bills:ALLB.length,votes:VOTES_ALL.length,detailed:Object.keys(VOTE_RES.votes||{}).length,lastVote:fmtDate(latest)}),newVotes:newSince.length})}
+  ${homeHeroHTML({kn:25,compact:true,badge:'כנסת 25 · ארכיון מלא',h1:'הכנסת ה־25, במעקב אזרחי שוטף.',lead:`<b>המנדט ה־121 נשאר אצלכם</b> — מעקב אזרחי חי אחרי כל חוק, כל הצבעה וכל ח״כ בכנסת ה־25. סמנו איך הייתם מצביעים, וגלו מי מצביע כמוכם.`,kpis:homeKpisHTML({members:seats25.length,factions:Object.keys(fac25).length,bills:ALLB.length,votes:VOTES_ALL.length,detailed:Object.keys(VOTE_RES.votes||{}).length,lastVote:fmtDate(latest)})})}
 
   <div id="plenumTvBox"></div>
 
@@ -5769,7 +5846,7 @@ function renderMine(){
   // By-party agreement is grouped per Knesset and never mixed: one group
   // for the current Knesset (K26 runs on voteModel26 the same way).
   const partyGroups=[{kn:KN,rows:fr}];
-  const newSince=prevSeen? eraVotes(KN).filter(v=>(v.date||'')>prevSeen):[];
+  const newSince=eraVotes(KN).filter(v=>inSinceWindow(v.date));
   // Followed bills are grouped by Knesset and never mixed (same rule as
   // partyGroups below): bills are era-specific, unlike followed MKs who
   // are shared across eras. Both groups show in Mine — it's the personal
@@ -5868,7 +5945,7 @@ function renderMine(){
   }
   feed.sort((a,b)=>(b.date||'').localeCompare(a.date||''));
   const feedTop=feed.slice(0,18);
-  const feedNew=prevSeen?feed.filter(e=>(e.date||'')>prevSeen).length:0;
+  const feedNew=feed.filter(e=>inSinceWindow(e.date)).length;
   $('#app').innerHTML=`
   <section class="cc-hero rise"><div style="display:flex;align-items:baseline;gap:.7rem;flex-wrap:wrap"><h2>⭐ מרכז המעקב שלי</h2><span class="small muted">המנדט ה־121 שלך — הצבעות, מעקב ומי מצביע כמוך מבין כל הח״כים · נשמר מקומית בדפדפן זה בלבד</span></div>
   <div class="cc-tiles">
@@ -5882,7 +5959,7 @@ function renderMine(){
   ${(S.followTopics||[]).length?`<div class="chips" style="margin-top:.7rem"><span class="pill-lbl">הנושאים שלי:</span>${S.followTopics.map(t=>`<button class="chip on" onclick="filterTopic('${jsq(t)}');go('votes')">${esc(t)}</button>`).join('')}</div>`:''}
   </section>
   ${feedTop.length?`<div class="card pad rise" style="margin-bottom:.85rem"><h3>🔔 פעילות במעקב שלי ${feedNew?`<span class="chip" style="background:var(--against-dim);color:var(--against);font-weight:800">${feedNew} חדשות מאז הביקור הקודם</span>`:''} <small class="dim">כל מה שהחוקים, הח״כים, הוועדות, הסיעות והנושאים שאתם עוקבים אחריהם עשו — מהחדש לישן</small></h3>
-  <div class="rows" style="margin:.5rem -.9rem 0">${feedTop.map(e=>`<div class="row" onclick="${e.go}"><span style="font-size:1.05rem">${e.icon}</span><span class="flex">${esc(e.title)}<br><span class="dim small">${esc(e.sub||'')}</span></span>${prevSeen&&(e.date||'')>prevSeen?'<span class="chip" style="background:var(--against-dim);color:var(--against);font-weight:800">חדש</span>':''}<span class="dim small">${fmtDate(e.date)}</span></div>`).join('')}</div>
+  <div class="rows" style="margin:.5rem -.9rem 0">${feedTop.map(e=>`<div class="row" onclick="${e.go}"><span style="font-size:1.05rem">${e.icon}</span><span class="flex">${esc(e.title)}<br><span class="dim small">${esc(e.sub||'')}</span></span>${inSinceWindow(e.date)?'<span class="chip" style="background:var(--against-dim);color:var(--against);font-weight:800">חדש</span>':''}<span class="dim small">${fmtDate(e.date)}</span></div>`).join('')}</div>
   ${feed.length>feedTop.length?`<div class="small dim" style="margin-top:.45rem">מוצגות ${feedTop.length} הפעולות האחרונות מתוך ${feed.length} שנמצאו במעקב שלך.</div>`:''}</div>`:followCount()?`<div class="card pad rise" style="margin-bottom:.85rem"><h3>🔔 פעילות במעקב שלי</h3><p class="muted small" style="margin-top:.35rem">עוד לא נרשמה פעילות לישויות שבמעקב שלך במאגר הנטען — פעילות תופיע כאן כשהחוקים יתעדכנו, יתקיימו הצבעות וישיבות.</p></div>`:''}
   ${prevSeen&&newSince.length?`<div class="card pad rise" style="margin-bottom:.85rem"><b>מאז הביקור הקודם (${fmtDate(prevSeen)}):</b> <span class="muted">${newSince.length} הצבעות חדשות במליאה.</span> <button class="btn" style="margin-inline-start:.5rem" onclick="go('now')">לראות ←</button></div>`:''}
   <div class="grid c2">
