@@ -254,8 +254,10 @@ def main():
         return 1
     old_ok = True
     try:
-        req = urllib.request.Request(PUBLIC_BASE + "/manifest.json",
-                                     headers={"Cache-Control": "no-cache"})
+        req = urllib.request.Request(
+            PUBLIC_BASE + "/manifest.json",
+            headers={"Cache-Control": "no-cache", "User-Agent": "Mozilla/5.0 mandat121-sync"},
+        )
         with urllib.request.urlopen(req, timeout=30) as r:
             old = json.loads(r.read())
     except Exception:

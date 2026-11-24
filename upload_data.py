@@ -97,7 +97,10 @@ def fetch_public(key: str, *, no_cache: bool = False):
     """GET a public object from R2 with retries on 5xx/network errors.
     Returns bytes, or None on 404."""
     url = f"{PUBLIC_BASE}/{key}"
-    headers = {"Cache-Control": "no-cache"} if no_cache else {}
+    # Cloudflare r2.dev returns 403 to Python's default urllib User-Agent.
+    headers = {"User-Agent": "Mozilla/5.0 mandat121-sync"}
+    if no_cache:
+        headers["Cache-Control"] = "no-cache"
     for attempt in range(4):
         req = urllib.request.Request(url, headers=headers)
         try:
