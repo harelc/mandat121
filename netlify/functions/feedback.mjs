@@ -5,7 +5,9 @@ import { getStore } from "@netlify/blobs";
 //   POST {type,text,name?,consent?,uid?,hp?}      -> submit (always "pending")
 //   GET                                            -> approved testimonials only (public wall)
 //   GET  ?data=1  + header x-hit-token             -> all submissions (owner, token-gated)
-//   POST {action:"approve"|"reject", id} + token   -> moderate one submission
+//   POST {action:"approve"|"reject"|"handled"|"pending", id} + token
+//        -> moderate one submission (approve/reject publish-gate testimonials;
+//           handled/pending is bookkeeping for bugs/ideas/corrections)
 //
 // Privacy (mirrors hit.mjs / stars.mjs): no accounts, no cookies, no raw
 // IPs stored. The optional visitor uid is stored only as a salted hash.
@@ -86,13 +88,13 @@ export default async function handler(request) {
   if (body && body.action) {
     if (!authorized(request)) return new Response("forbidden", { status: 403, headers: { "Cache-Control": "no-store" } });
     const { action, id } = body;
-    if (!["approve", "reject", "pending"].includes(action) || typeof id !== "string" || !ID_RE.test(id)) {
+    if (!["approve", "reject", "pending", "handled"].includes(action) || typeof id !== "string" || !ID_RE.test(id)) {
       return new Response("bad request", { status: 400 });
     }
     const key = `f:${id}`;
     const d = await store.get(key, { type: "json" }).catch(() => null);
     if (!d) return new Response("not found", { status: 404 });
-    d.status = action === "approve" ? "approved" : action === "reject" ? "rejected" : "pending";
+    d.status = { approve: "approved", reject: "rejected", handled: "handled", pending: "pending" }[action];
     await store.setJSON(key, d);
     return Response.json({ id, status: d.status }, { headers: { "Cache-Control": "no-store" } });
   }
