@@ -56,5 +56,35 @@ class IsShrinkTest(unittest.TestCase):
         self.assertFalse(mod.is_shrink(self.OLD, 2, 2000))
 
 
+class ShardsToUploadTest(unittest.TestCase):
+    FILES = {"aa.json": "h1", "ab.json": "h2-new", "ac.json": "h3"}
+
+    def test_version_change_uploads_every_shard(self):
+        # New prefix is empty in the bucket — unchanged shards included,
+        # or the manifest flip + stale-generation cleanup orphans them.
+        old = {"version": "v1", "shards": {"aa.json": ["h1", 10], "ab.json": ["h2", 10]}}
+        self.assertEqual(
+            mod.shards_to_upload(self.FILES, old, "v2"),
+            ["aa.json", "ab.json", "ac.json"],
+        )
+
+    def test_no_bucket_entry_uploads_every_shard(self):
+        self.assertEqual(
+            mod.shards_to_upload(self.FILES, None, "v1"),
+            ["aa.json", "ab.json", "ac.json"],
+        )
+        self.assertEqual(
+            mod.shards_to_upload(self.FILES, {}, "v1"),
+            ["aa.json", "ab.json", "ac.json"],
+        )
+
+    def test_same_version_uploads_only_changed(self):
+        old = {"version": "v1", "shards": {"aa.json": ["h1", 10], "ab.json": ["h2", 10]}}
+        self.assertEqual(
+            mod.shards_to_upload(self.FILES, old, "v1"),
+            ["ab.json", "ac.json"],
+        )
+
+
 if __name__ == "__main__":
     unittest.main()

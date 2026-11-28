@@ -187,6 +187,28 @@ def parse_selection(argv, known):
     return selected, force
 
 
+def shards_to_upload(files, old_entry, version):
+    """Shard filenames that must be PUT under shards/<version>/.
+
+    A version change creates a brand-new prefix: objects under the old
+    prefix do not carry over, so EVERY shard must be uploaded — uploading
+    only hash-changed shards and then deleting the stale generation left
+    the manifest pointing at 404s for every unchanged shard (2026-11-27:
+    120/571 p26 + 126/383 c26 shards missing, knesset-daily pull failing).
+    Only when the version is unchanged (same prefix already in the bucket)
+    is the hash-diff against the old manifest sufficient.
+    """
+    old = old_entry or {}
+    if old.get("version") != version:
+        return sorted(files)
+    shards = old.get("shards") or {}
+
+    def old_hash(meta):
+        return meta[0] if isinstance(meta, list) else meta
+
+    return [n for n, h in files.items() if old_hash(shards.get(n)) != h]
+
+
 def is_shrink(old_entry, n_files, total_bytes):
     """True if a local corpus would repoint the bucket at less data
     than it already serves for that corpus."""
@@ -296,10 +318,7 @@ def main():
             continue
         manifest["corpora"][corpus] = {"version": version, "shards": {
             n: [h, (d / n).stat().st_size] for n, h in files.items()}}
-        old_shards = old_c.get("shards") or {}
-        def old_hash(meta):
-            return meta[0] if isinstance(meta, list) else meta
-        changed = [n for n, h in files.items() if old_hash(old_shards.get(n)) != h]
+        changed = shards_to_upload(files, old_c, version)
         print(f"search_{corpus}: version {version}, {len(files)} shards, "
               f"{len(changed)} to upload")
         for n in changed:
